@@ -12,7 +12,7 @@
         "josegonzalez/dotenv": "^4.0",
         "mobiledetect/mobiledetectlib": "^4.8.03",
         "phpoffice/phpspreadsheet": "5.9",
-        "twbs/bootstrap": "5.3"
+        "twbs/bootstrap": "5.3.8"
     },
     "require-dev": {
         "cakephp/bake": "^3.6",

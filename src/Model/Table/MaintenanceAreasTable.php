@@ -16,6 +16,7 @@ class MaintenanceAreasTable extends Table
         'USINAG' => 'Usinagem',
         'INSTRU' => 'Instrumentação',
         'OPERAC' => 'Operação',
+        'TERCEI' => 'Terceirizada',
     ];
 
     /** Configures the maintenance areas repository. */

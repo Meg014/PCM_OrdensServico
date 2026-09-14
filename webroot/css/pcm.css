@@ -60,8 +60,8 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-updated { color: var(--pcm-muted); margin: .7rem 0 0; }
 .pcm-kpi-card {
     align-items: center; background: #fff; border-left: 5px solid; border-radius: .8rem;
-    box-shadow: 0 5px 18px rgba(28, 43, 64, .08); display: flex; justify-content: space-between;
-    min-height: 138px; overflow: hidden; padding: 1.45rem 1.6rem; transition: box-shadow 160ms ease, transform 160ms ease;
+    box-shadow: 0 5px 18px rgba(28, 43, 64, .08); display: flex; justify-content: center; text-align: center;
+    min-height: 112px; overflow: hidden; padding: .9rem 1.2rem; transition: box-shadow 160ms ease, transform 160ms ease;
 }
 .pcm-kpi-card:hover { box-shadow: 0 8px 24px rgba(28, 43, 64, .12); transform: translateY(-2px); }
 .pcm-kpi-label {
@@ -70,7 +70,6 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 }
 .pcm-kpi-value { color: var(--pcm-text); font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 700; line-height: 1; margin: 0; }
 .pcm-kpi-delta { color: var(--pcm-muted); font-size: .78rem; margin: .65rem 0 0; }
-.pcm-kpi-icon { color: #dbe0e7; font-size: 3rem; font-weight: 700; line-height: 1; margin-left: 1rem; }
 .pcm-kpi-total { border-color: #2f80ed; }
 .pcm-kpi-progress { border-color: #24527a; }
 .pcm-kpi-completed { border-color: #27ae60; }
@@ -319,11 +318,10 @@ code { color: var(--text-body); }
 }
 
 /* General TV cards and dedicated presentation view. */
-.pcm-kpi-grid-large .pcm-kpi-card { min-height: clamp(170px, 19vw, 250px); padding: clamp(1.5rem, 3vw, 2.6rem); }
+.pcm-kpi-grid-large .pcm-kpi-card { min-height: 150px; padding: .9rem 1.2rem; }
 .pcm-kpi-grid-large .pcm-kpi-label { font-size: clamp(1.05rem, 1.8vw, 1.7rem); letter-spacing: .06em; }
 .pcm-kpi-grid-large .pcm-kpi-value { font-size: clamp(3rem, 7vw, 6.5rem); }
-.pcm-kpi-grid-large .pcm-kpi-icon { font-size: clamp(3.5rem, 7vw, 6rem); }
-.pcm-maintenance-type-cards { margin-top: 1.25rem; }
+.pcm-maintenance-type-cards { margin-top: .5rem; }
 .pcm-maintenance-type-card {
     align-items: center; background: var(--bg-surface); border: 1px solid var(--border-primary);
     border-left: 4px solid var(--border-secondary); border-radius: .75rem; box-shadow: var(--shadow);
@@ -339,54 +337,55 @@ code { color: var(--text-body); }
 .pcm-presentation-mode .pcm-main { min-height: 100vh; padding: 0; }
 .pcm-presentation-mode .pcm-main > .container-xl { max-width: none; padding: 0; }
 .pcm-presentation {
-    display: flex; flex-direction: column; gap: clamp(1.5rem, 3vh, 3rem); min-height: 100vh;
-    padding: clamp(1.25rem, 3vw, 3.5rem);
+    display: grid; gap: 1rem; min-height: 100svh; padding: 1rem;
 }
-.pcm-presentation-header { align-items: flex-start; display: flex; gap: 2rem; justify-content: space-between; }
-.pcm-presentation-header h1 { font-size: clamp(2rem, 4.5vw, 5rem); font-weight: 750; margin: 0; }
-.pcm-presentation-cards { display: grid; flex: 1; gap: clamp(1.25rem, 3vw, 3rem); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pcm-presentation-header { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
+.pcm-presentation-header h1 { font-size: clamp(1.8rem, 3vw, 3.5rem); font-weight: 750; margin: 0; }
+.pcm-presentation-header .pcm-updated { font-size: clamp(1rem, 1.3vw, 1.5rem); margin: .25rem 0 0; }
+.pcm-presentation-cards { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pcm-presentation-card {
     align-items: center; background: var(--bg-surface); border: 1px solid var(--border-primary);
-    border-left: clamp(6px, .7vw, 12px) solid; border-radius: 1rem; box-shadow: var(--shadow);
-    display: flex; flex-direction: column; justify-content: center; min-height: 42vh; padding: clamp(1.5rem, 4vw, 4rem);
+    border-left: 6px solid; border-radius: 1rem; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: .75rem 1rem;
     text-align: center;
 }
 .pcm-presentation-open { border-left-color: #2f80ed; }
 .pcm-presentation-completed { border-left-color: #27ae60; }
 .pcm-presentation-card p {
-    color: var(--text-muted); font-size: clamp(1.35rem, 2.8vw, 3rem); font-weight: 750;
-    letter-spacing: .075em; margin: 0 0 clamp(1rem, 3vh, 2.5rem);
+    color: var(--text-muted); font-size: clamp(1.15rem, 1.8vw, 2.2rem); font-weight: 750;
+    letter-spacing: .025em; margin: 0 0 .5rem;
 }
-.pcm-presentation-card strong { color: var(--text-title); font-size: clamp(5rem, 13vw, 14rem); line-height: .9; }
-.pcm-presentation-type-cards { display: grid; gap: clamp(1rem, 2vw, 2rem); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pcm-presentation-card strong { color: var(--text-title); font-size: clamp(4rem, 10vh, 8rem); line-height: 1; font-variant-numeric: tabular-nums; }
+.pcm-presentation-type-cards { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pcm-presentation-type-cards article {
     align-items: center; background: var(--bg-surface); border: 1px solid var(--border-primary);
-    border-radius: .85rem; box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr auto;
-    min-height: clamp(120px, 17vh, 190px); padding: clamp(1rem, 2vw, 2rem);
+    border-radius: .85rem; box-shadow: var(--shadow); display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: .25rem .75rem; padding: .75rem 1rem; min-width: 0;
 }
-.pcm-presentation-type-cards p { color: var(--text-title); font-size: clamp(1rem, 1.8vw, 2rem); font-weight: 750; margin: 0; }
-.pcm-presentation-type-cards small { color: var(--text-muted); font-size: clamp(.7rem, 1vw, .95rem); }
-.pcm-presentation-type-cards strong { color: var(--text-title); font-size: clamp(2.8rem, 6vw, 6rem); grid-column: 2; grid-row: 1 / span 2; }
-.pcm-presentation-footer { color: var(--text-muted); display: flex; font-size: clamp(.85rem, 1.2vw, 1.1rem); justify-content: space-between; }
+.pcm-presentation-type-cards p { color: var(--text-title); font-size: clamp(1rem, 1.35vw, 1.7rem); font-weight: 750; line-height: 1.2; margin: 0; }
+.pcm-presentation-type-cards small { color: var(--text-muted); font-size: clamp(.8rem, 1vw, 1.1rem); }
+.pcm-presentation-type-cards strong { color: var(--text-title); font-size: clamp(2.5rem, 5.5vh, 4.5rem); line-height: 1; grid-column: 2; grid-row: 1 / span 2; font-variant-numeric: tabular-nums; }
+.pcm-presentation-footer { color: var(--text-muted); display: flex; gap: .5rem 1rem; flex-wrap: wrap; font-size: clamp(.85rem, 1.1vw, 1.2rem); justify-content: space-between; }
 .pcm-presentation-footer strong { color: var(--text-body); }
-@media (max-width: 767.98px) {
-    .pcm-presentation-header { flex-direction: column; gap: 1rem; }
-    .pcm-presentation-cards { grid-template-columns: 1fr; }
-    .pcm-presentation-card { min-height: 30vh; }
-    .pcm-presentation-card strong { font-size: clamp(4rem, 24vw, 8rem); }
-    .pcm-presentation-type-cards { grid-template-columns: 1fr; }
-}
-
-/* Eight TV indicators remain visible together on landscape screens. */
-@media (min-width: 768px) {
-    .pcm-presentation { gap: 2vh; padding: 2vh 2vw; }
-    .pcm-presentation-header h1 { font-size: clamp(1.8rem, 3.3vw, 3.5rem); }
-    .pcm-presentation-card { min-height: 27vh; padding: 2vh 1vw; }
-    .pcm-presentation-card strong { font-size: clamp(4rem, 9vh, 9rem); }
-    .pcm-presentation-card p { font-size: clamp(1.2rem, 2vw, 2.2rem); margin-bottom: 2vh; }
-    .pcm-presentation-type-cards article { min-height: 14vh; padding: 1.4vh 1vw; gap: .6vw; }
-    .pcm-presentation-type-cards p { font-size: clamp(.9rem, 1.3vw, 1.6rem); }
-    .pcm-presentation-type-cards strong { font-size: clamp(2rem, 5vh, 5rem); }
-}
 .pcm-service-card { height: 100%; }
 .pcm-service-card:hover, .pcm-service-card:focus-visible { border-color: var(--text-title); }
+.pcm-operational-notice { color: var(--text-title); font-weight: 700; font-size: clamp(.9rem, 1.5vw, 1.5rem); margin: .4rem 0; }
+
+/* Reserve one viewport for the header, 2x2 KPIs, two summary rows and footer.
+   Content remains visible: no overflow clipping or hidden indicators. */
+@media (min-width: 1024px) and (min-height: 600px) and (orientation: landscape) {
+    .pcm-presentation {
+        height: 100vh; height: 100svh; min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr) minmax(100px, 13vh) minmax(100px, 13vh) auto;
+        gap: clamp(.6rem, 1.4vh, 1rem); padding: clamp(.75rem, 1.6vh, 1.25rem) 1.5vw;
+    }
+    .pcm-presentation-cards { grid-template-rows: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .pcm-presentation-card { padding: .5rem .75rem; }
+}
+@media (max-width: 767.98px) {
+    .pcm-presentation { min-height: 100svh; }
+    .pcm-presentation-header { flex-direction: column; }
+    .pcm-presentation-cards, .pcm-presentation-type-cards { grid-template-columns: 1fr; }
+    .pcm-presentation-card { padding: 1rem; }
+    .pcm-presentation-card strong { font-size: clamp(3.5rem, 18vw, 6rem); }
+}

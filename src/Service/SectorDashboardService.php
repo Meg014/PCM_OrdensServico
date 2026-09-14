@@ -7,8 +7,7 @@ use Cake\ORM\Query\SelectQuery;
 
 final class SectorDashboardService
 {
-    public const STATUSES = [WorkOrderStatusResolver::OPEN, WorkOrderStatusResolver::COMPLETED,
-        WorkOrderStatusResolver::CANCELLED];
+    public const STATUSES = [WorkOrderStatusResolver::OPEN, WorkOrderStatusResolver::COMPLETED];
     public const SORT_FIELDS = ['source_order_number', 'equipment_code', 'equipment_name', 'service_code',
         'service_name', 'cost_center_code', 'maintenance_type', 'source_situation', 'finished_raw',
         'general_actual_start', 'treated_status'];
@@ -24,6 +23,15 @@ final class SectorDashboardService
         $limits = ['equipment' => 100, 'service' => 30, 'service_name' => 255, 'cost_center' => 30,
             'maintenance_type' => 30, 'area' => 30, 'q' => 100];
         $filters = [];
+        if (is_array($query['within'] ?? null)) {
+            $filters['within'] = array_values(array_intersect(array_keys(PcmIndicatorService::DRILLDOWNS), array_filter($query['within'], 'is_string')));
+        }
+        if (is_string($query['indicator'] ?? null) && isset(PcmIndicatorService::DRILLDOWNS[$query['indicator']])) {
+            $filters['indicator'] = $query['indicator'];
+        }
+        if (in_array($query['season'] ?? null, ['safra', 'offseason'], true)) {
+            $filters['season'] = $query['season'];
+        }
         if (isset($query['status']) && in_array($query['status'], self::STATUSES, true)) {
             $filters['status'] = $query['status'];
         }
@@ -46,7 +54,7 @@ final class SectorDashboardService
         return $filters;
     }
 
-    /** Builds a scoped query; audit lists retain cancelled OS. */
+    /** Builds a scoped query shared by operational lists and aggregates. */
     private function query(?int $areaId, array $filters = [], bool $operational = false): ?SelectQuery
     {
         $query = $this->current->query();
@@ -112,8 +120,8 @@ final class SectorDashboardService
             return [];
         }
         $query = clone $base;
-        $rows = $query->select(['dimension_code' => $code, 'dimension_label' => $label,
-            'quantity' => $query->func()->count('*')])->groupBy(array_unique([$code, $label]))
+        $rows = $query->select(['dimension_code' => $code, 'dimension_label' => $query->func()->min($label),
+            'quantity' => $query->func()->count('*')])->groupBy($code)
             ->orderBy(['quantity' => 'DESC', 'dimension_label' => 'ASC'])->limit(10)->disableHydration();
         $result = [];
         foreach ($rows as $row) {
@@ -164,7 +172,7 @@ final class SectorDashboardService
         return array_values($summary);
     }
 
-    /** Lists distinct filter options from the latest successful import, including audit rows. */
+    /** Lists distinct filter options from the current operational universe. */
     private function options(?int $areaId): array
     {
         $map = ['equipment' => ['equipment_code', 'equipment_name'], 'service' => ['service_code', 'service_name'],

@@ -16,8 +16,6 @@
     const nodes = {
         title: root.querySelector('[data-presentation-title]'),
         updated: root.querySelector('[data-presentation-updated]'),
-        open: root.querySelector('[data-presentation-open]'),
-        completed: root.querySelector('[data-presentation-completed]'),
         preventive: root.querySelector('[data-presentation-preventive]'),
         corrective: root.querySelector('[data-presentation-corrective]'),
         improvement: root.querySelector('[data-presentation-improvement]'),
@@ -27,6 +25,9 @@
         position: root.querySelector('[data-presentation-position]'),
         countdown: root.querySelector('[data-presentation-countdown]'),
     };
+    for (const key of ['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed']) {
+        nodes[key] = root.querySelector(`[data-presentation-${key}]`);
+    }
     const number = new Intl.NumberFormat('pt-BR');
 
     const updatedLabel = (isoDate) => {
@@ -43,12 +44,10 @@
         currentIndex %= screens.length;
         const screen = screens[currentIndex];
         nodes.title.textContent = screen.title;
-        nodes.open.textContent = number.format(screen.open);
-        nodes.completed.textContent = number.format(screen.completed);
         nodes.preventive.textContent = number.format(screen.preventive);
         nodes.corrective.textContent = number.format(screen.corrective);
         nodes.improvement.textContent = number.format(screen.improvement);
-        for (const key of ['emergency', 'scheduled', 'offseason']) {
+        for (const key of ['emergency', 'scheduled', 'offseason', 'safra_open', 'safra_completed', 'offseason_open', 'offseason_completed']) {
             nodes[key].textContent = number.format(screen[key] ?? 0);
         }
         nodes.position.textContent = `Tela ${currentIndex + 1} de ${screens.length}`;

@@ -52,7 +52,7 @@ final class CurrentPortfolioReplacementTest extends TestCase
         self::connection()->insert('work_order_snapshots', [
             'work_order_id' => $workOrderId,
             'report_import_id' => $importId,
-            'report_date' => $date,
+            'report_date' => $date, 'maintenance_planned_start' => $date,
             'branch_code' => '1',
             'source_order_number' => (string)$row,
             'finished_raw' => 'Não',

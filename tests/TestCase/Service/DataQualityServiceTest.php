@@ -68,7 +68,7 @@ final class DataQualityServiceTest extends TestCase
     public function testSnapshotWithoutInconsistenciesReturnsZeros(): void
     {
         $summary = (new DataQualityService())->summary();
-        $this->assertSame(575, $summary['total']);
+        $this->assertSame(529, $summary['total']);
         foreach ($summary['indicators'] as $indicator) {
             $this->assertSame(0, $indicator['count']);
             $this->assertSame(0.0, $indicator['percentage']);

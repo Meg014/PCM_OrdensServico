@@ -71,7 +71,7 @@ final class CurrentSnapshotService
         if ($import === null) {
             return null;
         }
-        $query = $this->snapshots->find('forImport', reportImportId: (int)$import->id);
+        $query = $this->snapshots->find('forImport', reportImportId: (int)$import->id)->find('operational');
         if ($areaCode !== null) {
             $query->innerJoinWith(
                 'MaintenanceAreas',
@@ -122,7 +122,7 @@ final class CurrentSnapshotService
             return null;
         }
 
-        return $this->snapshots->find()
+        return $this->query()
             ->contain([
                 'WorkOrders',
                 'ReportImports',

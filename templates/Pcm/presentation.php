@@ -16,8 +16,7 @@ $firstScreen = $payload['screens'][0];
 >
     <header class="pcm-presentation-header">
         <div>
-            <p class="pcm-eyebrow">MODO APRESENTAÇÃO</p>
-            <h1 data-presentation-title><?= h($firstScreen['title']) ?></h1>
+            <h1 data-presentation-title><?= h($firstScreen['title']) ?></h1><?= $this->element("pcm_operational_notice") ?>
             <p class="pcm-updated" data-presentation-updated>
                 <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
             </p>
@@ -26,14 +25,13 @@ $firstScreen = $payload['screens'][0];
     </header>
 
     <div class="pcm-presentation-cards" aria-live="polite">
-        <article class="pcm-presentation-card pcm-presentation-open">
-            <p>OS EM ABERTO</p>
-            <strong data-presentation-open><?= number_format((int)$firstScreen['open'], 0, ',', '.') ?></strong>
+        <?php foreach (['safra' => 'SAFRA', 'offseason' => 'ENTRESSAFRA'] as $season => $label): ?>
+        <?php foreach (['open' => 'OS EM ABERTO', 'completed' => 'OS FECHADAS'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
+        <article class="pcm-presentation-card pcm-presentation-<?= h($status) ?>">
+            <p><?= h($label . ' — ' . $statusLabel) ?></p>
+            <strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong>
         </article>
-        <article class="pcm-presentation-card pcm-presentation-completed">
-            <p>OS FECHADAS</p>
-            <strong data-presentation-completed><?= number_format((int)$firstScreen['completed'], 0, ',', '.') ?></strong>
-        </article>
+        <?php endforeach; endforeach; ?>
     </div>
 
     <div class="pcm-presentation-type-cards" aria-label="Tipos de manutenção das OS em aberto">

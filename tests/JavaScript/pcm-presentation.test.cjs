@@ -7,7 +7,7 @@ const nodes = new Map();
 const timers = [];
 const screen = (key, emergency, scheduled, offseason) => ({
     key, title: key, open: 10, completed: 20, preventive: 1, corrective: 8, improvement: 1,
-    emergency, scheduled, offseason,
+    emergency, scheduled, offseason, safra_open: 10 - offseason, safra_completed: 18, offseason_open: offseason, offseason_completed: 2,
 });
 const payload = {updated_at: null, screens: [screen('Geral', 2, 3, 4), screen('Setor', 5, 6, 7)]};
 const root = {
@@ -31,12 +31,18 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../webroot/js/pcm-pr
     document, window, Intl, fetch: async () => ({ok: true, json: async () => payload}),
 });
 const text = (key) => nodes.get(`[data-presentation-${key}]`).textContent;
+assert.equal(text('safra_open'), '6');
+assert.equal(text('safra_completed'), '18');
+assert.equal(text('offseason_open'), '4');
+assert.equal(text('offseason_completed'), '2');
 assert.equal(text('emergency'), '2');
 assert.equal(text('scheduled'), '3');
 assert.equal(text('offseason'), '4');
 const rotation = timers.find((timer) => timer.milliseconds === 1000);
 for (let second = 0; second < 15; second++) rotation.callback();
 assert.equal(text('title'), 'Setor');
+assert.equal(text('safra_open'), '3');
+assert.equal(text('offseason_open'), '7');
 assert.equal(text('emergency'), '5');
 assert.equal(text('scheduled'), '6');
 assert.equal(text('offseason'), '7');

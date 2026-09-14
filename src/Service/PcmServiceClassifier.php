@@ -73,7 +73,7 @@ final class PcmServiceClassifier
                 $row['service_code'],
                 $row['service_name'],
             );
-            if ($resolved === $classification) {
+            if ($resolved === $classification || ($classification === 'SAFRA' && $resolved !== 'ENTRESSAFRA')) {
                 $matches[] = [
                     ($row['maintenance_type'] === null ? 'maintenance_type IS' : 'maintenance_type')
                         => $row['maintenance_type'],

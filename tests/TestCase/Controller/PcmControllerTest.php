@@ -70,7 +70,7 @@ final class PcmControllerTest extends TestCase
         $this->get('/pcm/setor/MECANI');
         $this->assertResponseOk();
         $this->assertResponseContains('/pcm/setor/MECANI?');
-        $this->assertResponseContains('classification=EMERGENCIAL');
+        $this->assertResponseContains('indicator=emergency');
         $this->assertResponseContains('Resumo por serviço');
     }
 
@@ -154,7 +154,7 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseContains('Mecânica');
         $this->assertResponseContains('375');
         $this->assertResponseNotContains('OS Canceladas');
-        $this->assertResponseContains('Canceladas — auditoria');
+        $this->assertResponseNotContains('Canceladas — auditoria');
         $this->assertResponseContains('Preventivas');
         $this->assertResponseContains('Corretivas');
         $this->assertResponseContains('Melhorias');

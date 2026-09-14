@@ -92,7 +92,7 @@ final class DataQualityService
 
     private function baseQuery(int $importId): SelectQuery
     {
-        return $this->snapshots->find()->where(['WorkOrderSnapshots.report_import_id' => $importId]);
+        return $this->snapshots->find('operational')->where(['WorkOrderSnapshots.report_import_id' => $importId]);
     }
 
     private function applyRule(SelectQuery $query, string $type): SelectQuery

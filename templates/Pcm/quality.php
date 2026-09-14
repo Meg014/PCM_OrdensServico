@@ -4,9 +4,9 @@ $this->assign('title', 'Qualidade dos dados');
 <header class="pcm-page-header">
     <div>
         <p class="pcm-eyebrow">PCM | QUALIDADE DOS DADOS</p>
-        <h1><?= h($definition['label']) ?></h1>
+        <h1><?= h($definition['label']) ?></h1><?= $this->element("pcm_operational_notice") ?>
         <p class="pcm-updated">
-            <?= $currentImport ? 'Snapshot de ' . h($currentImport->report_date->format('d/m/Y')) : 'Nenhum snapshot disponível' ?>
+            <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
         </p>
     </div>
     <div><?= $this->Html->link('Voltar para Análises', ['_name' => 'pcm-analyses'], ['class' => 'btn pcm-secondary-action']) ?></div>

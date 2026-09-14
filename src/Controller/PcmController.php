@@ -79,19 +79,20 @@ final class PcmController extends AppController
             ->withStringBody((string)json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
-    /** Displays company-wide historical and comparative analysis. */
+    /** Displays company-wide operational and sector comparison analysis. */
     public function analyses(): void
     {
         $snapshot = new CurrentSnapshotService();
-        $historyService = new PcmHistoryService();
-        $history = $historyService->history(null, $historyService->period($this->request->getQueryParams()));
+        $historyService = new PcmHistoryService($snapshot);
+        $dashboard = $historyService->operationalReport();
+        $indicators = $dashboard['indicators'];
         $sectorComparison = $historyService->sectorComparison(
             (string)$this->request->getQuery('sector_sort', 'area'),
             (string)$this->request->getQuery('sector_direction', 'asc'),
         );
         $dataQuality = (new DataQualityService($snapshot))->summary();
 
-        $this->set(compact('history', 'sectorComparison', 'dataQuality') + $this->currentContext($snapshot));
+        $this->set(compact('dashboard', 'indicators', 'sectorComparison', 'dataQuality') + $this->currentContext($snapshot));
     }
 
     /** Lists current-snapshot OS affected by one objective data-quality rule. */
@@ -148,11 +149,7 @@ final class PcmController extends AppController
         $currentImport = $snapshot->currentImport();
         $lastUpdatedAt = $snapshot->lastSuccessfulImportAt();
         $navigationAreas = $snapshot->areas();
-        $historyService = new PcmHistoryService();
-        $history = $historyService->history((int)$area->id, $historyService->period($this->request->getQueryParams()));
-        $comparison = $history['comparison'];
-
-        $this->set(compact('area', 'indicators', 'currentImport', 'lastUpdatedAt', 'navigationAreas', 'dashboard', 'filters', 'orders', 'history', 'comparison'));
+        $this->set(compact('area', 'indicators', 'currentImport', 'lastUpdatedAt', 'navigationAreas', 'dashboard', 'filters', 'orders'));
     }
 
     /** Displays one current snapshot and the existing history of its OS identity. */
@@ -169,9 +166,10 @@ final class PcmController extends AppController
             ->orderBy(['ReportImports.report_date' => 'ASC', 'WorkOrderSnapshots.id' => 'ASC'])->all()->toList();
         $changes = $this->historyChanges($history);
         $currentImport = $snapshotService->currentImport();
+        $lastUpdatedAt = $snapshotService->lastSuccessfulImportAt();
         $navigationAreas = $snapshotService->areas();
 
-        $this->set(compact('snapshot', 'history', 'changes', 'currentImport', 'navigationAreas'));
+        $this->set(compact('snapshot', 'history', 'changes', 'currentImport', 'lastUpdatedAt', 'navigationAreas'));
     }
 
     /** Lists OS identities involved in the latest real snapshot movement. */
@@ -193,8 +191,8 @@ final class PcmController extends AppController
                 throw new NotFoundException('Área de manutenção não encontrada.');
             }
         }
-        $service = new PcmHistoryService();
-        $query = $service->movementQuery($type, $area ? (int)$area->id : null);
+        $service = new PcmHistoryService($snapshot);
+        $query = $service->operationalMovementQuery($type, $area ? (int)$area->id : null);
         if ($query === null) {
             throw new NotFoundException('Comparativo histórico ainda indisponível.');
         }

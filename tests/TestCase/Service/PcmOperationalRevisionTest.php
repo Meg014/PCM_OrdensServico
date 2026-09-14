@@ -14,6 +14,7 @@ use Cake\TestSuite\TestCase;
 final class PcmOperationalRevisionTest extends TestCase
 {
     use PcmSnapshotFixture;
+    use \Cake\TestSuite\IntegrationTestTrait;
 
     private int $areaId;
     private int $currentId;
@@ -76,7 +77,7 @@ final class PcmOperationalRevisionTest extends TestCase
     {
         $result = (new PcmIndicatorService())->calculate();
         foreach (
-            ['total' => 10, 'open' => 8, 'completed' => 2, 'cancelled' => 3,
+            ['total' => 10, 'open' => 8, 'completed' => 2, 'cancelled' => 0,
             'preventive' => 1, 'corrective' => 5, 'improvement' => 2,
             'emergency' => 3, 'scheduled' => 2, 'offseason' => 1] as $key => $expected
         ) {
@@ -101,7 +102,7 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame(2, $service->detailQuery($this->areaId, $filters)?->count());
         $this->assertSame(2, $service->dashboard($this->areaId, $filters)['indicators']['emergency']);
         $this->assertSame(3, $service->detailQuery(null, $filters)?->count());
-        $this->assertSame(3, $service->detailQuery($this->areaId, ['status' => 'CANCELADA'])?->count());
+        $this->assertSame(0, $service->detailQuery($this->areaId, ['status' => 'CANCELADA'])?->count());
         $this->assertSame(0, $service->dashboard($this->areaId, ['status' => 'CANCELADA'])['indicators']['total']);
         $this->assertSame(1, $service->detailQuery(null, ['area' => 'FUTURO', 'cost_center' => 'CC-13'])?->count());
         $this->assertSame(1, $service->detailQuery($this->areaId, ['service_name' => 'Revisão de entressafra'])?->count());
@@ -146,6 +147,64 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame('ENTRESSAFRA', (new PcmServiceClassifier())->classifySnapshot('PRE', 'FUTURO', 'ENTRESSAFRA'));
     }
 
+    public function testGlobalCutoffSeasonsAndEveryDrilldown(): void
+    {
+        $connection = self::connection();
+        $before = (new PcmIndicatorService())->calculate();
+        foreach (['2024-12-31', '2025-12-31', null] as $index => $date) {
+            foreach (['PRE', 'COR', 'MEL'] as $offset => $type) {
+                $number = 100 + $index * 10 + $offset;
+                $this->insertRow($this->currentId, $this->areaId, $number, 'Liberada', 'Não', $type, 'COREME', 'ENTRESSAFRA');
+                $connection->update('work_order_snapshots', ['maintenance_planned_start' => $date], ['source_order_number' => (string)$number]);
+            }
+        }
+        $this->assertSame($before, (new PcmIndicatorService())->calculate());
+        $this->assertSame(7, $before['safra_open']);
+        $this->assertSame(1, $before['safra_completed']);
+        $this->assertSame(1, $before['offseason_open']);
+        $this->assertSame(1, $before['offseason_completed']);
+        $this->assertSame($before['total'], $before['safra_open'] + $before['safra_completed'] + $before['offseason_open'] + $before['offseason_completed']);
+        $service = new SectorDashboardService();
+        foreach ([[], ['status' => 'FECHADA'], ['season' => 'offseason'], ['maintenance_type' => 'PRE']] as $filters) {
+            $counts = (new PcmIndicatorService())->calculate(null, $filters);
+            foreach (PcmIndicatorService::DRILLDOWNS as $key => $definition) {
+                $this->assertSame($counts[$key], $service->detailQuery(null, $filters + ['indicator' => $key])->count(), $key);
+            }
+        }
+        $this->insertRow($this->currentId, $this->areaId, 200, 'Liberada', 'Sim', 'MEL', 'FUT', 'Entressafra');
+        $connection->update('work_order_snapshots', ['maintenance_planned_start' => '2027-01-01'], ['source_order_number' => '200']);
+        $this->assertSame(2, (new PcmIndicatorService())->calculate()['offseason_completed']);
+        $this->assertSame(25, $connection->execute('SELECT COUNT(*) FROM work_order_snapshots')->fetchColumn(0));
+    }
+
+    public function testOperationalRoutesAndOldOrderCannotBypassScope(): void
+    {
+        $connection = self::connection();
+        $connection->update('work_order_snapshots', ['maintenance_planned_start' => '2025-12-31',
+            'equipment_name' => 'EXCLUDED_2025', 'equipment_code' => 'EXCLUDED_2025'],
+            ['report_import_id' => $this->currentId, 'source_order_number' => '1']);
+        foreach (['/pcm', '/pcm/ordens', '/pcm/setor/MECANI', '/pcm/setor/FUTURO', '/pcm/analises',
+            '/pcm/apresentacao', '/pcm/analises/qualidade/missing_service'] as $url) {
+            $this->get($url);
+            $this->assertResponseOk();
+            $this->assertResponseContains('DADOS REFERENTES ÀS OS CRIADAS A PARTIR DE 2026');
+            $this->assertResponseNotContains('EXCLUDED_2025');
+        }
+        $old = $connection->execute('SELECT id FROM work_order_snapshots WHERE report_import_id = :import AND source_order_number = :number',
+            ['import' => $this->currentId, 'number' => '1'])->fetchColumn(0);
+        $this->get('/pcm/os/' . $old);
+        $this->assertResponseCode(404);
+        $this->get('/pcm/ordens?season=offseason&indicator=safra_open');
+        $this->assertResponseOk();
+        $this->assertResponseContains('Nenhuma OS encontrada');
+        $filters = ['season' => 'offseason', 'within' => ['safra_open'], 'indicator' => 'offseason_open'];
+        $this->assertSame(0, (new SectorDashboardService())->detailQuery(null, $filters)->count());
+        $dashboard = (new SectorDashboardService())->dashboard(null, []);
+        $this->assertSame(9, array_sum(array_column($dashboard['status'], 'quantity')));
+        $this->assertSame(9, (new \App\Service\DataQualityService())->summary()['total']);
+        $this->assertSame(9, array_sum(array_column((new \App\Service\PcmHistoryService())->sectorComparison(), 'total')));
+    }
+
     private function insertRow(
         int $import,
         int $area,
@@ -169,7 +228,7 @@ final class PcmOperationalRevisionTest extends TestCase
             'treated_status' => (new WorkOrderStatusResolver())->resolve($situation, $finished),
             'status_rule_version' => 4, 'source_row_number' => $number, 'raw_payload' => '{}',
             'row_hash' => hash('sha256', (string)$number), 'created' => '2026-09-10', 'updated' => '2026-09-10',
-            'general_actual_start' => '2026-09-10 12:00:00',
+            'general_actual_start' => '2026-09-10 12:00:00', 'maintenance_planned_start' => '2026-01-01 00:00:00',
         ]);
     }
 }

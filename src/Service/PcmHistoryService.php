@@ -14,11 +14,17 @@ final class PcmHistoryService
     private Table $imports;
     private Table $snapshots;
 
-    public function __construct()
+    public function __construct(private readonly CurrentSnapshotService $current = new CurrentSnapshotService())
     {
         $locator = FactoryLocator::get('Table');
         $this->imports = $locator->get('ReportImports');
         $this->snapshots = $locator->get('WorkOrderSnapshots');
+    }
+
+    /** Current-only analysis, separate from immutable audit history. */
+    public function operationalReport(?int $areaId = null, array $filters = []): array
+    {
+        return (new SectorDashboardService($this->current))->dashboard($areaId, $filters);
     }
 
     /** @return array{mode:string,from:?string,to:?string} */
@@ -38,7 +44,9 @@ final class PcmHistoryService
         return compact('mode', 'from', 'to');
     }
 
-    /** @return array<string, mixed> */
+    /** Audit-only history across immutable imports; operational pages use operationalReport().
+     * @return array<string, mixed>
+     */
     public function history(?int $areaId, array $period): array
     {
         $allImports = $this->dailyImports();
@@ -58,31 +66,12 @@ final class PcmHistoryService
     /** @return list<array<string, int|float|string>> */
     public function sectorComparison(string $sort = 'area', string $direction = 'asc'): array
     {
-        $imports = $this->dailyImports();
-        $current = $imports === [] ? null : $imports[array_key_last($imports)];
-        if ($current === null) {
-            return [];
-        }
-        $sql = "SELECT a.source_code, a.display_name, s.treated_status, COUNT(*) quantity
-            FROM work_order_snapshots s JOIN maintenance_areas a ON a.id = s.maintenance_area_id
-            WHERE s.report_import_id = :import GROUP BY a.id, a.source_code, a.display_name, s.treated_status";
-        $rows = $this->snapshots->getConnection()->execute($sql, ['import' => $current['id']])->fetchAll('assoc');
+        $current = $this->current;
         $areas = [];
-        foreach ($rows as $row) {
-            $code = (string)$row['source_code'];
-            $areas[$code] ??= ['area' => $code, 'name' => (string)$row['display_name'], 'total' => 0,
-                'open' => 0, 'completed' => 0, 'cancelled' => 0, 'efficiency' => 0.0];
-            $key = $this->statusKey((string)$row['treated_status']);
-            $quantity = (int)$row['quantity'];
-            $areas[$code][$key] = $quantity;
-            if ($key !== 'cancelled') {
-                $areas[$code]['total'] += $quantity;
-            }
+        foreach ($current->areas() as $area) {
+            $areas[] = ['area' => $area->source_code, 'name' => $area->display_name]
+                + (new PcmIndicatorService($current))->calculate((int)$area->id);
         }
-        foreach ($areas as &$area) {
-            $area['efficiency'] = $area['total'] > 0 ? ($area['completed'] / $area['total']) * 100 : 0.0;
-        }
-        unset($area);
         $allowed = ['area', 'name', 'total', 'open', 'completed', 'cancelled', 'efficiency'];
         $sort = in_array($sort, $allowed, true) ? $sort : 'area';
         $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
@@ -92,6 +81,13 @@ final class PcmHistoryService
         });
 
         return array_values($areas);
+    }
+
+    /** Lists only eligible current rows, while previous values remain audit context. */
+    public function operationalMovementQuery(string $type, ?int $areaId = null): ?SelectQuery
+    {
+        return $this->movementQuery($type, $areaId)?->find('operational')
+            ->where(['WorkOrderSnapshots.report_import_id' => (int)$this->current->currentImport()?->id]);
     }
 
     public function movementQuery(string $type, ?int $areaId = null): ?SelectQuery

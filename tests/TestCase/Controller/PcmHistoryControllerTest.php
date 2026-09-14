@@ -30,9 +30,9 @@ final class PcmHistoryControllerTest extends TestCase
     {
         $this->get('/pcm/analises');
         $this->assertResponseOk();
-        $this->assertResponseContains('MOVIMENTAÇÃO DESDE O ÚLTIMO RELATÓRIO');
+        $this->assertResponseNotContains('MOVIMENTAÇÃO DESDE O ÚLTIMO RELATÓRIO');
         $this->assertResponseContains('COMPARATIVO ENTRE SETORES');
-        $this->assertResponseContains('21/08/2026 → 22/08/2026');
+        $this->assertResponseContains('DADOS REFERENTES ÀS OS CRIADAS A PARTIR DE 2026');
     }
 
     public function testGeneralDashboardRemainsExecutiveOnly(): void
@@ -48,8 +48,8 @@ final class PcmHistoryControllerTest extends TestCase
     {
         $this->get('/pcm/setor/MECANI?history_period=7');
         $this->assertResponseOk();
-        $this->assertResponseContains('Evolução entre relatórios');
-        $this->assertResponseContains('Passaram para fechada');
+        $this->assertResponseNotContains('Evolução entre relatórios');
+        $this->assertResponseContains('Safra — OS Fechadas');
     }
 
     public function testOrderTimelineShowsObservedStatusChange(): void

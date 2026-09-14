@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Model\Table;
 
+use App\Service\PcmIndicatorService;
 use App\Service\PcmServiceClassifier;
 use Cake\ORM\Query\SelectQuery;
 use Cake\ORM\Table;
@@ -26,11 +27,34 @@ class WorkOrderSnapshotsTable extends Table
             $query->where(['OR' => ['source_order_number LIKE' => $term, 'equipment_code LIKE' => $term,
                 'equipment_name LIKE' => $term, 'service_name LIKE' => $term]]);
         }
+        if (isset($filters['season'])) {
+            (new PcmServiceClassifier())->applyFilter($query, $filters['season'] === 'offseason' ? 'ENTRESSAFRA' : 'SAFRA');
+        }
         if (isset($filters['classification'])) {
             (new PcmServiceClassifier())->applyFilter($query, $filters['classification']);
         }
 
+        foreach ($filters['within'] ?? [] as $indicator) {
+            if (isset(PcmIndicatorService::DRILLDOWNS[$indicator])) {
+                $this->findFiltered($query, PcmIndicatorService::DRILLDOWNS[$indicator]);
+            }
+        }
+        if (isset(PcmIndicatorService::DRILLDOWNS[$filters['indicator'] ?? ''])) {
+            $this->findFiltered($query, PcmIndicatorService::DRILLDOWNS[$filters['indicator']]);
+        }
+
         return $query;
+    }
+
+    public const OPERATIONAL_START = '2026-01-01';
+
+    /** Operational eligibility; immutable historical queries remain explicitly unscoped. */
+    public function findOperational(SelectQuery $query): SelectQuery
+    {
+        return $query->where([
+            $this->aliasField('maintenance_planned_start') . ' >=' => self::OPERATIONAL_START,
+            $this->aliasField('treated_status') . ' IN' => ['EM ABERTO', 'FECHADA'],
+        ]);
     }
 
     public function initialize(array $config): void

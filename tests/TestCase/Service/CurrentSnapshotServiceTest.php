@@ -75,7 +75,7 @@ final class CurrentSnapshotServiceTest extends TestCase
     public function testCurrentPortfolioDoesNotAddOlderReports(): void
     {
         $service = new CurrentSnapshotService();
-        $this->assertSame(575, $service->query()?->count());
+        $this->assertSame(529, $service->query()?->count());
         $this->assertSame(576, (int)self::connection()->execute(
             'SELECT COUNT(*) FROM work_order_snapshots',
         )->fetchColumn(0));
@@ -94,7 +94,7 @@ final class CurrentSnapshotServiceTest extends TestCase
         $this->assertSame(529, $indicators['total']);
         $this->assertSame(158, $indicators['open']);
         $this->assertSame(371, $indicators['completed']);
-        $this->assertSame(46, $indicators['cancelled']);
+        $this->assertSame(0, $indicators['cancelled']);
         $this->assertSame(40, $indicators['preventive']);
         $this->assertSame(40, $indicators['corrective']);
         $this->assertSame(39, $indicators['improvement']);

@@ -70,7 +70,7 @@ final class PcmPresentationService
     /** @return array{open:int,completed:int,preventive:int,corrective:int,improvement:int,blank_maintenance_type:int} */
     private function emptyCounts(): array
     {
-        return ['open' => 0, 'completed' => 0, 'preventive' => 0, 'corrective' => 0,
+        return ['safra_open' => 0, 'safra_completed' => 0, 'offseason_open' => 0, 'offseason_completed' => 0, 'open' => 0, 'completed' => 0, 'preventive' => 0, 'corrective' => 0,
             'improvement' => 0, 'blank_maintenance_type' => 0, 'emergency' => 0, 'scheduled' => 0, 'offseason' => 0];
     }
 

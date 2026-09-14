@@ -7,19 +7,23 @@
  */
 $showCancelled ??= false;
 $largeCards ??= false;
-$cards = [
-    ['key' => 'open', 'label' => 'OS Em Aberto', 'value' => number_format((int)$indicators['open'], 0, ',', '.'), 'tone' => 'total', 'icon' => 'A'],
-    ['key' => 'completed', 'label' => 'OS Fechadas', 'value' => number_format((int)$indicators['completed'], 0, ',', '.'), 'tone' => 'completed', 'icon' => 'F'],
-];
-// Audit counts are opt-in; operational dashboards do not display this card.
-if ($showCancelled) {
-    $cards[] = ['key' => 'cancelled', 'label' => 'OS Canceladas', 'value' => number_format((int)$indicators['cancelled'], 0, ',', '.'), 'tone' => 'cancelled', 'icon' => 'C'];
+$cardRoute ??= ['_name' => 'pcm-orders'];
+$filters ??= [];
+$cards = [];
+foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label) {
+    foreach (['open' => 'OS Em Aberto', 'completed' => 'OS Fechadas'] as $status => $statusLabel) {
+        $key = $season . '_' . $status;
+        $cards[] = ['key' => $key, 'label' => $label . ' — ' . $statusLabel,
+            'value' => number_format((int)$indicators[$key], 0, ',', '.'),
+            'tone' => $status === 'open' ? 'total' : 'completed',
+            'filters' => \App\Service\PcmIndicatorService::drilldownFilters($filters, $key)];
+    }
 }
 ?>
-<div class="row g-4<?= $largeCards ? ' pcm-kpi-grid-large' : '' ?>" aria-label="Indicadores do snapshot atual">
+<div class="row g-3<?= $largeCards ? ' pcm-kpi-grid-large' : '' ?>" aria-label="Indicadores do snapshot atual">
     <?php foreach ($cards as $card) : ?>
-        <div class="col-12 col-sm-6 <?= count($cards) === 2 ? 'col-xl-6' : 'col-xl-4' ?>">
-            <article class="pcm-kpi-card pcm-kpi-<?= h($card['tone']) ?>">
+        <div class="col-12 col-sm-6 col-xl-6">
+            <a href="<?= h($this->Url->build($cardRoute + ['?' => $card['filters'], '#' => 'orders'])) ?>" class="text-decoration-none pcm-kpi-card pcm-kpi-<?= h($card['tone']) ?>">
                 <div>
                     <p class="pcm-kpi-label"><?= h($card['label']) ?></p>
                     <p class="pcm-kpi-value"><?= h($card['value']) ?></p>
@@ -28,8 +32,7 @@ if ($showCancelled) {
                         <p class="pcm-kpi-delta"><?= $delta > 0 ? '+' : '' ?><?= h(number_format($delta, 0, ',', '.')) ?> vs relatório anterior</p>
                     <?php endif; ?>
                 </div>
-                <span class="pcm-kpi-icon" aria-hidden="true"><?= h($card['icon']) ?></span>
-            </article>
+            </a>
         </div>
     <?php endforeach; ?>
 </div>
@@ -43,13 +46,13 @@ if ($showCancelled) {
         ] as [$key, $label, $code]
 ) : ?>
         <div class="col-12 col-sm-4">
-            <article class="pcm-maintenance-type-card pcm-maintenance-type-<?= h(strtolower($code)) ?>">
+            <a href="<?= h($this->Url->build($cardRoute + ['?' => \App\Service\PcmIndicatorService::drilldownFilters($filters, $key), '#' => 'orders'])) ?>" class="text-decoration-none pcm-maintenance-type-card pcm-maintenance-type-<?= h(strtolower($code)) ?>">
                 <div>
                     <p><?= h($label) ?></p>
                     <small>OS em aberto · Tipo Manut. <?= h($code) ?></small>
                 </div>
                 <strong><?= number_format((int)($indicators[$key] ?? 0), 0, ',', '.') ?></strong>
-            </article>
+            </a>
         </div>
     <?php endforeach; ?>
 </div>

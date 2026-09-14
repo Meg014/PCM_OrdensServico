@@ -71,7 +71,12 @@ final class CurrentSnapshotService
         if ($import === null) {
             return null;
         }
-        $query = $this->snapshots->find('forImport', reportImportId: (int)$import->id)->find('operational');
+        $scope = match ($status) {
+            WorkOrderStatusResolver::OPEN => 'operationalOpen',
+            WorkOrderStatusResolver::COMPLETED => 'operationalClosed',
+            default => 'operational',
+        };
+        $query = $this->snapshots->find('forImport', reportImportId: (int)$import->id)->find($scope);
         if ($areaCode !== null) {
             $query->innerJoinWith(
                 'MaintenanceAreas',

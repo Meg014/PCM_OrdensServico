@@ -147,7 +147,7 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame('ENTRESSAFRA', (new PcmServiceClassifier())->classifySnapshot('PRE', 'FUTURO', 'ENTRESSAFRA'));
     }
 
-    public function testGlobalCutoffSeasonsAndEveryDrilldown(): void
+    public function testOpenCutoffSeasonsAndEveryDrilldown(): void
     {
         $connection = self::connection();
         $before = (new PcmIndicatorService())->calculate();
@@ -187,7 +187,7 @@ final class PcmOperationalRevisionTest extends TestCase
             '/pcm/apresentacao', '/pcm/analises/qualidade/missing_service'] as $url) {
             $this->get($url);
             $this->assertResponseOk();
-            $this->assertResponseContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
+            $this->assertResponseNotContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
             $this->assertResponseNotContains('EXCLUDED_2025');
         }
         $old = $connection->execute('SELECT id FROM work_order_snapshots WHERE report_import_id = :import AND source_order_number = :number',
@@ -203,6 +203,90 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame(9, array_sum(array_column($dashboard['status'], 'quantity')));
         $this->assertSame(9, (new \App\Service\DataQualityService())->summary()['total']);
         $this->assertSame(9, array_sum(array_column((new \App\Service\PcmHistoryService())->sectorComparison(), 'total')));
+    }
+
+    public function testDistinctTemporalScopesAcrossCardsListsAndDashboards(): void
+    {
+        $connection = self::connection();
+        $before = (new PcmIndicatorService())->calculate();
+        $expectedOpen = $expectedClosed = [];
+        $number = 300;
+        foreach (['2024-01-01', '2025-12-31', '2026-01-01', '2027-01-01', null] as $date) {
+            foreach (['Safra', 'Entressafra'] as $season) {
+                foreach (['EM ABERTO', 'FECHADA', 'CANCELADA'] as $status) {
+                    $number++;
+                    $this->insertRow($this->currentId, $this->areaId, $number,
+                        $status === 'CANCELADA' ? 'Cancelada' : 'Liberada',
+                        $status === 'EM ABERTO' ? 'Não' : 'Sim', 'PRE', 'TEMP', $season);
+                    $connection->update('work_order_snapshots', [
+                        'maintenance_planned_start' => $date,
+                        'equipment_code' => 'TEMP-' . $number,
+                        'equipment_name' => 'TEMP-' . $number,
+                    ], ['source_order_number' => (string)$number]);
+                    if ($status === 'FECHADA') {
+                        $expectedClosed[] = (string)$number;
+                    } elseif ($status === 'EM ABERTO' && $date !== null && $date >= '2026-01-01') {
+                        $expectedOpen[] = (string)$number;
+                    }
+                }
+            }
+        }
+        // Neither a previous successful import nor a newer failed import contributes closed rows.
+        $connection->update('work_order_snapshots', [
+            'treated_status' => 'FECHADA', 'finished_raw' => 'Sim', 'maintenance_planned_start' => '2024-01-01',
+        ], ['source_order_number IN' => ['90', '91']]);
+        $current = new \App\Service\CurrentSnapshotService();
+        foreach (['EM ABERTO' => $expectedOpen, 'FECHADA' => $expectedClosed] as $status => $expected) {
+            $actual = $current->query(status: $status)->where(['source_order_number IN' => array_map('strval', range(301, 330))])
+                ->all()->extract('source_order_number')->toList();
+            $this->assertEqualsCanonicalizing($expected, $actual);
+        }
+        $counts = (new PcmIndicatorService())->calculate();
+        foreach (['safra_open' => 2, 'offseason_open' => 2, 'safra_completed' => 5,
+            'offseason_completed' => 5, 'open' => 4, 'completed' => 10, 'preventive' => 4,
+            'corrective' => 0, 'improvement' => 0, 'emergency' => 0, 'scheduled' => 0] as $key => $delta) {
+            $this->assertSame($before[$key] + $delta, $counts[$key], $key);
+        }
+        $this->assertSame(0, $counts['cancelled']);
+        $service = new SectorDashboardService();
+        foreach ([null, $this->areaId] as $areaId) {
+            foreach ([[], ['status' => 'FECHADA'], ['season' => 'offseason'],
+                ['maintenance_type' => 'PRE'], ['within' => ['safra_completed']]] as $filters) {
+                $filtered = (new PcmIndicatorService())->calculate($areaId, $filters);
+                foreach (PcmIndicatorService::DRILLDOWNS as $key => $definition) {
+                    $this->assertSame($filtered[$key], $service->detailQuery($areaId,
+                        $filters + ['indicator' => $key])->count(), $key);
+                }
+            }
+        }
+        $dashboard = $service->dashboard(null, []);
+        $this->assertSame($counts['total'], array_sum(array_column($dashboard['status'], 'quantity')));
+        $this->assertSame($counts['completed'], array_sum(array_column($dashboard['summary'], 'completed')));
+        $this->assertSame($counts['total'], array_sum(array_column(
+            (new \App\Service\PcmHistoryService())->sectorComparison(), 'total')));
+        $this->assertSame($counts['total'], (new \App\Service\DataQualityService())->summary()['total']);
+        $payload = (new PcmPresentationService())->payload();
+        foreach ($payload['screens'] as $screen) {
+            $areaId = $screen['key'] === 'general' ? null : (int)$current->area($screen['key'])->id;
+            $indicators = (new PcmIndicatorService())->calculate($areaId);
+            foreach (['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed'] as $key) {
+                $this->assertSame($indicators[$key], $screen[$key]);
+            }
+        }
+        // The first old closed Safra order is visible, while the adjacent old open/cancelled ones are not.
+        foreach (['/pcm/ordens', '/pcm/setor/MECANI'] as $route) {
+            $this->get($route . '?indicator=safra_completed&limit=1&sort=source_order_number&direction=asc&page=2');
+            $this->assertResponseOk();
+            $this->assertResponseContains('TEMP-302');
+            $this->assertResponseNotContains('TEMP-301');
+            $this->assertResponseNotContains('TEMP-303');
+            $this->get($route . '?indicator=safra_open');
+            $this->assertResponseOk();
+            $this->assertResponseNotContains('TEMP-301</td>');
+        }
+        $oldClosed = $current->query(status: 'FECHADA')->where(['source_order_number' => '302'])->first();
+        $this->get('/pcm/os/' . $oldClosed->id);
+        $this->assertResponseOk();
     }
 
     private function insertRow(

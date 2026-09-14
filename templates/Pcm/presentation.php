@@ -16,7 +16,7 @@ $firstScreen = $payload['screens'][0];
 >
     <header class="pcm-presentation-header">
         <div>
-            <h1 data-presentation-title><?= h($firstScreen['title']) ?></h1><?= $this->element("pcm_operational_notice") ?>
+            <h1 data-presentation-title><?= h($firstScreen['title']) ?></h1>
             <p class="pcm-updated" data-presentation-updated>
                 <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
             </p>

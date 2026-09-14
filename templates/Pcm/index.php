@@ -10,7 +10,7 @@ $this->Html->script('pcm-auto-refresh', ['block' => true]);
 <header class="pcm-page-header">
     <div>
         <p class="pcm-eyebrow">PCM | ORDENS DE SERVIÇO</p>
-        <h1>Visão Geral</h1><?= $this->element("pcm_operational_notice") ?>
+        <h1>Visão Geral</h1>
         <p class="pcm-updated">
             <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
             <span

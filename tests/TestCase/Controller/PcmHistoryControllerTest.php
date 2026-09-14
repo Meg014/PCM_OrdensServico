@@ -32,7 +32,7 @@ final class PcmHistoryControllerTest extends TestCase
         $this->assertResponseOk();
         $this->assertResponseNotContains('MOVIMENTAÇÃO DESDE O ÚLTIMO RELATÓRIO');
         $this->assertResponseContains('COMPARATIVO ENTRE SETORES');
-        $this->assertResponseContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
+        $this->assertResponseNotContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
     }
 
     public function testGeneralDashboardRemainsExecutiveOnly(): void

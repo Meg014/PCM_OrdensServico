@@ -4,7 +4,7 @@ $this->assign('title', 'Qualidade dos dados');
 <header class="pcm-page-header">
     <div>
         <p class="pcm-eyebrow">PCM | QUALIDADE DOS DADOS</p>
-        <h1><?= h($definition['label']) ?></h1><?= $this->element("pcm_operational_notice") ?>
+        <h1><?= h($definition['label']) ?></h1>
         <p class="pcm-updated">
             <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
         </p>

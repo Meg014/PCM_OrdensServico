@@ -5,10 +5,10 @@ $cardRoute = $area->source_code ? ['_name' => 'pcm-sector', 'code' => $area->sou
 $chartPayload = ['status' => $dashboard['status'], 'maintenance' => array_map(static function (array $row) use ($categories): array { $row['label'] = $categories[$row['key']] ?? $row['label']; return $row; }, $dashboard['maintenanceProfile']), 'equipment' => $dashboard['equipment'], 'services' => $dashboard['services'], 'costCenters' => $dashboard['costCenters']];
 $this->Html->script(['chart.umd.min', 'pcm-sector', 'pcm-history'], ['block' => true]);
 ?>
-<header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($area->display_name) ?></h1><?= $this->element("pcm_operational_notice") ?><p class="pcm-updated"><?php if ($area->source_code): ?>Código: <strong><?= h($area->source_code) ?></strong> <span aria-hidden="true">•</span><?php endif; ?> <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?></p></div></header>
+<header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($area->display_name) ?></h1><p class="pcm-updated"><?php if ($area->source_code): ?>Código: <strong><?= h($area->source_code) ?></strong> <span aria-hidden="true">•</span><?php endif; ?> <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?></p></div></header>
 <?php if ($currentImport === null): ?><div class="alert alert-light border shadow-sm">Nenhum relatório foi importado com sucesso.</div><?php endif; ?>
 <?= $this->element('pcm_indicator_cards', ['indicators' => $indicators, 'comparison' => $comparison ?? null, 'cardRoute' => $cardRoute, 'filters' => $filters]) ?>
-<section class="pcm-panel pcm-filter-panel mt-4"><div class="pcm-panel-heading"><h2><?= $area->source_code ? 'Filtros do setor' : 'Filtros do relatório' ?></h2><p>Indicadores, gráficos e listagens usam as O.S. operacionais de 2026+ da última importação bem-sucedida.</p></div>
+<section class="pcm-panel pcm-filter-panel mt-4"><div class="pcm-panel-heading"><h2><?= $area->source_code ? 'Filtros do setor' : 'Filtros do relatório' ?></h2><p>Indicadores, gráficos e listagens usam as O.S. operacionais da última importação bem-sucedida.</p></div>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?>
 <?php if (isset($filters['indicator'])): ?><?= $this->Form->hidden('indicator', ['value' => $filters['indicator']]) ?><?php endif; ?>
 <?php foreach ($filters['within'] ?? [] as $within): ?><?= $this->Form->hidden('within[]', ['value' => $within]) ?><?php endforeach; ?>

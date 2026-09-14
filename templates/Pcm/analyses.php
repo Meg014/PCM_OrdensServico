@@ -5,7 +5,7 @@ $this->Html->script(['chart.umd.min', 'pcm-history'], ['block' => true]);
 <header class="pcm-page-header">
     <div>
         <p class="pcm-eyebrow">PCM | ANÁLISES</p>
-        <h1>Visão Gerencial</h1><?= $this->element("pcm_operational_notice") ?>
+        <h1>Visão Gerencial</h1>
         <p class="pcm-updated"><?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?></p>
     </div>
 </header>

@@ -48,13 +48,38 @@ class WorkOrderSnapshotsTable extends Table
 
     public const OPERATIONAL_START = '2026-01-01';
 
-    /** Operational eligibility; immutable historical queries remain explicitly unscoped. */
+    /** Open work orders retain the temporary planned-start cutoff. */
+    private function operationalOpenConditions(): array
+    {
+        return [
+            $this->aliasField('maintenance_planned_start') . ' >=' => self::OPERATIONAL_START,
+            $this->aliasField('treated_status') => 'EM ABERTO',
+        ];
+    }
+
+    /** Closed work orders are eligible regardless of planned-start date, including null. */
+    private function operationalClosedConditions(): array
+    {
+        return [$this->aliasField('treated_status') => 'FECHADA'];
+    }
+
+    public function findOperationalOpen(SelectQuery $query): SelectQuery
+    {
+        return $query->where($this->operationalOpenConditions());
+    }
+
+    public function findOperationalClosed(SelectQuery $query): SelectQuery
+    {
+        return $query->where($this->operationalClosedConditions());
+    }
+
+    /** Union of eligible statuses; callers separately restrict the report import. */
     public function findOperational(SelectQuery $query): SelectQuery
     {
-        return $query->where([
-            $this->aliasField('maintenance_planned_start') . ' >=' => self::OPERATIONAL_START,
-            $this->aliasField('treated_status') . ' IN' => ['EM ABERTO', 'FECHADA'],
-        ]);
+        return $query->where(['OR' => [
+            $this->operationalOpenConditions(),
+            $this->operationalClosedConditions(),
+        ]]);
     }
 
     public function initialize(array $config): void

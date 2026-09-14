@@ -32,12 +32,12 @@ final class PcmControllerTest extends TestCase
         $this->get('/pcm');
         $this->assertResponseOk();
         $this->assertResponseContains('Visão Geral');
-        $this->assertResponseContains('OS Em Aberto');
-        $this->assertResponseContains('OS Fechadas');
+        $this->assertResponseContains('O.S. Em Aberto');
+        $this->assertResponseContains('O.S. Fechadas');
         $this->assertResponseContains('Preventivas');
         $this->assertResponseContains('Corretivas');
         $this->assertResponseContains('Melhorias');
-        $this->assertResponseNotContains('OS Canceladas');
+        $this->assertResponseNotContains('O.S. Canceladas');
         $this->assertResponseNotContains('Eficiência');
         $this->assertResponseNotContains('Não iniciada');
         $this->assertResponseContains('Dados atualizados em:');
@@ -62,7 +62,7 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseContains('Resumo por serviço');
         $this->assertResponseContains('Nome Serviço');
         $this->assertResponseContains('Centro de custo');
-        $this->assertResponseContains('Nenhuma OS encontrada');
+        $this->assertResponseContains('Nenhuma O.S. encontrada');
     }
 
     public function testSectorClassificationCardRetainsItsSectorRoute(): void
@@ -118,14 +118,14 @@ final class PcmControllerTest extends TestCase
         $this->get('/pcm/apresentacao');
         $this->assertResponseOk();
         $this->assertResponseContains('PCM - VISÃO GERAL');
-        $this->assertResponseContains('OS EM ABERTO');
-        $this->assertResponseContains('OS FECHADAS');
+        $this->assertResponseContains('O.S. EM ABERTO');
+        $this->assertResponseContains('O.S. FECHADAS');
         $this->assertResponseContains('PREVENTIVAS');
         $this->assertResponseContains('CORRETIVAS');
         $this->assertResponseContains('MELHORIAS');
         $this->assertResponseContains('Próxima tela em');
         $this->assertResponseContains('Sair da apresentação');
-        $this->assertResponseNotContains('OS CANCELADAS');
+        $this->assertResponseNotContains('O.S. CANCELADAS');
         $this->assertResponseNotContains('Top 10 equipamentos');
     }
 
@@ -153,7 +153,7 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseOk();
         $this->assertResponseContains('Mecânica');
         $this->assertResponseContains('375');
-        $this->assertResponseNotContains('OS Canceladas');
+        $this->assertResponseNotContains('O.S. Canceladas');
         $this->assertResponseNotContains('Canceladas — auditoria');
         $this->assertResponseContains('Preventivas');
         $this->assertResponseContains('Corretivas');
@@ -184,7 +184,7 @@ final class PcmControllerTest extends TestCase
         $row = self::connection()->execute("SELECT id FROM work_order_snapshots WHERE report_date = '2026-08-21' AND source_order_number = '4001'")->fetch('assoc');
         $this->get('/pcm/os/' . $row['id']);
         $this->assertResponseOk();
-        $this->assertResponseContains('OS 4001');
+        $this->assertResponseContains('O.S. 4001');
         $this->assertResponseContains('Snapshots existentes');
         $this->assertResponseContains('PLANEJAMENTO / REGISTRO');
         $this->assertResponseContains('P. In. Man. — data/hora');
@@ -220,8 +220,8 @@ final class PcmControllerTest extends TestCase
             $this->get('/pcm/analises/qualidade/missing_cost_center');
             $this->assertResponseOk();
             $this->assertResponseContains('INCONSISTÊNCIAS ENCONTRADAS');
-            $this->assertResponseContains('OS sem centro de custo');
-            $this->assertResponseContains('Ver OS');
+            $this->assertResponseContains('O.S. sem centro de custo');
+            $this->assertResponseContains('Ver O.S.');
         } finally {
             self::connection()->update('work_order_snapshots', ['cost_center_code' => '4101002'], [
                 'report_date' => '2026-08-21', 'source_order_number' => '4001',

@@ -36,6 +36,6 @@ final class PcmEmptyControllerTest extends TestCase
     {
         $this->get('/pcm/analises');
         $this->assertResponseOk();
-        $this->assertResponseContains('DADOS REFERENTES ÀS OS CRIADAS A PARTIR DE 2026');
+        $this->assertResponseContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
     }
 }

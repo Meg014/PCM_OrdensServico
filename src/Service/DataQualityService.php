@@ -13,10 +13,10 @@ final class DataQualityService
 {
     /** @var array<string, array{label:string,shortLabel:string,level:string}> */
     public const RULES = [
-        'missing_area' => ['label' => 'OS sem área de manutenção', 'shortLabel' => 'Sem área', 'level' => 'ATENÇÃO'],
-        'missing_service' => ['label' => 'OS sem nome de serviço', 'shortLabel' => 'Sem serviço', 'level' => 'ATENÇÃO'],
-        'missing_cost_center' => ['label' => 'OS sem centro de custo', 'shortLabel' => 'Sem centro de custo', 'level' => 'ATENÇÃO'],
-        'completed_without_start' => ['label' => 'OS fechada sem início real válido', 'shortLabel' => 'Fechada sem início', 'level' => 'ATENÇÃO'],
+        'missing_area' => ['label' => 'O.S. sem área de manutenção', 'shortLabel' => 'Sem área', 'level' => 'ATENÇÃO'],
+        'missing_service' => ['label' => 'O.S. sem nome de serviço', 'shortLabel' => 'Sem serviço', 'level' => 'ATENÇÃO'],
+        'missing_cost_center' => ['label' => 'O.S. sem centro de custo', 'shortLabel' => 'Sem centro de custo', 'level' => 'ATENÇÃO'],
+        'completed_without_start' => ['label' => 'O.S. fechada sem início real válido', 'shortLabel' => 'Fechada sem início', 'level' => 'ATENÇÃO'],
         'start_before_origin' => ['label' => 'Início real anterior à Data Origin.', 'shortLabel' => 'Início anterior à origem', 'level' => 'ATENÇÃO'],
         'possible_date_inconsistency' => ['label' => 'Possível inconsistência de data', 'shortLabel' => 'Possíveis inconsist. de data', 'level' => 'ATENÇÃO'],
     ];

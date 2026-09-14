@@ -16,7 +16,7 @@ $reportDate = $dataQuality['reportDate'];
                     <div class="pcm-quality-icon" aria-hidden="true">!</div>
                     <div>
                         <span><?= h($indicator['shortLabel']) ?></span>
-                        <strong><?= number_format($indicator['count'], 0, ',', '.') ?> OS</strong>
+                        <strong><?= number_format($indicator['count'], 0, ',', '.') ?> O.S.</strong>
                         <small><?= number_format($indicator['percentage'], 2, ',', '.') ?>% da base</small>
                     </div>
                     <?= $this->Html->link(

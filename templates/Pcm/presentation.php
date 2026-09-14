@@ -26,7 +26,7 @@ $firstScreen = $payload['screens'][0];
 
     <div class="pcm-presentation-cards" aria-live="polite">
         <?php foreach (['safra' => 'SAFRA', 'offseason' => 'ENTRESSAFRA'] as $season => $label): ?>
-        <?php foreach (['open' => 'OS EM ABERTO', 'completed' => 'OS FECHADAS'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
+        <?php foreach (['open' => 'O.S. EM ABERTO', 'completed' => 'O.S. FECHADAS'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
         <article class="pcm-presentation-card pcm-presentation-<?= h($status) ?>">
             <p><?= h($label . ' — ' . $statusLabel) ?></p>
             <strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong>
@@ -34,15 +34,15 @@ $firstScreen = $payload['screens'][0];
         <?php endforeach; endforeach; ?>
     </div>
 
-    <div class="pcm-presentation-type-cards" aria-label="Tipos de manutenção das OS em aberto">
-        <article><p>PREVENTIVAS</p><small>OS em aberto · PRE</small><strong data-presentation-preventive><?= number_format((int)$firstScreen['preventive'], 0, ',', '.') ?></strong></article>
-        <article><p>CORRETIVAS</p><small>OS em aberto · COR</small><strong data-presentation-corrective><?= number_format((int)$firstScreen['corrective'], 0, ',', '.') ?></strong></article>
-        <article><p>MELHORIAS</p><small>OS em aberto · MEL</small><strong data-presentation-improvement><?= number_format((int)$firstScreen['improvement'], 0, ',', '.') ?></strong></article>
+    <div class="pcm-presentation-type-cards" aria-label="Tipos de manutenção das O.S. em aberto">
+        <article><p>PREVENTIVAS</p><small>O.S. em aberto · PRE</small><strong data-presentation-preventive><?= number_format((int)$firstScreen['preventive'], 0, ',', '.') ?></strong></article>
+        <article><p>CORRETIVAS</p><small>O.S. em aberto · COR</small><strong data-presentation-corrective><?= number_format((int)$firstScreen['corrective'], 0, ',', '.') ?></strong></article>
+        <article><p>MELHORIAS</p><small>O.S. em aberto · MEL</small><strong data-presentation-improvement><?= number_format((int)$firstScreen['improvement'], 0, ',', '.') ?></strong></article>
     </div>
 
-    <div class="pcm-presentation-type-cards pcm-presentation-service-cards" aria-label="Classificações de serviço das OS em aberto">
+    <div class="pcm-presentation-type-cards pcm-presentation-service-cards" aria-label="Classificações de serviço das O.S. em aberto">
         <?php foreach (array_diff_key(\App\Service\PcmServiceClassifier::CARD_CLASSES, ['offseason' => true]) as $key => $classification): ?>
-        <article><p><?= h(mb_strtoupper(\App\Service\PcmServiceClassifier::LABELS[$classification])) ?></p><small>OS em aberto</small><strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong></article>
+        <article><p><?= h(mb_strtoupper(\App\Service\PcmServiceClassifier::LABELS[$classification])) ?></p><small>O.S. em aberto</small><strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong></article>
         <?php endforeach; ?>
     </div>
 

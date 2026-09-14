@@ -32,7 +32,7 @@ final class PcmHistoryControllerTest extends TestCase
         $this->assertResponseOk();
         $this->assertResponseNotContains('MOVIMENTAÇÃO DESDE O ÚLTIMO RELATÓRIO');
         $this->assertResponseContains('COMPARATIVO ENTRE SETORES');
-        $this->assertResponseContains('DADOS REFERENTES ÀS OS CRIADAS A PARTIR DE 2026');
+        $this->assertResponseContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
     }
 
     public function testGeneralDashboardRemainsExecutiveOnly(): void
@@ -49,7 +49,7 @@ final class PcmHistoryControllerTest extends TestCase
         $this->get('/pcm/setor/MECANI?history_period=7');
         $this->assertResponseOk();
         $this->assertResponseNotContains('Evolução entre relatórios');
-        $this->assertResponseContains('Safra — OS Fechadas');
+        $this->assertResponseContains('Safra — O.S. Fechadas');
     }
 
     public function testOrderTimelineShowsObservedStatusChange(): void
@@ -68,7 +68,7 @@ final class PcmHistoryControllerTest extends TestCase
     {
         $this->get('/pcm/movimentacao/new');
         $this->assertResponseOk();
-        $this->assertResponseContains('Novas OS');
+        $this->assertResponseContains('Novas O.S.');
         $this->assertResponseContains('4999');
         $this->get('/pcm/movimentacao/invalida');
         $this->assertResponseCode(404);

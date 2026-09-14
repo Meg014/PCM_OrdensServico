@@ -69,13 +69,13 @@ final class ReportImportService
                 $mapped = $this->rowMapper->map($row['values'], $row['source_row_number']);
                 if (!$mapped['branch_code'] || !$mapped['source_order_number']) {
                     throw new RuntimeException(sprintf(
-                        'Linha %d sem filial ou número da OS.',
+                        'Linha %d sem filial ou número da O.S.',
                         $row['source_row_number'],
                     ));
                 }
                 $key = $mapped['branch_code'] . '|' . $mapped['source_order_number'];
                 if (isset($seen[$key])) {
-                    throw new RuntimeException(sprintf('OS duplicada no arquivo nas linhas %d e %d: %s.', $seen[$key], $row['source_row_number'], $mapped['source_order_number']));
+                    throw new RuntimeException(sprintf('O.S. duplicada no arquivo nas linhas %d e %d: %s.', $seen[$key], $row['source_row_number'], $mapped['source_order_number']));
                 }
                 $seen[$key] = $row['source_row_number'];
                 $mappedRows[] = $mapped;

@@ -187,7 +187,7 @@ final class PcmOperationalRevisionTest extends TestCase
             '/pcm/apresentacao', '/pcm/analises/qualidade/missing_service'] as $url) {
             $this->get($url);
             $this->assertResponseOk();
-            $this->assertResponseContains('DADOS REFERENTES ÀS OS CRIADAS A PARTIR DE 2026');
+            $this->assertResponseContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
             $this->assertResponseNotContains('EXCLUDED_2025');
         }
         $old = $connection->execute('SELECT id FROM work_order_snapshots WHERE report_import_id = :import AND source_order_number = :number',
@@ -196,7 +196,7 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertResponseCode(404);
         $this->get('/pcm/ordens?season=offseason&indicator=safra_open');
         $this->assertResponseOk();
-        $this->assertResponseContains('Nenhuma OS encontrada');
+        $this->assertResponseContains('Nenhuma O.S. encontrada');
         $filters = ['season' => 'offseason', 'within' => ['safra_open'], 'indicator' => 'offseason_open'];
         $this->assertSame(0, (new SectorDashboardService())->detailQuery(null, $filters)->count());
         $dashboard = (new SectorDashboardService())->dashboard(null, []);

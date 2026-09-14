@@ -23,7 +23,7 @@ $this->assign('title', 'Qualidade dos dados');
     </div>
     <div class="table-responsive">
         <table class="table pcm-orders-table align-middle mb-0">
-            <thead><tr><th>OS</th><th>Área</th><th>Equipamento/Bem</th><th>Serviço</th><th>Centro de custo</th><th>Tipo da inconsistência</th><th>Valor encontrado</th><th>Ação</th></tr></thead>
+            <thead><tr><th>O.S.</th><th>Área</th><th>Equipamento/Bem</th><th>Serviço</th><th>Centro de custo</th><th>Tipo da inconsistência</th><th>Valor encontrado</th><th>Ação</th></tr></thead>
             <tbody>
             <?php foreach ($orders as $order): ?>
                 <tr>
@@ -34,7 +34,7 @@ $this->assign('title', 'Qualidade dos dados');
                     <td><?= h($order->cost_center_code ?: '—') ?></td>
                     <td><span class="badge pcm-quality-badge"><?= h($definition['level']) ?></span><br><small><?= h($definition['label']) ?></small></td>
                     <td class="pcm-quality-value"><?= h($values[(int)$order->id]) ?></td>
-                    <td><?= $this->Html->link('Ver OS', ['_name' => 'pcm-order', 'id' => $order->id], ['class' => 'btn btn-sm btn-outline-primary']) ?></td>
+                    <td><?= $this->Html->link('Ver O.S.', ['_name' => 'pcm-order', 'id' => $order->id], ['class' => 'btn btn-sm btn-outline-primary']) ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (count($orders) === 0): ?><tr><td colspan="8" class="pcm-empty-table">Nenhuma ocorrência encontrada no snapshot atual.</td></tr><?php endif; ?>
@@ -43,7 +43,7 @@ $this->assign('title', 'Qualidade dos dados');
     </div>
     <?php if (count($orders) > 0): ?>
         <footer class="pcm-pagination">
-            <p><?= $this->Paginator->counter('Página {{page}} de {{pages}} • {{count}} OS') ?></p>
+            <p><?= $this->Paginator->counter('Página {{page}} de {{pages}} • {{count}} O.S.') ?></p>
             <nav aria-label="Paginação"><ul class="pcm-page-list"><?= $this->Paginator->prev('‹ Anterior') ?><?= $this->Paginator->numbers(['modulus' => 5, 'first' => 1, 'last' => 1]) ?><?= $this->Paginator->next('Próxima ›') ?></ul></nav>
         </footer>
     <?php endif; ?>

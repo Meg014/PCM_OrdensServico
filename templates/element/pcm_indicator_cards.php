@@ -11,7 +11,7 @@ $cardRoute ??= ['_name' => 'pcm-orders'];
 $filters ??= [];
 $cards = [];
 foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label) {
-    foreach (['open' => 'OS Em Aberto', 'completed' => 'OS Fechadas'] as $status => $statusLabel) {
+    foreach (['open' => 'O.S. Em Aberto', 'completed' => 'O.S. Fechadas'] as $status => $statusLabel) {
         $key = $season . '_' . $status;
         $cards[] = ['key' => $key, 'label' => $label . ' — ' . $statusLabel,
             'value' => number_format((int)$indicators[$key], 0, ',', '.'),
@@ -37,7 +37,7 @@ foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label
     <?php endforeach; ?>
 </div>
 
-<div class="row g-3 pcm-maintenance-type-cards" aria-label="Tipos de manutenção das OS em aberto">
+<div class="row g-3 pcm-maintenance-type-cards" aria-label="Tipos de manutenção das O.S. em aberto">
     <?php foreach (
         [
             ['preventive', 'Preventivas', 'PRE'],
@@ -49,7 +49,7 @@ foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label
             <a href="<?= h($this->Url->build($cardRoute + ['?' => \App\Service\PcmIndicatorService::drilldownFilters($filters, $key), '#' => 'orders'])) ?>" class="text-decoration-none pcm-maintenance-type-card pcm-maintenance-type-<?= h(strtolower($code)) ?>">
                 <div>
                     <p><?= h($label) ?></p>
-                    <small>OS em aberto · Tipo Manut. <?= h($code) ?></small>
+                    <small>O.S. em aberto · Tipo Manut. <?= h($code) ?></small>
                 </div>
                 <strong><?= number_format((int)($indicators[$key] ?? 0), 0, ',', '.') ?></strong>
             </a>

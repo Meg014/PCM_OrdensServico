@@ -13,8 +13,8 @@
             new Chart(canvas, {type: 'line', data: {labels, datasets}, options: {responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false}, plugins: {tooltip: {callbacks: {label: context => `${context.dataset.label}: ${context.raw}${suffix}`}}}, scales: {y: {beginAtZero: true}}}});
         };
         line('[data-pcm-history="status"]', [
-            ['Total de OS', 'total', '#2f80ed'], ['Em aberto', 'open', '#24527a'], ['Fechadas', 'completed', '#27ae60'], ['Canceladas', 'cancelled', '#d64545']
-        ].map(item => ({label: item[0], data: payload.series.map(point => point[item[1]]), borderColor: item[2], backgroundColor: item[2], tension: .2})), ' OS');
+            ['Total de O.S.', 'total', '#2f80ed'], ['Em aberto', 'open', '#24527a'], ['Fechadas', 'completed', '#27ae60'], ['Canceladas', 'cancelled', '#d64545']
+        ].map(item => ({label: item[0], data: payload.series.map(point => point[item[1]]), borderColor: item[2], backgroundColor: item[2], tension: .2})), ' O.S.');
         line('[data-pcm-history="efficiency"]', [{label: 'Eficiência', data: payload.series.map(point => point.efficiency), borderColor: '#7b61c9', backgroundColor: '#7b61c9', tension: .2}], '%');
         const equipment = document.querySelector('[data-pcm-history="equipment"]');
         if (equipment) new Chart(equipment, {type: 'bar', data: {labels: payload.equipment.map(row => row.label), datasets: [{data: payload.equipment.map(row => row.quantity), backgroundColor: '#356796', borderRadius: 5}]}, options: {responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: {legend: {display: false}}, scales: {x: {beginAtZero: true, ticks: {precision: 0}}}}});

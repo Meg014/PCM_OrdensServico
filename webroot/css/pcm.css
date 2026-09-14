@@ -357,6 +357,7 @@ code { color: var(--text-body); }
 }
 .pcm-presentation-card strong { color: var(--text-title); font-size: clamp(4rem, 10vh, 8rem); line-height: 1; font-variant-numeric: tabular-nums; }
 .pcm-presentation-type-cards { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pcm-presentation-service-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pcm-presentation-type-cards article {
     align-items: center; background: var(--bg-surface); border: 1px solid var(--border-primary);
     border-radius: .85rem; box-shadow: var(--shadow); display: grid; grid-template-columns: minmax(0, 1fr) auto;

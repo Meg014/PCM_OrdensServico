@@ -48,7 +48,7 @@
         nodes.corrective.textContent = number.format(screen.corrective);
         nodes.improvement.textContent = number.format(screen.improvement);
         for (const key of ['emergency', 'scheduled', 'offseason', 'safra_open', 'safra_completed', 'offseason_open', 'offseason_completed']) {
-            nodes[key].textContent = number.format(screen[key] ?? 0);
+            if (nodes[key]) nodes[key].textContent = number.format(screen[key] ?? 0);
         }
         nodes.position.textContent = `Tela ${currentIndex + 1} de ${screens.length}`;
         nodes.countdown.textContent = String(remaining);

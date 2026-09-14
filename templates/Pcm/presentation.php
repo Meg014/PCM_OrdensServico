@@ -40,8 +40,8 @@ $firstScreen = $payload['screens'][0];
         <article><p>MELHORIAS</p><small>OS em aberto · MEL</small><strong data-presentation-improvement><?= number_format((int)$firstScreen['improvement'], 0, ',', '.') ?></strong></article>
     </div>
 
-    <div class="pcm-presentation-type-cards" aria-label="Classificações de serviço das OS em aberto">
-        <?php foreach (\App\Service\PcmServiceClassifier::CARD_CLASSES as $key => $classification): ?>
+    <div class="pcm-presentation-type-cards pcm-presentation-service-cards" aria-label="Classificações de serviço das OS em aberto">
+        <?php foreach (array_diff_key(\App\Service\PcmServiceClassifier::CARD_CLASSES, ['offseason' => true]) as $key => $classification): ?>
         <article><p><?= h(mb_strtoupper(\App\Service\PcmServiceClassifier::LABELS[$classification])) ?></p><small>OS em aberto</small><strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong></article>
         <?php endforeach; ?>
     </div>

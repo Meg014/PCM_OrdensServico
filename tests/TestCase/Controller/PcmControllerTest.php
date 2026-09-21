@@ -10,6 +10,7 @@ use Cake\TestSuite\TestCase;
 final class PcmControllerTest extends TestCase
 {
     use IntegrationTestTrait;
+    use \App\Test\TestCase\Support\AuthenticatedUserTrait;
     use PcmSnapshotFixture;
 
     private static array $ids;
@@ -168,7 +169,7 @@ final class PcmControllerTest extends TestCase
         $this->get('/pcm/setor/ELETRI?page=2');
         $this->assertResponseOk();
         $this->assertResponseContains('Elétrica');
-        $this->assertResponseContains('4396');
+        $this->assertResponseContains('4509');
     }
 
     public function testFiltersLimitDashboardAndTable(): void

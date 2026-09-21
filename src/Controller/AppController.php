@@ -17,6 +17,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use Cake\Controller\Controller;
+use Cake\Event\EventInterface;
+use Cake\Http\Exception\ForbiddenException;
 
 /**
  * Application Controller
@@ -42,11 +44,57 @@ class AppController extends Controller
         parent::initialize();
 
         $this->loadComponent('Flash');
+        $this->loadComponent('Authentication.Authentication');
 
         /*
          * Enable the following component for recommended CakePHP form protection settings.
          * see https://book.cakephp.org/5/en/controllers/components/form-protection.html
          */
         //$this->loadComponent('FormProtection');
+    }
+
+    /** Revalidates sessions and enforces administrative permissions on the server. */
+    public function beforeFilter(EventInterface $event): void
+    {
+        parent::beforeFilter($event);
+        $this->response = $this->response->withHeader('Cache-Control', 'no-store');
+        $identity = $this->request->getAttribute('identity');
+        $currentUser = null;
+        if ($identity !== null) {
+            $currentUser = $this->fetchTable('Users')->find('active')
+                ->where(['Users.id' => $identity->getIdentifier()])->first();
+            // Recheck status, role and password on every request, including existing sessions.
+            if ($currentUser === null || !hash_equals($currentUser->password, (string)$identity->get('password'))) {
+                $this->Authentication->logout();
+                $event->setResult($this->redirect('/login'));
+
+                return;
+            }
+        }
+        $this->set(compact('currentUser'));
+        if ($currentUser !== null && $currentUser->role === 'TV') {
+            $path = $this->request->getUri()->getPath();
+            if ($identity->get('role') !== 'TV') {
+                $this->Authentication->logout();
+                $event->setResult($this->redirect('/login'));
+
+                return;
+            }
+            $allowed = ($this->request->is('get') && in_array($path, [
+                '/pcm/apresentacao', '/pcm/apresentacao/data', '/login',
+            ], true)) || ($path === '/logout' && $this->request->is('post'))
+                || ($path === '/login' && $this->request->is('post'));
+            if (!$allowed) {
+                throw new ForbiddenException('Perfil TV: acesso exclusivo à apresentação.');
+            }
+        }
+        if (
+            $currentUser !== null && (
+            $this->request->getParam('controller') === 'Users'
+            || ($this->request->getParam('controller') === 'ReportImports' && $this->request->getParam('action') === 'manual')
+            ) && $currentUser->role !== 'ADMIN'
+        ) {
+            throw new ForbiddenException('Acesso exclusivo para administradores.');
+        }
     }
 }

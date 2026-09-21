@@ -424,6 +424,12 @@ return [
      */
     'Session' => [
         'defaults' => 'php',
+        'timeout' => 480,
+        'ini' => [
+            'session.cookie_httponly' => 1,
+            'session.cookie_samesite' => 'Lax',
+            'session.use_strict_mode' => 1,
+        ],
     ],
 
     /**

@@ -22,8 +22,13 @@ final class PcmOperationalRevisionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $users = \Cake\Datasource\FactoryLocator::get('Table')->get('Users');
+        $user = $users->newEntity(['nome' => 'Test', 'email' => 'revision@example.com', 'password' => 'Test-password-2026', 'role' => 'ADMIN', 'ativo' => true]);
+
         $connection = self::connection();
         $connection->begin();
+        $users->saveOrFail($user);
+        $this->session(['Auth' => $user]);
         self::clearPcmData();
         $areas = [];
         foreach (['MECANI', 'FUTURO'] as $code) {

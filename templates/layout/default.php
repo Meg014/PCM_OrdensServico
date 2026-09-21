@@ -4,6 +4,7 @@
  * @var list<\App\Model\Entity\MaintenanceArea>|null $navigationAreas
  */
 $navigationAreas ??= [];
+$isTv = isset($currentUser) && $currentUser->role === 'TV';
 $title = trim($this->fetch('title')) ?: 'PCM';
 ?>
 <!doctype html>
@@ -34,19 +35,27 @@ $title = trim($this->fetch('title')) ?: 'PCM';
 <body>
     <nav class="navbar navbar-expand-lg pcm-navbar">
         <div class="container-xl">
-            <?= $this->Html->link('PCM', ['_name' => 'pcm'], ['class' => 'navbar-brand fw-bold']) ?>
+            <?= $this->Html->link('PCM', ['_name' => $isTv ? 'pcm-presentation' : 'pcm'], ['class' => 'navbar-brand fw-bold']) ?>
             <div class="d-flex align-items-center gap-2 order-lg-3">
+                <?php if (isset($currentUser)): ?>
+                    <span class="small text-body-secondary"><?= h($currentUser->nome) ?></span>
+                    <?= $this->Form->postLink('Sair', '/logout', ['class' => 'btn btn-sm btn-outline-secondary']) ?>
+                <?php endif; ?>
                 <button class="pcm-theme-toggle" type="button" data-pcm-theme-toggle
                         title="Ativar tema claro" aria-label="Ativar tema claro">
                     <span data-pcm-theme-icon aria-hidden="true">☀</span>
                 </button>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#pcmNavigation"
+                <?php if (!$isTv): ?><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#pcmNavigation"
                         aria-controls="pcmNavigation" aria-expanded="false" aria-label="Abrir navegação">
                     <span class="navbar-toggler-icon"></span>
-                </button>
+                </button><?php endif; ?>
             </div>
+            <?php if (isset($currentUser) && !$isTv): ?>
             <div class="collapse navbar-collapse" id="pcmNavigation">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <?php if ($currentUser->role === 'ADMIN'): ?>
+                        <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
+                    <?php endif; ?>
                     <li class="nav-item">
                         <?= $this->Html->link('PCM Geral', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
                     </li>
@@ -81,6 +90,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                     </li>
                 </ul>
             </div>
+            <?php endif; ?>
         </div>
     </nav>
     <main class="pcm-main">

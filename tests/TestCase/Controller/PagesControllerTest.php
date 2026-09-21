@@ -27,6 +27,7 @@ use Cake\TestSuite\TestCase;
 class PagesControllerTest extends TestCase
 {
     use IntegrationTestTrait;
+    use \App\Test\TestCase\Support\AuthenticatedUserTrait;
 
     /**
      * testDisplay method

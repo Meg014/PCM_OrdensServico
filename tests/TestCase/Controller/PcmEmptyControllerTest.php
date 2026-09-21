@@ -10,6 +10,7 @@ use Cake\TestSuite\TestCase;
 final class PcmEmptyControllerTest extends TestCase
 {
     use IntegrationTestTrait;
+    use \App\Test\TestCase\Support\AuthenticatedUserTrait;
     use PcmSnapshotFixture;
 
     public static function setUpBeforeClass(): void

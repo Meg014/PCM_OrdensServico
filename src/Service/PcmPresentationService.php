@@ -54,7 +54,7 @@ final class PcmPresentationService
         foreach (MaintenanceAreasTable::FRIENDLY_NAMES as $code => $friendlyName) {
             if (isset($areasByCode[$code])) {
                 $area = $areasByCode[$code];
-                $label = mb_strtoupper($friendlyName);
+                $label = mb_strtoupper((string)$area->display_name);
                 $ordered[] = compact('area', 'label');
                 unset($areasByCode[$code]);
             }

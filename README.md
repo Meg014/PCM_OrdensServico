@@ -1,5 +1,9 @@
 # PCM — Ordens de Serviço TOTVS
 
+## Login e usuários
+
+Consulte [Autenticação e usuários](docs/autenticacao-usuarios.md) para criar o primeiro ADMIN com `bin/create-admin.ps1`, acessar `/login` e administrar usuários em `/usuarios`. O documento também descreve a ordenação por criação da OS e os filtros de datas do detalhamento.
+
 A [revisão funcional de setembro de 2026](docs/revisao-funcional-pcm.md) documenta a exclusão de canceladas dos KPIs, as classificações de serviço, os novos cards, filtros, datas e checklist de validação. Ela não exige migration nem reimportação.
 
 ## MariaDB externo no Windows

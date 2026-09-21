@@ -10,6 +10,7 @@ use Cake\TestSuite\TestCase;
 final class PcmHistoryControllerTest extends TestCase
 {
     use IntegrationTestTrait;
+    use \App\Test\TestCase\Support\AuthenticatedUserTrait;
     use PcmSnapshotFixture;
     private static array $ids;
 

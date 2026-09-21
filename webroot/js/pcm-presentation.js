@@ -87,7 +87,7 @@
     }, 30_000);
 
     const exit = async () => {
-        if (stopped) return;
+        if (stopped || !root.dataset.exitUrl) return;
         stopped = true;
         window.clearInterval(rotateTimer);
         window.clearInterval(refreshTimer);

@@ -33,6 +33,7 @@ $statusPresentation = [
                 <strong><?= $currentImport ? number_format((int)$currentImport->rows_imported, 0, ',', '.') : '0' ?></strong>
             </div>
         </div>
+        <?php if ($currentUser->role === 'ADMIN'): ?>
         <div class="col-12 col-md-4 d-grid">
             <?= $this->Html->link(
                 'Importar novo relatório',
@@ -40,6 +41,7 @@ $statusPresentation = [
                 ['class' => 'btn btn-primary pcm-primary-action d-flex align-items-center justify-content-center'],
             ) ?>
         </div>
+        <?php endif; ?>
     </div>
 </section>
 

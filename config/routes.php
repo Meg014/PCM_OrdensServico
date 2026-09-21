@@ -50,6 +50,13 @@ return function (RouteBuilder $routes): void {
     $routes->setRouteClass(DashedRoute::class);
 
     $routes->scope('/', function (RouteBuilder $builder): void {
+        $builder->connect('/login', ['controller' => 'Auth', 'action' => 'login']);
+        $builder->post('/logout', ['controller' => 'Auth', 'action' => 'logout']);
+        $builder->connect('/usuarios', ['controller' => 'Users', 'action' => 'index']);
+        $builder->connect('/usuarios/novo', ['controller' => 'Users', 'action' => 'add']);
+        $builder->connect('/usuarios/{id}/revogar-tv', ['controller' => 'Users', 'action' => 'revokeTv'], ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_method' => 'POST']);
+        $builder->connect('/usuarios/{id}/editar', ['controller' => 'Users', 'action' => 'edit'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
+        $builder->connect('/usuarios/{id}/senha', ['controller' => 'Users', 'action' => 'password'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
         $builder->connect('/pcm', ['controller' => 'Pcm', 'action' => 'index'], ['_name' => 'pcm']);
         $builder->get('/pcm/ordens', ['controller' => 'Pcm', 'action' => 'orders'], 'pcm-orders');
         $builder->get(

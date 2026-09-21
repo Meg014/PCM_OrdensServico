@@ -10,7 +10,7 @@ final class SectorDashboardService
     public const STATUSES = [WorkOrderStatusResolver::OPEN, WorkOrderStatusResolver::COMPLETED];
     public const SORT_FIELDS = ['source_order_number', 'equipment_code', 'equipment_name', 'service_code',
         'service_name', 'cost_center_code', 'maintenance_type', 'source_situation', 'finished_raw',
-        'general_actual_start', 'treated_status'];
+        'general_actual_start', 'maintenance_planned_start', 'id', 'treated_status'];
 
     /** Reuses the same current import for every query in a request. */
     public function __construct(private readonly CurrentSnapshotService $current = new CurrentSnapshotService())
@@ -23,6 +23,20 @@ final class SectorDashboardService
         $limits = ['equipment' => 100, 'service' => 30, 'service_name' => 255, 'cost_center' => 30,
             'maintenance_type' => 30, 'area' => 30, 'q' => 100];
         $filters = [];
+        foreach (['date_start', 'date_end'] as $field) {
+            $value = $query[$field] ?? null;
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $date = is_string($value) ? \DateTimeImmutable::createFromFormat('!Y-m-d', $value) : false;
+            if (!$date || $date->format('Y-m-d') !== $value) {
+                throw new \Cake\Http\Exception\BadRequestException('Informe datas válidas no formato AAAA-MM-DD.');
+            }
+            $filters[$field] = $value;
+        }
+        if (isset($filters['date_start'], $filters['date_end']) && $filters['date_start'] > $filters['date_end']) {
+            throw new \Cake\Http\Exception\BadRequestException('A data inicial deve ser anterior ou igual à data final.');
+        }
         if (is_array($query['within'] ?? null)) {
             $filters['within'] = array_values(array_intersect(array_keys(PcmIndicatorService::DRILLDOWNS), array_filter($query['within'], 'is_string')));
         }
@@ -106,11 +120,20 @@ final class SectorDashboardService
     /** Returns only the fields needed by the paginated list. */
     public function detailQuery(?int $areaId, array $filters): ?SelectQuery
     {
-        return $this->query($areaId, $filters)?->select([
+        $query = $this->query($areaId, $filters);
+        if (isset($filters['date_start'])) {
+            $query?->where(['WorkOrderSnapshots.maintenance_planned_start >=' => $filters['date_start'] . ' 00:00:00']);
+        }
+        if (isset($filters['date_end'])) {
+            $nextDay = (new \DateTimeImmutable($filters['date_end']))->modify('+1 day')->format('Y-m-d');
+            $query?->where(['WorkOrderSnapshots.maintenance_planned_start <' => $nextDay . ' 00:00:00']);
+        }
+
+        return $query?->select([
             'id', 'work_order_id', 'source_order_number', 'equipment_code', 'equipment_name',
             'service_code', 'service_name', 'maintenance_area_code', 'cost_center_code',
-            'maintenance_type', 'source_situation', 'finished_raw', 'general_actual_start', 'treated_status',
-        ]);
+            'maintenance_type', 'source_situation', 'finished_raw', 'general_actual_start', 'maintenance_planned_start', 'treated_status',
+        ])->orderBy(['WorkOrderSnapshots.maintenance_planned_start' => 'DESC', 'WorkOrderSnapshots.id' => 'DESC']);
     }
 
     /** Groups distinct dimensions on the database rather than loading snapshots. */
@@ -181,6 +204,8 @@ final class SectorDashboardService
             'maintenance_type' => ['maintenance_type', 'maintenance_type'],
             'area' => ['maintenance_area_code', 'maintenance_area_code']];
         $options = [];
+        $areaNames = \Cake\Datasource\FactoryLocator::get('Table')->get('MaintenanceAreas')->find()->all()
+            ->combine('source_code', 'display_name')->toArray();
         foreach ($map as $filter => [$code, $label]) {
             $query = $this->query($areaId);
             $options[$filter] = [];
@@ -194,7 +219,8 @@ final class SectorDashboardService
                 $value = (string)$row['option_value'];
                 $name = (string)$row['option_label'];
                 $options[$filter][] = [
-                    'value' => $value, 'label' => $value === $name ? $value : $value . ' — ' . $name,
+                    'value' => $value, 'label' => $filter === 'area' ? ($areaNames[$value] ?? $value)
+                        : ($value === $name ? $value : $value . ' — ' . $name),
                 ];
             }
         }

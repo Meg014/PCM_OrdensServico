@@ -6,13 +6,14 @@
  */
 $this->assign('title', 'Modo Apresentação');
 $this->Html->script('pcm-presentation', ['block' => true]);
+$isTv = isset($currentUser) && $currentUser->role === 'TV';
 $firstScreen = $payload['screens'][0];
 ?>
 <section
     class="pcm-presentation"
     data-pcm-presentation
     data-presentation-url="<?= h($this->Url->build(['_name' => 'pcm-presentation-data'])) ?>"
-    data-exit-url="<?= h($this->Url->build(['_name' => 'pcm'])) ?>"
+    <?php if (!$isTv): ?>data-exit-url="<?= h($this->Url->build(['_name' => 'pcm'])) ?>"<?php endif; ?>
 >
     <header class="pcm-presentation-header">
         <div>
@@ -21,7 +22,10 @@ $firstScreen = $payload['screens'][0];
                 <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?>
             </p>
         </div>
-        <button class="btn btn-outline-secondary" type="button" data-presentation-exit>Sair da apresentação</button>
+        <?php if (!$isTv): ?><button class="btn btn-outline-secondary" type="button" data-presentation-exit>Sair da apresentação</button>
+        <?php else: ?>
+        <?= $this->Form->postLink('Logout', '/logout', ['class' => 'btn btn-sm btn-outline-secondary']) ?>
+        <?php endif; ?>
     </header>
 
     <div class="pcm-presentation-cards" aria-live="polite">

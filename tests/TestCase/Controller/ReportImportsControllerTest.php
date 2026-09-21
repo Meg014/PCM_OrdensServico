@@ -9,6 +9,7 @@ use Cake\TestSuite\TestCase;
 final class ReportImportsControllerTest extends TestCase
 {
     use IntegrationTestTrait;
+    use \App\Test\TestCase\Support\AuthenticatedUserTrait;
 
     public function testHistoryPageUsesPcmPresentation(): void
     {

@@ -36,7 +36,7 @@ final class PcmController extends AppController
         $dashboard = $service->dashboard(null, $filters);
         $query = $service->detailQuery(null, $filters);
         $orders = $query === null ? [] : $this->paginate($query, [
-            'limit' => 20, 'maxLimit' => 100, 'order' => ['source_order_number' => 'ASC'],
+            'limit' => 20, 'maxLimit' => 100, 'order' => ['maintenance_planned_start' => 'DESC', 'id' => 'DESC'],
             'sortableFields' => SectorDashboardService::SORT_FIELDS,
         ]);
         $area = (object)['source_code' => null, 'display_name' => 'Todas as áreas'];
@@ -109,8 +109,8 @@ final class PcmController extends AppController
         $orders = $query === null ? [] : $this->paginate($query, [
             'limit' => 30,
             'maxLimit' => 100,
-            'order' => ['source_order_number' => 'ASC'],
-            'sortableFields' => ['source_order_number', 'maintenance_area_code', 'equipment_code', 'service_name', 'cost_center_code'],
+            'order' => ['maintenance_planned_start' => 'DESC', 'id' => 'DESC'],
+            'sortableFields' => ['maintenance_planned_start', 'id', 'source_order_number', 'maintenance_area_code', 'equipment_code', 'service_name', 'cost_center_code'],
         ]);
         $values = [];
         foreach ($orders as $order) {
@@ -143,7 +143,7 @@ final class PcmController extends AppController
         $orders = $query === null ? [] : $this->paginate($query, [
             'limit' => 20,
             'maxLimit' => 100,
-            'order' => ['source_order_number' => 'ASC'],
+            'order' => ['maintenance_planned_start' => 'DESC', 'id' => 'DESC'],
             'sortableFields' => SectorDashboardService::SORT_FIELDS,
         ]);
         $currentImport = $snapshot->currentImport();
@@ -196,7 +196,7 @@ final class PcmController extends AppController
         if ($query === null) {
             throw new NotFoundException('Comparativo histórico ainda indisponível.');
         }
-        $orders = $this->paginate($query, ['limit' => 30, 'maxLimit' => 100, 'order' => ['source_order_number' => 'ASC']]);
+        $orders = $this->paginate($query, ['limit' => 30, 'maxLimit' => 100, 'order' => ['maintenance_planned_start' => 'DESC', 'id' => 'DESC']]);
         $currentImport = $snapshot->currentImport();
         $lastUpdatedAt = $snapshot->lastSuccessfulImportAt();
         $navigationAreas = $snapshot->areas();

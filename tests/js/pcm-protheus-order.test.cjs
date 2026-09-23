@@ -73,6 +73,8 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.match(h.targets.detail.textContent, /<script>/);
     assert.equal(all(h.targets.detail).some(el => el.tag === 'script'), false);
     assert.match(h.targets.history.textContent, /18\/08\/2026/);
+    assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 3);
+    assert.equal(all(h.targets.history).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 1);
     all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Ver mais').listeners.click();
     await tick();
     assert.match(h.calls[1].url, /part=history&page=2/);
@@ -91,6 +93,7 @@ test('network failure, invalid response and expired login only show the public f
         await tick();
         assert.equal(h.targets.detail.textContent, 'Detalhes do Protheus temporariamente indisponíveis.');
         assert.equal(h.targets.history.textContent, '');
+        assert.doesNotMatch(h.targets.detail.textContent, /Fonte: Protheus/);
         assert.doesNotMatch(h.targets.detail.textContent, /SQLSTATE|secret/);
         assert.equal(h.targets.detail.attributes['aria-busy'], 'false');
     }

@@ -20,7 +20,10 @@
     const codeName = (code, name) => [code, name].filter(v => v !== null && v !== undefined && v !== '').join(' — ') || '—';
     const heading = (title, label = 'PROTHEUS') => {
         const block = node('div', undefined, 'pcm-section-title mt-4');
-        block.append(node('p', label), node('h2', title));
+        const headingText = node('h2', title);
+        headingText.append(node('span', 'Fonte: Protheus',
+            'badge rounded-pill bg-secondary-subtle text-secondary-emphasis border fw-normal ms-2 align-middle'));
+        block.append(node('p', label), headingText);
         return block;
     };
     const notice = (target, text = unavailable) => target.replaceChildren(node('p', text, 'text-body-secondary py-3'));

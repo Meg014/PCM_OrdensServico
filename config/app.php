@@ -276,6 +276,22 @@ return [
      *   other RDBMS.
      */
     'Datasources' => [
+        // Isolated integration: never use this datasource for ORM writes or migrations.
+        'protheus' => [
+            'className' => Connection::class,
+            'driver' => \App\Database\Driver\ProtheusReadOnly::class,
+            'host' => env('PROTHEUS_DB_HOST', ''),
+            'port' => (int)env('PROTHEUS_DB_PORT', 1433),
+            'database' => env('PROTHEUS_DB_DATABASE', ''),
+            'username' => env('PROTHEUS_DB_USERNAME', ''),
+            'password' => env('PROTHEUS_DB_PASSWORD', ''),
+            'encrypt' => filter_var(env('PROTHEUS_DB_ENCRYPT', true), FILTER_VALIDATE_BOOLEAN) ? 'yes' : 'no',
+            'trustServerCertificate' => filter_var(env('PROTHEUS_DB_TRUST_SERVER_CERTIFICATE', false), FILTER_VALIDATE_BOOLEAN) ? 'yes' : 'no',
+            'loginTimeout' => 5,
+            'persistent' => false,
+            'log' => false,
+            'cacheMetadata' => false,
+        ],
         /*
          * These configurations should contain permanent settings used
          * by all environments.

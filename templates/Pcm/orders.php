@@ -10,10 +10,16 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <?= $this->Html->link('Consultar legado Excel', ['_name' => 'pcm-orders-legacy'], ['class' => 'btn btn-outline-secondary']) ?></header>
 <section class="pcm-panel p-3 mb-4">
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-3']) ?>
-<?php foreach (['os' => 'Número da OS (com zeros à esquerda)', 'filial' => 'Filial (vazio: todas)', 'bem' => 'Código do equipamento'] as $key => $label): ?>
+<?php if (!empty($filters['filial'])): ?><?= $this->Form->hidden('filial', ['value' => $filters['filial']]) ?><?php endif; ?>
+<?php foreach (['os' => 'Número da OS (com zeros à esquerda)', 'centro' => 'Centro de custo', 'bem' => 'Código do equipamento'] as $key => $label): ?>
 <div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
-<input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key]) ?>"></div>
+<input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
+<?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $key => $label): ?>
+<div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
+<input type="date" class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($filters[$key] ?? '') ?>" aria-describedby="reference-date-help"></div>
+<?php endforeach; ?>
+<div class="col-12 text-body-secondary" id="reference-date-help">Período opcional da Data de referência, incluindo as datas inicial e final.</div>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
 <span class="text-body-secondary ms-2">Pesquisa por códigos exatos.</span></div>

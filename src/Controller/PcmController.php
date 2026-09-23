@@ -221,6 +221,7 @@ final class PcmController extends AppController
 
     public function sectorLegacy(string $code): void
     {
+        $this->set('isLegacySector', true);
         $code = strtoupper(trim($code));
         if (!preg_match('/^[A-Z0-9_-]{1,30}$/', $code)) {
             throw new NotFoundException('Código de área inválido.');

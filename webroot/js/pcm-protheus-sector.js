@@ -32,6 +32,9 @@
             if (!response.ok || response.redirected || !response.headers.get('content-type')?.includes('application/json')) throw Error('Unavailable');
             const data = await response.json();
             if (!data.available || typeof data.html !== 'string' || !data.charts || !Number.isFinite(Date.parse(data.queried_at))) throw Error('Incomplete');
+            for (const key of Object.keys(filters)) {
+                if (!Array.isArray(data.charts[key]) || data.charts[key].some(row => !Number.isSafeInteger(row.quantity) || row.quantity < 0)) throw Error('Incomplete charts');
+            }
             const fragment = document.createElement('template');
             // Same-origin CakePHP fragment; all database values are escaped in the server template.
             fragment.innerHTML = data.html;

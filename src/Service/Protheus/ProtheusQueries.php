@@ -133,7 +133,7 @@ SQL;
     }
 
     /** Eight closed variants: exact order, branch and equipment filters. */
-    public static function orders(bool $number, bool $branch, bool $equipment): string
+    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false): string
     {
         $where = "j.D_E_L_E_T_ <> '*'";
         if ($number) {
@@ -146,24 +146,33 @@ SQL;
             $where .= ' AND j.TJ_CODBEM = CAST(:bem AS VARCHAR(100))';
         }
 
-        return self::orderPage($where, false, false, false);
+        $join = '';
+        if ($filters) {
+            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
+            $date = self::REFERENCE_DATE;
+            $where .= " AND (f.centro = '' OR j.TJ_CCUSTO = f.centro)"
+                . " AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))"
+                . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))";
+        }
+
+        return self::orderPage($where, false, false, false, $join);
     }
 
-    private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true): string
+    private const REFERENCE_DATE = "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))";
+
+    private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true, string $join = ''): string
     {
         $start = $startUser ? 'j.TJ_USUAINI' : 'CAST(NULL AS VARCHAR(25))';
         $end = $endUser ? 'j.TJ_USUAFIM' : 'CAST(NULL AS VARCHAR(25))';
         $descriptionColumn = $description ? 'CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,' : '';
+        $referenceDate = self::REFERENCE_DATE;
 
         return <<<SQL
 WITH page_keys AS (
-    SELECT j.R_E_C_N_O_, COALESCE(
-               TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112),
-               TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112),
-               TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)
-           ) AS reference_date,
+    SELECT j.R_E_C_N_O_, {$referenceDate} AS reference_date,
            COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
+    {$join}
     WHERE {$where}
     ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC
     OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
@@ -273,7 +282,7 @@ SQL;
         foreach ([false, true] as $number) {
             foreach ([false, true] as $branch) {
                 foreach ([false, true] as $equipment) {
-                    if ($sql === self::orders($number, $branch, $equipment)) {
+                    if ($sql === self::orders($number, $branch, $equipment) || $sql === self::orders($number, $branch, $equipment, true)) {
                         return true;
                     }
                 }

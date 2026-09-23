@@ -91,7 +91,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = ''): array
     {
         if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -105,7 +105,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $params[$key] = rtrim($value, ' ');
             }
         }
-        $rows = $this->read(ProtheusQueries::orders($number !== null, $branch !== null, $equipment !== null),
+        $extraFilters = $costCenter !== '' || $dateStart !== '' || $dateEnd !== '';
+        if ($extraFilters) {
+            $params += ['centro' => $costCenter, 'date_start' => $dateStart, 'date_end' => $dateEnd];
+        }
+        $rows = $this->read(ProtheusQueries::orders($number !== null, $branch !== null, $equipment !== null, $extraFilters),
             $params, ['offset' => 'integer', 'fetch' => 'integer']);
         foreach ($rows as &$row) {
             if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {

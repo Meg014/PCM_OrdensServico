@@ -80,7 +80,8 @@ final class OrderListingTest extends TestCase
     {
         $calls = [];
         $service = new OrderListingService($this->repository([], $calls));
-        foreach ([['os' => []], ['page' => '0'], ['limite' => '101']] as $input) {
+        foreach ([['os' => []], ['page' => '0'], ['limite' => '101'], ['date_start' => '2026-02-30'],
+            ['date_end' => []], ['date_start' => '2026-08-19', 'date_end' => '2026-08-18']] as $input) {
             try {
                 $service->load($input);
                 self::fail('Invalid input accepted.');
@@ -88,6 +89,26 @@ final class OrderListingTest extends TestCase
                 self::assertSame([], $calls);
             }
         }
+    }
+
+    public function testCostCenterAndInclusiveReferencePeriodAreBoundBeforePagination(): void
+    {
+        $calls = [];
+        $service = new OrderListingService($this->repository([], $calls));
+        $result = $service->load(['centro' => '00100', 'date_start' => '2026-08-18', 'date_end' => '2026-08-18', 'page' => '2']);
+        self::assertTrue($result['available']);
+        [$sql, $params] = $calls[0];
+        self::assertSame('00100', $params['centro']);
+        self::assertSame('2026-08-18', $params['date_start']);
+        self::assertSame('2026-08-18', $params['date_end']);
+        self::assertSame(20, $params['offset']);
+        self::assertTrue(ProtheusQueries::allows($sql));
+        self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
+        self::assertStringContainsString('j.TJ_CCUSTO = f.centro', $sql);
+        self::assertStringContainsString(">= CONVERT(date, NULLIF(f.date_start, ''), 23)", $sql);
+        self::assertStringContainsString("<= CONVERT(date, NULLIF(f.date_end, ''), 23)", $sql);
+        self::assertSame(3, substr_count($sql, "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))"));
+        self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'f.date_end ='));
     }
 
     private function repository(array $rows, array &$calls, bool $fail = false): ProtheusRepository

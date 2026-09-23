@@ -1,10 +1,11 @@
 <?php
 $this->assign('title', $area->display_name);
 $categories = ['COR' => 'Corretivas', 'PRE' => 'Preventivas', 'MEL' => 'Melhorias'];
-$cardRoute = $area->source_code ? ['_name' => 'pcm-sector', 'code' => $area->source_code] : ['_name' => 'pcm-orders-legacy'];
+$cardRoute = $area->source_code ? ['_name' => !empty($isLegacySector) ? 'pcm-sector-legacy' : 'pcm-sector', 'code' => $area->source_code] : ['_name' => 'pcm-orders-legacy'];
 $chartPayload = ['status' => $dashboard['status'], 'maintenance' => array_map(static function (array $row) use ($categories): array { $row['label'] = $categories[$row['key']] ?? $row['label']; return $row; }, $dashboard['maintenanceProfile']), 'equipment' => $dashboard['equipment'], 'services' => $dashboard['services'], 'costCenters' => $dashboard['costCenters']];
 $this->Html->script(['chart.umd.min', 'pcm-sector', 'pcm-history'], ['block' => true]);
 ?>
+<?php if (!empty($isLegacySector)): ?><p class="alert alert-secondary">Legado Excel — última importação. Use a tela setorial principal para consultar o Protheus.</p><?php endif; ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($area->display_name) ?></h1><p class="pcm-updated"><?php if ($area->source_code): ?>Código: <strong><?= h($area->source_code) ?></strong> <span aria-hidden="true">•</span><?php endif; ?> <?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?></p></div></header>
 <?php if ($currentImport === null): ?><div class="alert alert-light border shadow-sm">Nenhum relatório foi importado com sucesso.</div><?php endif; ?>
 <?= $this->element('pcm_indicator_cards', ['indicators' => $indicators, 'comparison' => $comparison ?? null, 'cardRoute' => $cardRoute, 'filters' => $filters]) ?>

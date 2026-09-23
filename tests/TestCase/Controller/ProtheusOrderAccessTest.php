@@ -113,7 +113,10 @@ final class ProtheusOrderAccessTest extends TestCase
             'indicators' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::CARDS, null)]]);
         $html = $view->render('protheus_dashboard', false);
         self::assertStringContainsString('/pcm/apresentacao/data', $html);
-        self::assertStringContainsString('Protheus ainda não confirmado', $html);
+        self::assertSame(9, substr_count($html, 'data-dashboard-card='));
+        foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled'] as $key) {
+            self::assertStringContainsString('data-dashboard-card="' . $key . '"', $html);
+        }
         self::assertStringContainsString('Safra — O.S. em aberto', $html);
         self::assertStringContainsString('Entressafra — O.S. fechadas', $html);
         self::assertStringNotContainsString('Eficiência', $html);
@@ -121,6 +124,12 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('Fonte: Protheus', $html);
         self::assertStringNotContainsString('data-pcm-current-version', $html);
         self::assertStringNotContainsString('Importe um XLSX', $html);
+        $view->set('presentation', false);
+        $general = $view->render('protheus_dashboard', false);
+        self::assertSame(4, substr_count($general, 'data-dashboard-card='));
+        foreach (['Preventivas', 'Corretivas', 'Melhorias'] as $label) {
+            self::assertStringNotContainsString($label, $general);
+        }
     }
 
     public function testDirectDetailRouteAndPageNeedNoSnapshot(): void

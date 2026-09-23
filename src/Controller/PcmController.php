@@ -187,6 +187,40 @@ final class PcmController extends AppController
     /** Validates reusable indicator filtering for one maintenance area. */
     public function sector(string $code): void
     {
+        $result = $this->sectorPayload($code);
+        $this->set(['sector' => $result, 'navigationAreas' => array_map(static fn ($code, $name) =>
+            (object)['source_code' => $code, 'display_name' => $name],
+            array_keys(\App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES),
+            array_values(\App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES))]);
+        $this->viewBuilder()->setTemplate('sector_protheus');
+    }
+
+    public function sectorData(string $code): Response
+    {
+        $this->request->allowMethod(['get']);
+        $sector = $this->sectorPayload($code);
+        $this->set(compact('sector'));
+        $this->viewBuilder()->setLayout(false);
+        $html = $sector['available'] ? $this->createView()->element('protheus_sector_content', compact('sector')) : null;
+
+        return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
+            ->withStatus($sector['available'] ? 200 : 503)
+            ->withStringBody((string)json_encode(['available' => $sector['available'], 'html' => $html,
+                'charts' => $sector['charts'], 'queried_at' => $sector['queried_at']], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function sectorPayload(string $code): array
+    {
+        $this->request->getSession()->close();
+        try {
+            return (new \App\Service\Protheus\ProtheusSectorService())->load(strtoupper(trim($code)), $this->request->getQueryParams());
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros, área ou paginação inválidos.');
+        }
+    }
+
+    public function sectorLegacy(string $code): void
+    {
         $code = strtoupper(trim($code));
         if (!preg_match('/^[A-Z0-9_-]{1,30}$/', $code)) {
             throw new NotFoundException('Código de área inválido.');
@@ -211,6 +245,7 @@ final class PcmController extends AppController
         $lastUpdatedAt = $snapshot->lastSuccessfulImportAt();
         $navigationAreas = $snapshot->areas();
         $this->set(compact('area', 'indicators', 'currentImport', 'lastUpdatedAt', 'navigationAreas', 'dashboard', 'filters', 'orders'));
+        $this->viewBuilder()->setTemplate('sector');
     }
 
     /** Displays one current snapshot and the existing history of its OS identity. */

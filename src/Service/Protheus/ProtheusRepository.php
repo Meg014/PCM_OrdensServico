@@ -35,6 +35,31 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
+    /** Two bounded reads, never hydration of resources or snapshots. */
+    public function sector(array $params, int $page, int $limit, string $start, string $end): array
+    {
+        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+            throw new InvalidArgumentException('Paginação inválida.');
+        }
+        $aggregate = $this->read(ProtheusSectorQueries::aggregates(), $params);
+        $rows = $this->read(ProtheusSectorQueries::page(), $params + ['date_start' => $start,
+            'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1],
+            ['offset' => 'integer', 'fetch' => 'integer']);
+        $cardGroups = 0;
+        foreach (array_merge($aggregate, $rows) as $row) {
+            $cardGroups += ($row['dimension'] ?? '') === 'cards' ? 1 : 0;
+            if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
+                throw new RuntimeException('Identidade ou cadastro ambíguo.');
+            }
+        }
+        if ($cardGroups > 2000) {
+            throw new RuntimeException('Agregação incompleta.');
+        }
+
+        return ['aggregates' => $aggregate, 'orders' => array_slice($rows, 0, $limit),
+            'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
+    }
+
     /** SQL aggregates only: 61 ranking rows or at most 2000 management groups. */
     public function dashboard(array $filters, bool $management = false): array
     {

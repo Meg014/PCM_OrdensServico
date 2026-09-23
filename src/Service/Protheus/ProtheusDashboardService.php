@@ -35,10 +35,7 @@ final class ProtheusDashboardService
             'indicators' => array_fill_keys(self::CARDS, null), 'screens' => []];
         try {
             $rows = ($this->repository ?? new ProtheusRepository(budgetSeconds: 5))->dashboard($filters, true);
-            $counts = array_fill_keys(self::CARDS, null);
-            foreach (array_slice(self::CARDS, 0, 4) as $key) {
-                $counts[$key] = 0;
-            }
+            $counts = array_fill_keys(self::CARDS, 0);
             $screens = ['general' => ['key' => 'general', 'title' => 'PCM - VISÃO GERAL'] + $counts];
             $classifier = new PcmServiceClassifier();
             $payload['record_count'] = 0;
@@ -58,9 +55,17 @@ final class ProtheusDashboardService
                 // classifySnapshot changes EMERGENCIAL/PROGRAMADA to OUTROS for non-COR;
                 // neither result is ENTRESSAFRA, so the seasonal split is type-independent.
                 $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                $typeKey = ['PRE' => 'preventive', 'COR' => 'corrective', 'MEL' => 'improvement'][rtrim((string)($row['TJ_TIPO'] ?? ''), ' ')] ?? null;
+                $serviceKey = ['COREME' => 'emergency', 'CORPRO' => 'scheduled'][rtrim((string)$row['TJ_SERVICO'], ' ')] ?? null;
                 foreach (['general', $areaKey] as $key) {
                     $screens[$key][$season . '_open'] += (int)$row['open_count'];
                     $screens[$key][$season . '_completed'] += (int)$row['closed_count'];
+                    if ($typeKey !== null) {
+                        $screens[$key][$typeKey] += (int)$row['open_count'];
+                    }
+                    if ($serviceKey !== null) {
+                        $screens[$key][$serviceKey] += (int)$row['open_count'];
+                    }
                 }
             }
             $payload['indicators'] = array_intersect_key($screens['general'], $counts);

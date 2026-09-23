@@ -11,7 +11,7 @@ final class ProtheusQueries
     /** Aggregate before master lookup: no individual OS hydration or guessed maintenance type. */
     public const MANAGEMENT = <<<'SQL'
 WITH base AS (
-    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_SERVICO, j.TJ_SITUACA, j.TJ_TERMINO,
+    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_SERVICO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
            TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_start,
            COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
@@ -29,7 +29,7 @@ WITH base AS (
       AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
 ), counts AS (
-    SELECT TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, COUNT_BIG(*) AS quantity,
+    SELECT TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO, COUNT_BIG(*) AS quantity,
         MAX(identity_count) AS identity_count,
         SUM(CAST(CASE WHEN TJ_TERMINO = 'N' AND TJ_SITUACA <> 'C'
             AND planned_start >= CONVERT(date, :cutoff, 112) THEN 1 ELSE 0 END AS BIGINT)) AS open_count,
@@ -37,9 +37,9 @@ WITH base AS (
         SUM(CAST(CASE WHEN TJ_SITUACA IS NULL OR TJ_SITUACA NOT IN ('C', 'L', 'P')
             OR TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S')
             OR (TJ_SITUACA = 'C' AND TJ_TERMINO = 'S') THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
-    FROM base GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO
+    FROM base GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO
 )
-SELECT TOP (2001) c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.quantity,
+SELECT TOP (2001) c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.TJ_TIPO, c.quantity,
     c.identity_count, c.open_count, c.closed_count, c.unconfirmed_count,
     CASE WHEN local_service.matches > 0 THEN local_service.name ELSE shared_service.name END AS service_name,
     CASE WHEN local_service.matches > 0 THEN local_service.matches ELSE shared_service.matches END AS service_matches
@@ -52,7 +52,7 @@ OUTER APPLY (
     SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
     WHERE s.T4_SERVICO = c.TJ_SERVICO AND s.T4_FILIAL = '' AND s.D_E_L_E_T_ <> '*'
 ) shared_service
-ORDER BY c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO
+ORDER BY c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.TJ_TIPO
 OPTION (RECOMPILE)
 SQL;
 
@@ -267,6 +267,9 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()) {
+            return true;
+        }
         foreach ([false, true] as $number) {
             foreach ([false, true] as $branch) {
                 foreach ([false, true] as $equipment) {

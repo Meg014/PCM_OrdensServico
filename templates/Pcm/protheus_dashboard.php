@@ -35,12 +35,16 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <p class="pcm-kpi-label"><?= h($label . ' — O.S. ' . $statusLabel) ?></p>
 <strong class="pcm-kpi-value" data-dashboard-card="<?= h($key) ?>"><?= $payload['indicators'][$key] === null ? '—' : h(number_format($payload['indicators'][$key], 0, ',', '.')) ?></strong>
 </article></div><?php endforeach; endforeach; ?></div>
+<?php if ($presentation): ?>
 <?php foreach ([['preventive' => 'Preventivas', 'corrective' => 'Corretivas', 'improvement' => 'Melhorias'],
     ['emergency' => 'Corretivas Emergenciais', 'scheduled' => 'Corretivas Programadas']] as $labels): ?>
 <div class="pcm-presentation-type-cards mt-3">
-<?php foreach ($labels as $label): ?><article><p><?= h($label) ?></p><strong>—</strong>
-<small>Campo “Tipo Manut.” do Protheus ainda não confirmado</small></article><?php endforeach; ?></div>
+<?php foreach ($labels as $key => $label): ?><article><p><?= h($label) ?></p>
+<strong data-dashboard-card="<?= h($key) ?>"><?= $payload['indicators'][$key] === null ? '—' : h(number_format($payload['indicators'][$key], 0, ',', '.')) ?></strong>
+<small>O.S. em aberto elegíveis</small>
+</article><?php endforeach; ?></div>
 <?php endforeach; ?>
+<?php endif; ?>
 <?php if ($presentation): ?><footer class="pcm-presentation-footer"><span data-dashboard-position>Tela 1</span>
 <span>Alternância de áreas a cada 15 segundos</span></footer><?php endif; ?>
 <details class="mt-3 text-body-secondary"><summary>Informação técnica</summary>

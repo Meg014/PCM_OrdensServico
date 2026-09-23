@@ -59,6 +59,10 @@ return function (RouteBuilder $routes): void {
         $builder->connect('/usuarios/{id}/senha', ['controller' => 'Users', 'action' => 'password'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
         $builder->connect('/pcm', ['controller' => 'Pcm', 'action' => 'index'], ['_name' => 'pcm']);
         $builder->get('/pcm/data', ['controller' => 'Pcm', 'action' => 'dashboardData'], 'pcm-data');
+        $builder->get('/pcm/setor/{code}/data', ['controller' => 'Pcm', 'action' => 'sectorData'], 'pcm-sector-data')
+            ->setPass(['code'])->setPatterns(['code' => '[A-Za-z0-9_-]+']);
+        $builder->get('/pcm/setor/{code}/legado', ['controller' => 'Pcm', 'action' => 'sectorLegacy'], 'pcm-sector-legacy')
+            ->setPass(['code'])->setPatterns(['code' => '[A-Za-z0-9_-]+']);
         $builder->get('/pcm/legado', ['controller' => 'Pcm', 'action' => 'indexLegacy'], 'pcm-legacy');
         $builder->get('/pcm/apresentacao/legado', ['controller' => 'Pcm', 'action' => 'presentationLegacy'], 'pcm-presentation-legacy');
         $builder->get('/pcm/apresentacao/legado/data', ['controller' => 'Pcm', 'action' => 'presentationLegacyData'], 'pcm-presentation-legacy-data');

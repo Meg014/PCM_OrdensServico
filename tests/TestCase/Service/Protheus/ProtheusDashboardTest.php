@@ -27,7 +27,8 @@ final class ProtheusDashboardTest extends TestCase
         self::assertSame(3, $result['indicators']['safra_completed']);
         self::assertSame(4, $result['indicators']['offseason_open']);
         self::assertSame(5, $result['indicators']['offseason_completed']);
-        foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled'] as $key) self::assertNull($result['indicators'][$key]);
+        foreach (['preventive', 'corrective', 'improvement'] as $key) self::assertSame(0, $result['indicators'][$key]);
+        foreach (['emergency', 'scheduled'] as $key) self::assertSame(1, $result['indicators'][$key]);
         self::assertCount(2, $result['screens']);
         self::assertCount(1, $calls);
         self::assertSame("X'; DELETE--", $calls[0][1]['bem']);
@@ -48,6 +49,33 @@ final class ProtheusDashboardTest extends TestCase
         }
     }
 
+    public function testTypesUseOnlyOrderCodeAndEligibleOpenCounts(): void
+    {
+        $calls = [];
+        $rows = [];
+        foreach ([['COR ', 'ELEPRE', 'PREVENTIVA ELETRICA', 2, 5],
+            ['COR', 'COROPE', 'CORRETIVA OPERACIONAL', 3, 7],
+            ['PRE', 'CORPRO', 'CORRETIVA PROGRAMADA', 4, 1],
+            ['MEL', 'COREME', 'CORRETIVA EMERGENCIAL', 6, 2],
+            ['', 'PRE', 'PREVENTIVA', 8, 0], ['XYZ', 'COR', 'CORRETIVA', 9, 0],
+            ['COR', 'X', 'CANCELADA OU FORA DO CORTE', 0, 0]] as [$type, $code, $name, $open, $closed]) {
+            $row = $this->row($code, $name, $open, $closed);
+            $row['TJ_TIPO'] = $type;
+            $rows[] = $row;
+        }
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        self::assertTrue($result['available']);
+        foreach ([$result['indicators'], $result['screens'][1]] as $counts) {
+            self::assertSame(5, $counts['corrective']);
+            self::assertSame(4, $counts['preventive']);
+            self::assertSame(6, $counts['improvement']);
+            self::assertSame(6, $counts['emergency']);
+            self::assertSame(4, $counts['scheduled']);
+        }
+        self::assertCount(1, $calls);
+        self::assertStringContainsString('GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO', $calls[0][0]);
+    }
+
     public function testClosedSqlAggregatesAndPreservesStatusAndDateScope(): void
     {
         $sql = ProtheusQueries::MANAGEMENT;
@@ -59,6 +87,21 @@ final class ProtheusDashboardTest extends TestCase
         self::assertSame(3, substr_count($sql, "D_E_L_E_T_ <> '*'"));
         self::assertStringNotContainsString('STL010', $sql);
         self::assertStringNotContainsString('SELECT *', $sql);
+    }
+
+    public function testEmergencyAndScheduledNeverInferFromNames(): void
+    {
+        $calls = [];
+        $rows = [$this->row('COREME ', 'OUTRO NOME', 2, 20),
+            $this->row('CORPRO ', 'OUTRO NOME', 3, 30),
+            $this->row('X', 'MANUTENCAO CORRETIVA EMERGENCIAL', 7, 0),
+            $this->row('Y', 'MANUTENCAO CORRETIVA PROGRAMADA', 8, 0),
+            $this->row('COREME', 'FORA DO ESCOPO DE ABERTAS', 0, 9)];
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        self::assertTrue($result['available']);
+        self::assertSame(2, $result['indicators']['emergency']);
+        self::assertSame(3, $result['indicators']['scheduled']);
+        self::assertSame(20, $result['indicators']['safra_open']);
     }
 
     public function testUnconfirmedOrAmbiguousDataAndFailureNeverBecomeZero(): void
@@ -90,7 +133,7 @@ final class ProtheusDashboardTest extends TestCase
 
     private function row(string $code, string $name, int $open, int $closed): array
     {
-        return ['TJ_FILIAL' => '01', 'TJ_CODAREA' => 'ELETRI', 'TJ_SERVICO' => $code,
+        return ['TJ_FILIAL' => '01', 'TJ_CODAREA' => 'ELETRI', 'TJ_SERVICO' => $code, 'TJ_TIPO' => '',
             'service_name' => $name, 'quantity' => $open + $closed, 'open_count' => $open, 'closed_count' => $closed,
             'identity_count' => 1, 'service_matches' => 1, 'unconfirmed_count' => 0];
     }

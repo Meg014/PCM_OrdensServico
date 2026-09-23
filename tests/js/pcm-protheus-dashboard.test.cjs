@@ -11,13 +11,14 @@ class Element {
     set innerHTML(_) { throw Error('Unsafe HTML'); }
 }
 const payload = {available: true, record_count: 12, queried_at: '2026-09-23T10:00:00-03:00',
-    screens: [{key: 'general', title: 'PCM', safra_open: 2, safra_completed: 3, offseason_open: 4, offseason_completed: 3},
-        {key: 'area:ELETRI', title: '<script>bad</script>', safra_open: 1, safra_completed: 2, offseason_open: 0, offseason_completed: 3}]};
+    screens: [{key: 'general', title: 'PCM', safra_open: 2, safra_completed: 3, offseason_open: 4, offseason_completed: 3, preventive: 1, corrective: 4, improvement: 1},
+        {key: 'area:ELETRI', title: '<script>bad</script>', safra_open: 1, safra_completed: 2, offseason_open: 0, offseason_completed: 3, preventive: 0, corrective: 1, improvement: 0}]};
 function harness(initial = payload, presentation = false) {
     const nodes = Object.fromEntries(['notice', 'count', 'updated', 'title', 'position'].map(key => [key, new Element()]));
     const group = new Element(); group.dataset.dashboardCard = 'safra_open';
+    const types = ['preventive', 'corrective', 'improvement'].map(key => { const el = new Element(); el.dataset.dashboardCard = key; return el; });
     const root = {dataset: {url: '/pcm/data?filial=01', presentation: String(presentation)},
-        querySelector: selector => nodes[selector.match(/data-dashboard-(.*)\]/)[1]], querySelectorAll: () => [group]};
+        querySelector: selector => nodes[selector.match(/data-dashboard-(.*)\]/)[1]], querySelectorAll: () => [group, ...types]};
     const intervals = []; const calls = [];
     const state = {reply: payload};
     vm.runInNewContext(script, {document: {body: {classList: {add: () => {}}}, documentElement: {}, querySelector: selector => selector === '[data-protheus-dashboard]' ? root : {textContent: JSON.stringify(initial)}, createElement: () => new Element()},
@@ -27,13 +28,14 @@ function harness(initial = payload, presentation = false) {
             if (state.reply instanceof Error) throw state.reply;
             return {ok: true, redirected: false, headers: {get: () => 'application/json'}, json: async () => state.reply};
         }});
-    return {nodes, group, intervals, calls, state};
+    return {nodes, group, types, intervals, calls, state};
 }
 test('one five-minute refresh preserves filters and renders seasonal counts', async () => {
     const h = harness();
     assert.equal(h.nodes.count.textContent, '12');
     assert.equal(h.intervals[0].delay, 300000);
     assert.equal(h.group.textContent, '2');
+    assert.deepEqual(h.types.map(el => el.textContent), ['1', '4', '1']);
     assert.equal(h.calls.length, 0);
     await h.intervals[0].fn();
     assert.equal(h.calls.length, 1);
@@ -49,6 +51,7 @@ test('failure or incomplete payload keeps last count, timestamp and cards', asyn
         assert.equal(h.nodes.count.textContent, '12');
         assert.equal(h.nodes.updated.textContent, date);
         assert.equal(h.group.textContent, '2');
+        assert.deepEqual(h.types.map(el => el.textContent), ['1', '4', '1']);
         assert.match(h.nodes.notice.textContent, /última consulta válida/);
         assert.doesNotMatch(h.nodes.notice.textContent, /SQLSTATE|secret/);
     }

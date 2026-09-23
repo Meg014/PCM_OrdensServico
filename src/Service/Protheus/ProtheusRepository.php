@@ -13,6 +13,8 @@ final class ProtheusRepository
 {
     private Connection $connection;
 
+    private ?array $historyUserColumns = null;
+
     public function __construct(?Connection $connection = null)
     {
         $connection ??= ConnectionManager::get('protheus');
@@ -79,6 +81,58 @@ final class ProtheusRepository
         return $result;
     }
 
+    /**
+     * One bounded page of STJ010, without resource hydration or a global COUNT.
+     * null branch includes all branches explicitly identified in each returned row.
+     *
+     * @return array{equipment_code: string, branch: ?string, page: int, limit: int,
+     *   has_more: bool, orders: array, user_columns: array}
+     */
+    public function findEquipmentHistory(string $equipmentCode, ?string $branch = null, int $page = 1, int $limit = 20): array
+    {
+        $equipmentCode = rtrim($equipmentCode, ' ');
+        $branch = $branch === null ? null : rtrim($branch, ' ');
+        if ($equipmentCode === '' || strlen($equipmentCode) > 100 || ($branch !== null && strlen($branch) > 100)) {
+            throw new InvalidArgumentException('Código de bem ou filial inválido.');
+        }
+        if ($page < 1 || $limit < 1 || $limit > 100 || $page > intdiv(PHP_INT_MAX, $limit)) {
+            throw new InvalidArgumentException('Use página positiva e limite entre 1 e 100.');
+        }
+        $this->historyUserColumns ??= $this->read(ProtheusQueries::HISTORY_USER_COLUMNS)[0];
+        $params = ['bem' => $equipmentCode, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1];
+        if ($branch !== null) {
+            $params['filial'] = $branch;
+        }
+        $rows = $this->read(ProtheusQueries::equipmentHistory(
+            $branch !== null,
+            $this->historyUserColumns['inicio'] !== null,
+            $this->historyUserColumns['fim'] !== null,
+        ), $params, ['offset' => 'integer', 'fetch' => 'integer']);
+        $hasMore = count($rows) > $limit;
+        $identities = [];
+        foreach ($rows as &$row) {
+            if ((int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
+                throw new RuntimeException('Cadastro ambíguo no histórico do equipamento.');
+            }
+            $key = json_encode([$row['TJ_FILIAL'], $row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            if ((int)$row['identity_count'] > 1 || isset($identities[$key])) {
+                throw new RuntimeException('Identidade de OS duplicada no histórico do equipamento.');
+            }
+            $identities[$key] = true;
+            unset($row['equipment_matches'], $row['service_matches'], $row['identity_count']);
+        }
+        unset($row);
+
+        return [
+            'equipment_code' => $equipmentCode, 'branch' => $branch, 'page' => $page,
+            'limit' => $limit, 'has_more' => $hasMore, 'orders' => array_slice($rows, 0, $limit),
+            'user_columns' => [
+                'TJ_USUAINI' => $this->historyUserColumns['inicio'] !== null,
+                'TJ_USUAFIM' => $this->historyUserColumns['fim'] !== null,
+            ],
+        ];
+    }
+
     private function one(string $sql, array $params): ?array
     {
         $rows = $this->read($sql, $params);
@@ -94,9 +148,9 @@ final class ProtheusRepository
      * Future SQL must also be registered in ProtheusQueries; history should call read()
      * directly rather than findOrder() per row (which loads all resource entries).
      */
-    private function read(string $sql, array $params = []): array
+    private function read(string $sql, array $params = [], array $types = []): array
     {
-        $statement = $this->connection->execute($sql, $params, array_fill_keys(array_keys($params), 'string'));
+        $statement = $this->connection->execute($sql, $params, $types + array_fill_keys(array_keys($params), 'string'));
         try {
             $rows = $statement->fetchAll('assoc');
         } finally {

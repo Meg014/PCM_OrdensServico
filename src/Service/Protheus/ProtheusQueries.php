@@ -8,6 +8,70 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    /** Optional columns are probed without executing arbitrary SQL or scanning STJ010. */
+    public const HISTORY_USER_COLUMNS = <<<'SQL'
+SELECT COL_LENGTH('dbo.STJ010', 'TJ_USUAINI') AS inicio,
+       COL_LENGTH('dbo.STJ010', 'TJ_USUAFIM') AS fim
+SQL;
+
+    /**
+     * Finite templates only: boolean choices cannot inject identifiers or expressions.
+     * SQL Server equality pads CHAR/VARCHAR operands, respecting trailing spaces
+     * without wrapping indexed equipment/branch columns in RTRIM.
+     */
+    public static function equipmentHistory(bool $branch, bool $startUser = false, bool $endUser = false): string
+    {
+        $branchFilter = $branch ? ' AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))' : '';
+        $start = $startUser ? 'j.TJ_USUAINI' : 'CAST(NULL AS VARCHAR(25))';
+        $end = $endUser ? 'j.TJ_USUAFIM' : 'CAST(NULL AS VARCHAR(25))';
+
+        return <<<SQL
+WITH page_keys AS (
+    SELECT j.R_E_C_N_O_, TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112) AS reference_date,
+           COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
+    FROM dbo.STJ010 j
+    WHERE j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}
+    ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC
+    OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
+)
+SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM,
+       CASE WHEN b.local_count > 0 THEN b.local_name ELSE b.shared_name END AS equipment_name,
+       CASE WHEN b.local_count > 0 THEN b.local_count ELSE b.shared_count END AS equipment_matches,
+       j.TJ_SERVICO,
+       CASE WHEN s.local_count > 0 THEN s.local_name ELSE s.shared_name END AS service_name,
+       CASE WHEN s.local_count > 0 THEN s.local_count ELSE s.shared_count END AS service_matches,
+       j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
+       CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
+       j.TJ_DTORIGI, j.TJ_DTPPINI, j.TJ_HOPPINI, j.TJ_DTPPFIM, j.TJ_HOPPFIM,
+       j.TJ_DTPRINI, j.TJ_HOPRINI, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
+       j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
+       j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
+       {$start} AS TJ_USUAINI, {$end} AS TJ_USUAFIM,
+       CONVERT(VARCHAR(10), p.reference_date, 23) AS reference_date
+FROM page_keys p
+INNER JOIN dbo.STJ010 j ON j.R_E_C_N_O_ = p.R_E_C_N_O_ AND j.D_E_L_E_T_ <> '*'
+OUTER APPLY (
+    SELECT COUNT(CASE WHEN b.T9_FILIAL = j.TJ_FILIAL THEN 1 END) AS local_count,
+           MAX(CASE WHEN b.T9_FILIAL = j.TJ_FILIAL THEN b.T9_NOME END) AS local_name,
+           COUNT(CASE WHEN b.T9_FILIAL = '' THEN 1 END) AS shared_count,
+           MAX(CASE WHEN b.T9_FILIAL = '' THEN b.T9_NOME END) AS shared_name
+    FROM dbo.ST9010 b
+    WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*'
+      AND (b.T9_FILIAL = j.TJ_FILIAL OR b.T9_FILIAL = '')
+) b
+OUTER APPLY (
+    SELECT COUNT(CASE WHEN s.T4_FILIAL = j.TJ_FILIAL THEN 1 END) AS local_count,
+           MAX(CASE WHEN s.T4_FILIAL = j.TJ_FILIAL THEN s.T4_NOME END) AS local_name,
+           COUNT(CASE WHEN s.T4_FILIAL = '' THEN 1 END) AS shared_count,
+           MAX(CASE WHEN s.T4_FILIAL = '' THEN s.T4_NOME END) AS shared_name
+    FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.D_E_L_E_T_ <> '*'
+      AND (s.T4_FILIAL = j.TJ_FILIAL OR s.T4_FILIAL = '')
+) s
+ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC
+SQL;
+    }
+
     public const ORDER = <<<'SQL'
 SELECT TOP (2) j.*, CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS pcm_descricao
 FROM dbo.STJ010 j
@@ -51,7 +115,17 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        foreach ([false, true] as $branch) {
+            foreach ([false, true] as $startUser) {
+                foreach ([false, true] as $endUser) {
+                    if ($sql === self::equipmentHistory($branch, $startUser, $endUser)) {
+                        return true;
+                    }
+                }
+            }
+        }
         return in_array($sql, [
+            self::HISTORY_USER_COLUMNS,
             self::HEALTH, self::ORDER, self::ORDER_BRANCH, self::EQUIPMENT,
             self::SERVICE, self::ENTRIES, self::PROFESSIONAL, self::PRODUCT,
         ], true);

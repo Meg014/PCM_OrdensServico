@@ -1,5 +1,8 @@
 # Protheus: integração inicial de leitura
 
+O histórico paginado por equipamento está descrito em [protheus-historico.md](protheus-historico.md).
+As notas abaixo sobre RTRIM e cadastros referem-se à consulta de detalhe original.
+
 O datasource `default` continua sendo o MariaDB pcm. A conexão `protheus` é
 independente e aberta apenas quando utilizada. CSV, dashboards, indicadores,
 autenticação e migrations não usam esta integração.

@@ -61,8 +61,11 @@
         const m = data.maintenance;
         const title = heading('Detalhes da manutenção', `PROTHEUS · OS ${value(data.number)} · FILIAL ${value(data.branch)}`);
         const card = node('section', undefined, 'pcm-detail-card');
-        card.append(node('h3', 'O que foi feito', 'h5'));
-        const description = node('p', value(data.description));
+        card.append(node('h3', 'Descrição do serviço', 'h5'));
+        const descriptionText = data.description == null ? '' : String(data.description)
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+            .replace(/(^|\s)□(?=\s|$)/g, '$1').trim();
+        const description = node('p', value(descriptionText));
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
         const list = node('dl');

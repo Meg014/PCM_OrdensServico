@@ -209,6 +209,30 @@ final class PcmController extends AppController
                 'charts' => $sector['charts'], 'queried_at' => $sector['queried_at']], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
     }
 
+    public function sectorOptions(): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        try {
+            $areas = (new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5))->findAreas();
+            $items = [];
+            foreach ($areas as $area) {
+                $code = $area['code'];
+                if (!is_string($code) || !preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $code)) continue;
+                $items[] = ['code' => $code,
+                    'name' => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$code] ?? $code,
+                    'url' => \Cake\Routing\Router::url(['_name' => 'pcm-sector', 'code' => $code])];
+            }
+            $payload = ['available' => true, 'areas' => $items];
+        } catch (\Throwable) {
+            $payload = ['available' => false, 'areas' => []];
+        }
+
+        return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
+            ->withStatus($payload['available'] ? 200 : 503)
+            ->withStringBody((string)json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
+    }
+
     private function sectorPayload(string $code): array
     {
         $this->request->getSession()->close();

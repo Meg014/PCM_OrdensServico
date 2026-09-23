@@ -87,6 +87,8 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-primary-action { background: #244f7b; border-color: #244f7b; font-weight: 600; }
 .pcm-primary-action:hover, .pcm-primary-action:focus { background: #193b60; border-color: #193b60; }
 .pcm-panel { padding: 0; overflow: hidden; }
+.pcm-sector-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pcm-sector-table-scroll > table { min-width: 100%; width: max-content; }
 .pcm-panel-heading { padding: 1.5rem 1.5rem 1rem; }
 .pcm-panel-heading h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
 .pcm-import-table { font-size: .9rem; white-space: nowrap; }

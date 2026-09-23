@@ -113,23 +113,31 @@ final class ProtheusOrderAccessTest extends TestCase
             'indicators' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::CARDS, null)]]);
         $html = $view->render('protheus_dashboard', false);
         self::assertStringContainsString('/pcm/apresentacao/data', $html);
-        self::assertSame(9, substr_count($html, 'data-dashboard-card='));
-        foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled'] as $key) {
+        self::assertSame(10, substr_count($html, 'data-dashboard-card='));
+        foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'] as $key) {
             self::assertStringContainsString('data-dashboard-card="' . $key . '"', $html);
         }
         self::assertStringContainsString('Safra — O.S. em aberto', $html);
         self::assertStringContainsString('Entressafra — O.S. fechadas', $html);
         self::assertStringNotContainsString('Eficiência', $html);
         self::assertStringNotContainsString('Concluídas', $html);
-        self::assertStringContainsString('Fonte: Protheus', $html);
+        self::assertStringNotContainsString('Fonte: Protheus', $html);
+        self::assertStringNotContainsString('Filtros da consulta Protheus', $html);
+        self::assertStringNotContainsString('Comparar legado Excel', $html);
         self::assertStringNotContainsString('data-pcm-current-version', $html);
         self::assertStringNotContainsString('Importe um XLSX', $html);
         $view->set('presentation', false);
         $general = $view->render('protheus_dashboard', false);
+        self::assertStringContainsString('Fonte: Protheus', $general);
         self::assertSame(4, substr_count($general, 'data-dashboard-card='));
-        foreach (['Preventivas', 'Corretivas', 'Melhorias'] as $label) {
+        foreach (['Preventivas', 'Corretivas', 'Melhorias', 'PARADAS POR OPORTUNIDADE'] as $label) {
             self::assertStringNotContainsString($label, $general);
         }
+        $view->set('currentUser', new Entity(['nome' => 'Teste', 'role' => 'ADMIN']));
+        $page = $view->render('protheus_dashboard', 'default');
+        self::assertStringNotContainsString('href="/pcm/analises"', $page);
+        self::assertStringNotContainsString('>Análises<', $page);
+        self::assertStringContainsString('href="/pcm/ordens"', $page);
     }
 
     public function testDirectDetailRouteAndPageNeedNoSnapshot(): void

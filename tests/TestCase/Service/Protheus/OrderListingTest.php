@@ -130,4 +130,15 @@ final class OrderListingTest extends TestCase
 
         return new ProtheusRepository($connection);
     }
+
+    public function testAreasComeFromDistinctNonDeletedNonBlankProtheusRows(): void
+    {
+        $calls = [];
+        $rows = $this->repository([['code' => 'ELETRI '], ['code' => 'NEWAREA']], $calls)->findAreas();
+        self::assertSame([['code' => 'ELETRI'], ['code' => 'NEWAREA']], $rows);
+        self::assertSame(ProtheusQueries::AREAS, $calls[0][0]);
+        self::assertStringContainsString('SELECT DISTINCT', $calls[0][0]);
+        self::assertStringContainsString("D_E_L_E_T_ <> '*'", $calls[0][0]);
+        self::assertStringContainsString("NULLIF(LTRIM(RTRIM(TJ_CODAREA)), '') IS NOT NULL", $calls[0][0]);
+    }
 }

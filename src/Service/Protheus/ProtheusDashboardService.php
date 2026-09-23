@@ -13,7 +13,7 @@ use RuntimeException;
 final class ProtheusDashboardService
 {
     public const CARDS = ['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed',
-        'preventive', 'corrective', 'improvement', 'emergency', 'scheduled'];
+        'preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'];
     public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'];
 
     public function __construct(private ?ProtheusRepository $repository = null)
@@ -56,7 +56,8 @@ final class ProtheusDashboardService
                 // neither result is ENTRESSAFRA, so the seasonal split is type-independent.
                 $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 $typeKey = ['PRE' => 'preventive', 'COR' => 'corrective', 'MEL' => 'improvement'][rtrim((string)($row['TJ_TIPO'] ?? ''), ' ')] ?? null;
-                $serviceKey = ['COREME' => 'emergency', 'CORPRO' => 'scheduled'][rtrim((string)$row['TJ_SERVICO'], ' ')] ?? null;
+                $serviceKey = ['COREME' => 'emergency', 'CORPRO' => 'scheduled',
+                    'MECOP' => 'opportunity', 'ELECOP' => 'opportunity'][rtrim((string)$row['TJ_SERVICO'], ' ')] ?? null;
                 foreach (['general', $areaKey] as $key) {
                     $screens[$key][$season . '_open'] += (int)$row['open_count'];
                     $screens[$key][$season . '_completed'] += (int)$row['closed_count'];

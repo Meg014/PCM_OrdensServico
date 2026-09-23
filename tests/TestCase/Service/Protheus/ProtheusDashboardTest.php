@@ -115,7 +115,7 @@ final class ProtheusDashboardTest extends TestCase
             self::assertNull($result['record_count']);
             self::assertNull($result['queried_at']);
             self::assertSame([], $result['screens']);
-            self::assertSame(array_fill(0, 9, null), array_values($result['indicators']));
+            self::assertSame(array_fill(0, count(ProtheusDashboardService::CARDS), null), array_values($result['indicators']));
             self::assertStringNotContainsString('SQLSTATE', json_encode($result));
         }
     }
@@ -136,6 +136,20 @@ final class ProtheusDashboardTest extends TestCase
         return ['TJ_FILIAL' => '01', 'TJ_CODAREA' => 'ELETRI', 'TJ_SERVICO' => $code, 'TJ_TIPO' => '',
             'service_name' => $name, 'quantity' => $open + $closed, 'open_count' => $open, 'closed_count' => $closed,
             'identity_count' => 1, 'service_matches' => 1, 'unconfirmed_count' => 0];
+    }
+
+    public function testOpportunityCountsOnlyEligibleOpenServiceCodes(): void
+    {
+        $calls = [];
+        $rows = [$this->row('MECOP ', 'OUTRO NOME', 2, 50),
+            $this->row('ELECOP', 'OUTRO NOME', 3, 60),
+            $this->row('X', 'PARADAS POR OPORTUNIDADE', 9, 0),
+            $this->row('MECOP', 'CANCELADA OU FORA DO CORTE', 0, 0)];
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        self::assertTrue($result['available']);
+        self::assertSame(5, $result['indicators']['opportunity']);
+        self::assertSame(5, $result['screens'][1]['opportunity']);
+        self::assertCount(1, $calls);
     }
 
     private function repository(?array $rows, array &$calls): ProtheusRepository

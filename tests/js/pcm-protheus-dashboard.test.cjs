@@ -15,6 +15,7 @@ const payload = {available: true, record_count: 12, queried_at: '2026-09-23T10:0
         {key: 'area:ELETRI', title: '<script>bad</script>', safra_open: 1, safra_completed: 2, offseason_open: 0, offseason_completed: 3, preventive: 0, corrective: 1, improvement: 0}]};
 function harness(initial = payload, presentation = false) {
     const nodes = Object.fromEntries(['notice', 'count', 'updated', 'title', 'position'].map(key => [key, new Element()]));
+    if (presentation) { delete nodes.count; delete nodes.position; }
     const group = new Element(); group.dataset.dashboardCard = 'safra_open';
     const types = ['preventive', 'corrective', 'improvement'].map(key => { const el = new Element(); el.dataset.dashboardCard = key; return el; });
     const root = {dataset: {url: '/pcm/data?filial=01', presentation: String(presentation)},
@@ -64,7 +65,7 @@ test('presentation rotates general and areas and preserves screen on refresh', a
     assert.equal(h.group.textContent, '1');
     await h.intervals[0].fn();
     assert.equal(h.group.textContent, '1');
-    assert.equal(h.nodes.position.textContent, 'Tela 2 de 2');
+    assert.doesNotMatch(h.nodes.updated.textContent, /Protheus/);
 });
 test('first failure does not invent zero and recovers on next refresh', async () => {
     const h = harness({available: false});

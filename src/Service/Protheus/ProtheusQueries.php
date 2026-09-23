@@ -8,6 +8,13 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    public const AREAS = <<<'SQL'
+SELECT DISTINCT RTRIM(TJ_CODAREA) AS code
+FROM dbo.STJ010
+WHERE D_E_L_E_T_ <> '*' AND NULLIF(LTRIM(RTRIM(TJ_CODAREA)), '') IS NOT NULL
+ORDER BY code
+SQL;
+
     /** Aggregate before master lookup: no individual OS hydration or guessed maintenance type. */
     public const MANAGEMENT = <<<'SQL'
 WITH base AS (
@@ -298,7 +305,7 @@ SQL;
             }
         }
         return in_array($sql, [
-            self::DASHBOARD, self::MANAGEMENT,
+            self::DASHBOARD, self::MANAGEMENT, self::AREAS,
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
             self::HISTORY_USER_COLUMNS,

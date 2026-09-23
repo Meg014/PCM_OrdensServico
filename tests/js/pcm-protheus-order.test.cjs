@@ -50,7 +50,7 @@ function harness(fetchReply) {
 }
 const ok = payload => ({ok: true, redirected: false, headers: {get: () => 'application/json'}, json: async () => payload});
 const detail = {
-    state: 'available', number: '004368', branch: '01', description: '<script>alert("xss")</script>',
+    state: 'available', number: '004368', branch: '01', description: '<script>alert("xss")</script>\n□\u0000',
     maintenance: {equipment_code: 'MEL 80 115', equipment_name: 'MOTOR ROSCA RO-02 - SILO 01',
         service_code: 'ELEPRE', service_name: 'PREVENTIVA ELETRICA', actual_end_date: '2026-08-18'},
     labor: [{professional: 'DAMIAO GONCALVES', code: '008382', hours: '1.00', unit: 'H'},
@@ -71,6 +71,8 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.match(h.targets.detail.textContent, /Outro profissional/);
     assert.match(h.targets.detail.textContent, /ROLAMENTO 6203 ZZ C3/);
     assert.match(h.targets.detail.textContent, /<script>/);
+    assert.match(h.targets.detail.textContent, /Descrição do serviço/);
+    assert.doesNotMatch(h.targets.detail.textContent, /O que foi feito|□|\u0000/);
     assert.equal(all(h.targets.detail).some(el => el.tag === 'script'), false);
     assert.match(h.targets.history.textContent, /18\/08\/2026/);
     assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 3);

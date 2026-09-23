@@ -5,16 +5,17 @@ $isTv = isset($currentUser) && $currentUser->role === 'TV';
 ?>
 <section class="<?= $presentation ? 'p-4' : '' ?>" data-protheus-dashboard data-presentation="<?= $presentation ? 'true' : 'false' ?>"
  data-url="<?= h($this->Url->build(['_name' => $presentation ? 'pcm-presentation-data' : 'pcm-data', '?' => $payload['filters']])) ?>">
-<header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | PROTHEUS</p>
+<header class="pcm-page-header"><div><?php if (!$presentation): ?><p class="pcm-eyebrow">PCM | PROTHEUS</p><?php endif; ?>
 <h1 data-dashboard-title><?= $presentation ? 'PCM - VISÃO GERAL' : 'Visão Geral' ?></h1>
-<span class="badge text-bg-secondary">Fonte: Protheus</span>
+<?php if (!$presentation): ?><span class="badge text-bg-secondary">Fonte: Protheus</span><?php endif; ?>
 <p class="pcm-updated" data-dashboard-updated>Dados atualizados em: consulta ainda indisponível</p>
-<small>Atualização automática a cada 5 minutos</small></div>
-<?php if (!$isTv): ?><div class="d-flex gap-2">
+<?php if (!$presentation): ?><small>Atualização automática a cada 5 minutos</small><?php endif; ?></div>
+<?php if (!$presentation && !$isTv): ?><div class="d-flex gap-2">
 <?= $this->Html->link($presentation ? 'Sair da apresentação' : 'Modo Apresentação', ['_name' => $presentation ? 'pcm' : 'pcm-presentation', '?' => $payload['filters']], ['class' => 'btn btn-outline-primary']) ?>
 <?= $this->Html->link('Comparar legado Excel', ['_name' => $presentation ? 'pcm-presentation-legacy' : 'pcm-legacy'], ['class' => 'btn btn-outline-secondary']) ?>
-</div><?php else: ?><?= $this->Form->postLink('Logout', '/logout', ['class' => 'btn btn-outline-secondary']) ?><?php endif; ?></header>
+</div><?php endif; ?></header>
 <p data-dashboard-notice role="status" aria-live="polite" class="text-body-secondary"></p>
+<?php if (!$presentation): ?>
 <p class="text-body-secondary">Safra/Entressafra seguem a classificação de serviços do PCM.
 Abertas: término N, situação diferente de C e início planejado desde 01/01/2026.
 Fechadas: término S, sem corte de data. Combinações conflitantes aguardam validação.</p>
@@ -28,6 +29,7 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <div class="col-12"><button type="submit" class="btn btn-primary">Aplicar códigos exatos</button>
 <small>Vazio: sem filtro. A atualização automática preserva estes filtros.</small></div>
 <?= $this->Form->end() ?></details>
+<?php endif; ?>
 <div class="<?= $presentation ? 'pcm-presentation-cards' : 'row g-3 pcm-kpi-grid-large' ?>" aria-live="polite">
 <?php foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label): ?>
 <?php foreach (['open' => 'em aberto', 'completed' => 'fechadas'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
@@ -37,19 +39,18 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 </article></div><?php endforeach; endforeach; ?></div>
 <?php if ($presentation): ?>
 <?php foreach ([['preventive' => 'Preventivas', 'corrective' => 'Corretivas', 'improvement' => 'Melhorias'],
-    ['emergency' => 'Corretivas Emergenciais', 'scheduled' => 'Corretivas Programadas']] as $labels): ?>
+    ['emergency' => 'Corretivas Emergenciais', 'scheduled' => 'Corretivas Programadas', 'opportunity' => 'PARADAS POR OPORTUNIDADE']] as $labels): ?>
 <div class="pcm-presentation-type-cards mt-3">
 <?php foreach ($labels as $key => $label): ?><article><p><?= h($label) ?></p>
 <strong data-dashboard-card="<?= h($key) ?>"><?= $payload['indicators'][$key] === null ? '—' : h(number_format($payload['indicators'][$key], 0, ',', '.')) ?></strong>
-<small>O.S. em aberto elegíveis</small>
 </article><?php endforeach; ?></div>
 <?php endforeach; ?>
 <?php endif; ?>
-<?php if ($presentation): ?><footer class="pcm-presentation-footer"><span data-dashboard-position>Tela 1</span>
-<span>Alternância de áreas a cada 15 segundos</span></footer><?php endif; ?>
+<?php if (!$presentation): ?>
 <details class="mt-3 text-body-secondary"><summary>Informação técnica</summary>
 O.S. não excluídas nos filtros selecionados: <span data-dashboard-count>—</span> (não é o total operacional).
 </details>
+<?php endif; ?>
 <noscript>Ative JavaScript para a atualização automática.</noscript>
 </section>
 <script type="application/json" data-dashboard-payload><?= json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>

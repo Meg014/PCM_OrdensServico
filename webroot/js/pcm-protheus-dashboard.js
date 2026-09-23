@@ -23,7 +23,7 @@
         cards.forEach(card => { card.textContent = format.format(current[card.dataset.dashboardCard]); });
         if (root.dataset.presentation === 'true') {
             title.textContent = current.title;
-            position.textContent = `Tela ${index + 1} de ${payload.screens.length}`;
+            if (position) position.textContent = `Tela ${index + 1} de ${payload.screens.length}`;
         }
     };
     const render = next => {
@@ -40,8 +40,8 @@
         index = Math.max(0, next.screens.findIndex(item => item.key === currentKey));
         payload = next;
         screen();
-        count.textContent = format.format(next.record_count);
-        updated.textContent = `Dados atualizados em: ${date} · consulta ao Protheus`;
+        if (count) count.textContent = format.format(next.record_count);
+        updated.textContent = `Dados atualizados em: ${date}` + (root.dataset.presentation === 'true' ? '' : ' · consulta ao Protheus');
         notice.textContent = '';
     };
     try { render(JSON.parse(initial.textContent)); } catch (_) { fail(); }

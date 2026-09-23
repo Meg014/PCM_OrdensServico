@@ -20,7 +20,7 @@ $url = fn (int $page) => ['_name' => 'pcm-sector', 'code' => $sector['code'], '?
 <?php foreach (['equipment' => 'Equipamento mais recorrente', 'services' => 'Serviço mais recorrente'] as $key => $label): ?>
 <div class="col-md-4 pcm-attention-card"><span><?= h($label) ?></span><strong class="pcm-attention-name"><?= h($sector['charts'][$key][0]['label'] ?? '—') ?></strong></div>
 <?php endforeach; ?></div></section>
-<section class="pcm-dashboard-section" id="orders"><h2>Ordens de Serviço</h2><div class="pcm-panel table-responsive"><table class="table pcm-orders-table align-middle">
+<section class="pcm-dashboard-section" id="orders"><h2>Ordens de Serviço</h2><div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Ordens de Serviço — rolagem horizontal" tabindex="0"><table class="table pcm-orders-table align-middle">
 <thead><tr><?php foreach (['Filial / OS', 'Equipamento', 'Serviço', 'Centro de custo', 'Tipo', 'Situação / término', 'Início planejado', 'Início real', 'Status'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($sector['orders'] as $row): ?><tr>
 <td><?= h($value($row['TJ_FILIAL'])) ?> /
@@ -33,7 +33,7 @@ $url = fn (int $page) => ['_name' => 'pcm-sector', 'code' => $sector['code'], '?
 <td><?= h($value((new \App\Service\Protheus\Presentation\OrderSupplementMapper())->date($row['TJ_DTPRINI']))) ?> <?= h($value($row['TJ_HOPRINI'])) ?></td>
 <td><span class="badge pcm-status-badge"><?= h($row['status']) ?></span></td></tr><?php endforeach; ?>
 <?php if (!$sector['orders']): ?><tr><td colspan="9">Nenhuma O.S. encontrada para os filtros aplicados.</td></tr><?php endif; ?>
-</tbody></table><footer class="pcm-pagination"><span>Página <?= h($sector['page']) ?></span>
+</tbody></table></div><footer class="pcm-pagination"><span>Página <?= h($sector['page']) ?></span>
 <?php if ($sector['page'] > 1): ?><?= $this->Html->link('Anterior', $url($sector['page'] - 1), ['class' => 'btn btn-outline-secondary']) ?><?php endif; ?>
 <?php if ($sector['has_more']): ?><?= $this->Html->link('Ver mais', $url($sector['page'] + 1), ['class' => 'btn btn-outline-secondary']) ?><?php endif; ?>
 </footer></div></section>

@@ -33,6 +33,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
     <?= $this->fetch('css') ?>
 </head>
 <body>
+    <?php if (empty($presentation)): ?>
     <nav class="navbar navbar-expand-lg pcm-navbar">
         <div class="container-xl">
             <?= $this->Html->link('PCM', ['_name' => $isTv ? 'pcm-presentation' : 'pcm'], ['class' => 'navbar-brand fw-bold']) ?>
@@ -60,26 +61,11 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                     <li class="nav-item">
                         <?= $this->Html->link('PCM Geral', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
                     </li>
-                    <li class="nav-item">
-                        <?= $this->Html->link('Análises', ['_name' => 'pcm-analyses'], ['class' => 'nav-link']) ?>
-                    </li>
-                    <li class="nav-item dropdown">
+                    <li class="nav-item dropdown" data-sectors-menu data-url="<?= h($this->Url->build(['_name' => 'pcm-sector-options'])) ?>">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
                            aria-expanded="false">Setores</a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <?php if ($navigationAreas === []) : ?>
-                                <li><span class="dropdown-item-text text-body-secondary">Nenhum setor disponível</span></li>
-                            <?php else : ?>
-                                <?php foreach ($navigationAreas as $navigationArea) : ?>
-                                    <li>
-                                        <?= $this->Html->link(
-                                            $navigationArea->display_name,
-                                            ['_name' => 'pcm-sector', 'code' => $navigationArea->source_code],
-                                            ['class' => 'dropdown-item'],
-                                        ) ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <ul class="dropdown-menu dropdown-menu-end" data-sectors-items aria-live="polite">
+                            <li><span class="dropdown-item-text text-body-secondary">Abra para consultar os setores.</span></li>
                         </ul>
                     </li>
                     <li class="nav-item">
@@ -94,6 +80,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
             <?php endif; ?>
         </div>
     </nav>
+    <?php endif; ?>
     <main class="pcm-main">
         <div class="container-xl">
             <?= $this->Flash->render() ?>
@@ -102,6 +89,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
     </main>
     <?= $this->Html->script('bootstrap.bundle.min') ?>
     <?= $this->Html->script('pcm-theme') ?>
+    <?= $this->Html->script('pcm-sectors-menu', ['defer' => true]) ?>
     <?= $this->fetch('script') ?>
 </body>
 </html>

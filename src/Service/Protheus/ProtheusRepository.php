@@ -35,6 +35,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
+    public function findAreas(): array
+    {
+        return $this->read(ProtheusQueries::AREAS);
+    }
+
     /** Two bounded reads, never hydration of resources or snapshots. */
     public function sector(array $params, int $page, int $limit, string $start, string $end): array
     {

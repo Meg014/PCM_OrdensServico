@@ -15,9 +15,10 @@ WITH scoped AS (
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))
-      AND j.TJ_SITUACA IN ('L', 'P')
-      AND (j.TJ_TERMINO = 'S' OR (j.TJ_TERMINO = 'N'
-          AND TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) >= CONVERT(date, :cutoff, 112)))
+      AND (
+SQL
+        . ProtheusOperationalEligibility::OPERATIONAL . <<<'SQL'
+)
 ), named AS (
     SELECT j.*,
         CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END AS equipment_name,

@@ -124,6 +124,7 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringNotContainsString('Fonte: Protheus', $html);
         self::assertStringNotContainsString('Filtros da consulta Protheus', $html);
         self::assertStringNotContainsString('Comparar legado Excel', $html);
+        self::assertStringContainsString('href="/pcm" class="btn btn-sm btn-outline-secondary">Sair da apresentação</a>', $html);
         self::assertStringNotContainsString('data-pcm-current-version', $html);
         self::assertStringNotContainsString('Importe um XLSX', $html);
         $view->set('presentation', false);

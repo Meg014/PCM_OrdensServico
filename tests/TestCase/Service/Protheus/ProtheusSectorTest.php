@@ -30,7 +30,7 @@ final class ProtheusSectorTest extends TestCase
         self::assertSame(1, $sector['cards']['safra_completed']);
         self::assertSame(0, $sector['cards']['corrective']);
         self::assertFalse(ProtheusQueries::allows(ProtheusSectorQueries::page() . '; SELECT 2'));
-        self::assertStringContainsString("j.TJ_SITUACA IN ('L', 'P')", $calls[0][0]);
+        self::assertStringContainsString("TJ_SITUACA = 'L' AND TJ_TERMINO = 'N'", $calls[0][0]);
         self::assertStringContainsString('ORDER BY planned_date DESC, record_id DESC', $calls[1][0]);
 
         if (!defined('ROOT')) require dirname(__DIR__, 4) . '/config/paths.php';

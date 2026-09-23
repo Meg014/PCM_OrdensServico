@@ -19,7 +19,7 @@ SQL;
     public const MANAGEMENT = <<<'SQL'
 WITH base AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_SERVICO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
-           TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_start,
+           j.TJ_DTMPINI,
            COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial, CAST(:area AS VARCHAR(100)) AS area,
@@ -38,12 +38,16 @@ WITH base AS (
 ), counts AS (
     SELECT TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO, COUNT_BIG(*) AS quantity,
         MAX(identity_count) AS identity_count,
-        SUM(CAST(CASE WHEN TJ_TERMINO = 'N' AND TJ_SITUACA <> 'C'
-            AND planned_start >= CONVERT(date, :cutoff, 112) THEN 1 ELSE 0 END AS BIGINT)) AS open_count,
-        SUM(CAST(CASE WHEN TJ_TERMINO = 'S' AND TJ_SITUACA <> 'C' THEN 1 ELSE 0 END AS BIGINT)) AS closed_count,
+        SUM(CAST(CASE WHEN (
+SQL
+        . ProtheusOperationalEligibility::ELIGIBLE_OPEN . <<<'SQL'
+) THEN 1 ELSE 0 END AS BIGINT)) AS open_count,
+        SUM(CAST(CASE WHEN (
+SQL
+        . ProtheusOperationalEligibility::CLOSED . <<<'SQL'
+) THEN 1 ELSE 0 END AS BIGINT)) AS closed_count,
         SUM(CAST(CASE WHEN TJ_SITUACA IS NULL OR TJ_SITUACA NOT IN ('C', 'L', 'P')
-            OR TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S')
-            OR (TJ_SITUACA = 'C' AND TJ_TERMINO = 'S') THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
+            OR TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S') THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
     FROM base GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO
 )
 SELECT TOP (2001) c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.TJ_TIPO, c.quantity,

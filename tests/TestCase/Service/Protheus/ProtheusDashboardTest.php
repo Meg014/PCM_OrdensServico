@@ -81,8 +81,8 @@ final class ProtheusDashboardTest extends TestCase
         $sql = ProtheusQueries::MANAGEMENT;
         self::assertTrue(ProtheusQueries::allows($sql));
         self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM STJ010'));
-        foreach (['TOP (2001)', "TJ_TERMINO = 'N' AND TJ_SITUACA <> 'C'", 'planned_start >= CONVERT(date, :cutoff, 112)',
-            "TJ_TERMINO = 'S' AND TJ_SITUACA <> 'C'", "NULLIF(j.TJ_DTMPINI, '')", 'GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO',
+        foreach (['TOP (2001)', "TJ_SITUACA = 'L' AND TJ_TERMINO = 'N'", '>= CONVERT(date, :cutoff, 112)',
+            "TJ_SITUACA = 'L' AND TJ_TERMINO = 'S'", "NULLIF(TJ_DTMPINI, '')", 'GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO',
             's.T4_FILIAL = c.TJ_FILIAL', "s.T4_FILIAL = ''"] as $expected) self::assertStringContainsString($expected, $sql);
         self::assertSame(3, substr_count($sql, "D_E_L_E_T_ <> '*'"));
         self::assertStringNotContainsString('STL010', $sql);
@@ -141,14 +141,15 @@ final class ProtheusDashboardTest extends TestCase
     public function testOpportunityCountsOnlyEligibleOpenServiceCodes(): void
     {
         $calls = [];
-        $rows = [$this->row('MECOP ', 'OUTRO NOME', 2, 50),
-            $this->row('ELECOP', 'OUTRO NOME', 3, 60),
+        $rows = [$this->row('MECOPO ', 'OUTRO NOME', 14, 50),
+            $this->row('ELECOP', 'OUTRO NOME', 1, 60),
+            $this->row('MECOP', 'CÓDIGO ANTIGO', 10, 0),
             $this->row('X', 'PARADAS POR OPORTUNIDADE', 9, 0),
-            $this->row('MECOP', 'CANCELADA OU FORA DO CORTE', 0, 0)];
+            $this->row('MECOPO', 'CANCELADA OU FORA DO CORTE', 0, 0)];
         $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
         self::assertTrue($result['available']);
-        self::assertSame(5, $result['indicators']['opportunity']);
-        self::assertSame(5, $result['screens'][1]['opportunity']);
+        self::assertSame(15, $result['indicators']['opportunity']);
+        self::assertSame(15, $result['screens'][1]['opportunity']);
         self::assertCount(1, $calls);
     }
 

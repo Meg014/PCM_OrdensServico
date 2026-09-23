@@ -10,6 +10,9 @@ $isTv = isset($currentUser) && $currentUser->role === 'TV';
 <?php if (!$presentation): ?><span class="badge text-bg-secondary">Fonte: Protheus</span><?php endif; ?>
 <p class="pcm-updated" data-dashboard-updated>Dados atualizados em: consulta ainda indisponível</p>
 <?php if (!$presentation): ?><small>Atualização automática a cada 5 minutos</small><?php endif; ?></div>
+<?php if ($presentation && !$isTv): ?>
+<?= $this->Html->link('Sair da apresentação', ['_name' => 'pcm'], ['class' => 'btn btn-sm btn-outline-secondary']) ?>
+<?php endif; ?>
 <?php if (!$presentation && !$isTv): ?><div class="d-flex gap-2">
 <?= $this->Html->link($presentation ? 'Sair da apresentação' : 'Modo Apresentação', ['_name' => $presentation ? 'pcm' : 'pcm-presentation', '?' => $payload['filters']], ['class' => 'btn btn-outline-primary']) ?>
 <?= $this->Html->link('Comparar legado Excel', ['_name' => $presentation ? 'pcm-presentation-legacy' : 'pcm-legacy'], ['class' => 'btn btn-outline-secondary']) ?>

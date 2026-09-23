@@ -27,7 +27,11 @@ SQL;
 
         return <<<SQL
 WITH page_keys AS (
-    SELECT j.R_E_C_N_O_, TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112) AS reference_date,
+    SELECT j.R_E_C_N_O_, COALESCE(
+               TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112),
+               TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112),
+               TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)
+           ) AS reference_date,
            COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     WHERE j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}

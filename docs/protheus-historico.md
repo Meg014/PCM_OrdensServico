@@ -61,12 +61,18 @@ inteiros e busca `limite + 1` registros, removendo o excedente em PHP para infor
 com nomes e converter o varbinary da descrição. STL010, ST1010 e SB1010 não são
 consultadas; findOrder() não é chamado para cada linha.
 
-Ordenação adotada: **TJ_DTORIGI decrescente**, convertida de `YYYYMMDD` com
-`TRY_CONVERT(date, NULLIF(..., ''), 112)`. Datas vazias/inválidas tornam-se null e
-ficam por último no DESC do SQL Server, sem substituir por hoje, 1900 ou outra
-data inventada. `R_E_C_N_O_ DESC` desempata, inclusive para OS sem data. `reference_date`
-retorna a data válida em ISO ou null. A origem não significa necessariamente
-execução real nem data de criação: confirmar se é o critério desejado de recência.
+Ordenação adotada: **reference_date decrescente**, escolhendo a primeira data válida
+entre `TJ_DTMRFIM`, `TJ_DTMRINI` e `TJ_DTORIGI` (fallback de origem já utilizado).
+Cada candidata é convertida de `YYYYMMDD` com
+`TRY_CONVERT(date, NULLIF(..., ''), 112)` antes do COALESCE. Se nenhuma for válida,
+o resultado é null e fica por último no DESC, sem inventar data.
+`R_E_C_N_O_ DESC` continua como desempate. `reference_date` retorna ISO ou null;
+as datas/horas brutas planejadas e reais continuam separadas e inalteradas.
+
+Não traduzir `TJ_TIPO`, `TJ_SITUACA` ou outros códigos: a OS real 004368 tem
+serviço ELEPRE / PREVENTIVA ELETRICA e `TJ_TIPO = COR`; esse código não autoriza
+classificá-la como corretiva. `TJ_USUAINI`/`TJ_USUAFIM` permanecem campos técnicos
+disponíveis, sem interpretação adicional até a validação dos dados reais.
 
 Filtros de código/filial usam igualdade e CAST no **parâmetro**, sem funções sobre
 as colunas de busca. As comparações SQL Server de CHAR/VARCHAR consideram espaços

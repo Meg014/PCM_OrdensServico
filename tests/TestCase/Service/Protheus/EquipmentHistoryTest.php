@@ -100,7 +100,18 @@ final class EquipmentHistoryTest extends TestCase
                     self::assertStringNotContainsString('SELECT *', $sql);
                     self::assertStringNotContainsString('STL010', $sql);
                     self::assertStringNotContainsString('RTRIM(j.TJ_CODBEM)', $sql);
-                    self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)", $sql);
+                    self::assertMatchesRegularExpression(
+                        '/COALESCE\(\s*'
+                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTMRFIM, ''\\), 112\\),\\s*"
+                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTMRINI, ''\\), 112\\),\\s*"
+                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTORIGI, ''\\), 112\\)\\s*"
+                        . '\) AS reference_date/',
+                        $sql,
+                    );
+                    self::assertStringContainsString('ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC', $sql);
+                    self::assertStringContainsString('j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM', $sql);
+                    self::assertStringContainsString('j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM', $sql);
+                    self::assertStringContainsString('j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO', $sql);
                     self::assertStringContainsString('ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC', $sql);
                     self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $sql);
                     self::assertSame(6, substr_count($sql, "D_E_L_E_T_ <> '*'"));

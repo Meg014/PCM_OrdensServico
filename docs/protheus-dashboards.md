@@ -1,5 +1,8 @@
 # PCM Geral e Apresentação: primeira etapa direta
 
+> Histórico da etapa provisória. Os cards e a consulta atuais estão descritos em
+> [protheus-indicadores-gerenciais.md](protheus-indicadores-gerenciais.md).
+
 ## Regra encontrada e bloqueio de equivalências
 
 O `WorkOrderStatusResolver` versão 4 interpreta os textos do Excel:

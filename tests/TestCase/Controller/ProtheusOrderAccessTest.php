@@ -109,10 +109,15 @@ final class ProtheusOrderAccessTest extends TestCase
         $view->setTemplatePath('Pcm');
         $view->set(['presentation' => true, 'payload' => ['available' => false,
             'filters' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::FILTERS, ''),
-            'record_count' => null, 'groups' => [], 'queried_at' => null]]);
+            'record_count' => null, 'groups' => [], 'queried_at' => null,
+            'indicators' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::CARDS, null)]]);
         $html = $view->render('protheus_dashboard', false);
         self::assertStringContainsString('/pcm/apresentacao/data', $html);
-        self::assertStringContainsString('Aguardando validação da regra', $html);
+        self::assertStringContainsString('Protheus ainda não confirmado', $html);
+        self::assertStringContainsString('Safra — O.S. em aberto', $html);
+        self::assertStringContainsString('Entressafra — O.S. fechadas', $html);
+        self::assertStringNotContainsString('Eficiência', $html);
+        self::assertStringNotContainsString('Concluídas', $html);
         self::assertStringContainsString('Fonte: Protheus', $html);
         self::assertStringNotContainsString('data-pcm-current-version', $html);
         self::assertStringNotContainsString('Importe um XLSX', $html);

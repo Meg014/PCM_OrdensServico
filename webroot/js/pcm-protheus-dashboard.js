@@ -6,49 +6,43 @@
     const notice = root.querySelector('[data-dashboard-notice]');
     const count = root.querySelector('[data-dashboard-count]');
     const updated = root.querySelector('[data-dashboard-updated]');
-    const groups = [...root.querySelectorAll('[data-dashboard-group]')];
+    const title = root.querySelector('[data-dashboard-title]');
+    const position = root.querySelector('[data-dashboard-position]');
+    const cards = [...root.querySelectorAll('[data-dashboard-card]')];
     const format = new Intl.NumberFormat('pt-BR');
-    let valid = false;
+    let payload = null;
+    let index = 0;
     let loading = false;
     const fail = () => {
-        notice.textContent = 'Protheus temporariamente indisponível.' +
-            (valid ? ' Mantida a última consulta válida; os dados podem estar desatualizados.' : ' Não foi possível consultar os dados atuais.');
+        notice.textContent = 'Protheus temporariamente indisponível ou com dados que exigem validação.' +
+            (payload ? ' Mantida a última consulta válida; os dados podem estar desatualizados.' : ' Não foi possível consultar os dados atuais.');
     };
-    const node = (tag, text) => {
-        const item = document.createElement(tag);
-        item.textContent = text;
-        return item;
+    const screen = () => {
+        if (!payload) return;
+        const current = payload.screens[index];
+        cards.forEach(card => { card.textContent = format.format(current[card.dataset.dashboardCard]); });
+        if (root.dataset.presentation === 'true') {
+            title.textContent = current.title;
+            position.textContent = `Tela ${index + 1} de ${payload.screens.length}`;
+        }
     };
-    const render = payload => {
-        if (!payload || payload.available !== true || !Number.isSafeInteger(payload.record_count) || payload.record_count < 0 ||
-            !payload.groups || !payload.queried_at || !Number.isFinite(Date.parse(payload.queried_at))) throw new Error('Invalid data');
-        // Build and validate everything before replacing the last valid visualization.
-        const contents = groups.map(target => {
-            const rows = payload.groups[target.dataset.dashboardGroup] || [];
-            if (!Array.isArray(rows) || rows.length > 10) throw new Error('Invalid groups');
-            return rows.length ? rows.map(row => {
-                if (!Number.isSafeInteger(row.quantity) || row.quantity < 0) throw new Error('Invalid quantity');
-                const line = node('div', '');
-                line.className = 'mb-3';
-                const label = `Filial ${row.branch || '(em branco)'} · ${row.code || '(em branco)'}` +
-                    (target.dataset.dashboardGroup === 'status_raw' ? ` / ${row.ending || '(em branco)'}` : '');
-                line.append(node('div', `${label} — ${format.format(row.quantity)}`));
-                const meter = document.createElement('meter');
-                meter.min = 0;
-                meter.max = Math.max(1, payload.record_count);
-                meter.value = row.quantity;
-                meter.style.width = '100%';
-                meter.setAttribute('aria-label', label);
-                line.append(meter);
-                return line;
-            }) : [node('p', 'Nenhuma OS para os filtros informados.')];
-        });
-        const date = new Intl.DateTimeFormat('pt-BR', {dateStyle: 'short', timeStyle: 'medium'}).format(new Date(payload.queried_at));
-        groups.forEach((target, index) => target.replaceChildren(...contents[index]));
-        count.textContent = format.format(payload.record_count);
+    const render = next => {
+        if (!next || next.available !== true || !Number.isSafeInteger(next.record_count) || next.record_count < 0 ||
+            !next.queried_at || !Number.isFinite(Date.parse(next.queried_at)) || !Array.isArray(next.screens) || !next.screens.length) throw new Error('Invalid data');
+        for (const item of next.screens) {
+            if (typeof item.key !== 'string' || typeof item.title !== 'string') throw new Error('Invalid screen');
+            for (const card of cards) {
+                if (!Number.isSafeInteger(item[card.dataset.dashboardCard]) || item[card.dataset.dashboardCard] < 0) throw new Error('Invalid count');
+            }
+        }
+        const date = new Intl.DateTimeFormat('pt-BR', {dateStyle: 'short', timeStyle: 'medium'}).format(new Date(next.queried_at));
+        const currentKey = payload?.screens[index]?.key;
+        index = Math.max(0, next.screens.findIndex(item => item.key === currentKey));
+        payload = next;
+        screen();
+        count.textContent = format.format(next.record_count);
         updated.textContent = `Dados atualizados em: ${date} · consulta ao Protheus`;
         notice.textContent = '';
-        valid = true;
     };
     try { render(JSON.parse(initial.textContent)); } catch (_) { fail(); }
     const refresh = async () => {
@@ -66,11 +60,7 @@
     window.setInterval(refresh, 300000);
     if (root.dataset.presentation === 'true') {
         document.body.classList.add('pcm-presentation-mode');
-        const panels = [...root.querySelectorAll('[data-dashboard-panel]')];
-        let position = 0;
-        const rotate = () => panels.forEach((panel, index) => { panel.hidden = index !== position; });
-        rotate();
-        window.setInterval(() => { position = (position + 1) % panels.length; rotate(); }, 15000);
+        window.setInterval(() => { if (payload) { index = (index + 1) % payload.screens.length; screen(); } }, 15000);
         try { document.documentElement.requestFullscreen?.().catch(() => {}); } catch (_) { /* Optional. */ }
     }
 })();

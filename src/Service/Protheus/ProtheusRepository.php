@@ -35,8 +35,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
-    /** Aggregated on SQL Server, at most 61 rows, never individual orders. */
-    public function dashboard(array $filters): array
+    /** SQL aggregates only: 61 ranking rows or at most 2000 management groups. */
+    public function dashboard(array $filters, bool $management = false): array
     {
         $params = [];
         foreach (['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'] as $key) {
@@ -46,7 +46,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
             }
             $params[$key] = trim($value);
         }
-        $rows = $this->read(ProtheusQueries::DASHBOARD, $params);
+        if ($management) {
+            $params['cutoff'] = str_replace('-', '', \App\Model\Table\WorkOrderSnapshotsTable::OPERATIONAL_START);
+        }
+        $rows = $this->read($management ? ProtheusQueries::MANAGEMENT : ProtheusQueries::DASHBOARD, $params);
+        if ($management && count($rows) > 2000) {
+            throw new RuntimeException('Limite de grupos excedido; resultado incompleto.');
+        }
         foreach ($rows as &$row) {
             if ((int)$row['identity_count'] > 1) {
                 throw new RuntimeException('Identidade de OS ambígua.');

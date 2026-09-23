@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
-
 namespace App\Test\TestCase\Service\Protheus;
 
 use App\Database\Driver\ProtheusReadOnly;
 use App\Service\Protheus\ProtheusDashboardService;
 use App\Service\Protheus\ProtheusQueries;
 use App\Service\Protheus\ProtheusRepository;
+use App\Service\PcmServiceClassifier;
 use Cake\Database\Connection;
 use Cake\Database\StatementInterface;
 use PHPUnit\Framework\TestCase;
@@ -14,61 +14,85 @@ use RuntimeException;
 
 final class ProtheusDashboardTest extends TestCase
 {
-    public function testOneBoundQueryAndNoInventedStatus(): void
+    public function testSeasonalCardsReuseLegacyClassifierWithoutInventingType(): void
     {
         $calls = [];
-        $rows = [$this->row('total', 50), $this->row('type', 30, 'COR')];
+        $rows = [$this->row('ELEPRE', 'PREVENTIVA ELETRICA', 2, 3),
+            $this->row('X', 'Manutenção ENTRESSAFRA', 4, 5),
+            $this->row('COREME', 'ENTRESSAFRA', 1, 0),
+            $this->row('CORPRO', 'ENTRESSAFRA', 1, 0)];
         $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['filial' => '01', 'bem' => "X'; DELETE--"]);
         self::assertTrue($result['available']);
-        self::assertSame(50, $result['record_count']);
-        self::assertSame('COR', $result['groups']['type'][0]['code']);
-        self::assertSame(array_fill(0, 6, null), array_values($result['indicators']));
-        self::assertNotNull($result['queried_at']);
+        self::assertSame(4, $result['indicators']['safra_open']);
+        self::assertSame(3, $result['indicators']['safra_completed']);
+        self::assertSame(4, $result['indicators']['offseason_open']);
+        self::assertSame(5, $result['indicators']['offseason_completed']);
+        foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled'] as $key) self::assertNull($result['indicators'][$key]);
+        self::assertCount(2, $result['screens']);
         self::assertCount(1, $calls);
         self::assertSame("X'; DELETE--", $calls[0][1]['bem']);
+        self::assertSame('20260101', $calls[0][1]['cutoff']);
         self::assertStringNotContainsString("X'; DELETE--", $calls[0][0]);
         self::assertSame('string', $calls[0][2]['filial']);
     }
 
-    public function testClosedBoundedSqlDoesNotHydrateOrders(): void
+    public function testSeasonSplitIsIndependentOfUnknownMaintenanceType(): void
     {
-        $sql = ProtheusQueries::DASHBOARD;
-        self::assertTrue(ProtheusQueries::allows($sql));
-        self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM STJ010'));
-        self::assertStringContainsString('GROUP BY GROUPING SETS', $sql);
-        self::assertStringContainsString('position <= 10', $sql);
-        self::assertStringContainsString('PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM', $sql);
-        self::assertStringContainsString("j.D_E_L_E_T_ <> '*'", $sql);
-        foreach (['STL010', 'SELECT *', 'FECHADA', 'CANCELADA', 'CORRETIVA'] as $forbidden) {
-            self::assertStringNotContainsString($forbidden, $sql);
+        $classifier = new PcmServiceClassifier();
+        foreach ([['COREME', 'ENTRESSAFRA'], ['CORPRO', 'ENTRESSAFRA'], ['X', 'CORRETIVA EMERGENCIAL ENTRESSAFRA'],
+            ['X', 'CORRETIVA PROGRAMADA ENTRESSAFRA'], ['X', 'manutenção entressafra'], ['ELEPRE', 'PREVENTIVA ELETRICA']] as [$code, $name]) {
+            foreach ([null, '', 'COR', 'PRE', 'MEL', 'UNKNOWN'] as $type) {
+                self::assertSame($classifier->classifySnapshot($type, $code, $name) === 'ENTRESSAFRA',
+                    $classifier->classify($code, $name) === 'ENTRESSAFRA');
+            }
         }
     }
 
-    public function testFailureAndAmbiguityNeverBecomeZeroOrLeakErrors(): void
+    public function testClosedSqlAggregatesAndPreservesStatusAndDateScope(): void
     {
-        foreach ([null, [], [$this->row('total', 20) + []]] as $rows) {
-            if ($rows !== null && $rows !== []) $rows[0]['identity_count'] = 2;
+        $sql = ProtheusQueries::MANAGEMENT;
+        self::assertTrue(ProtheusQueries::allows($sql));
+        self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM STJ010'));
+        foreach (['TOP (2001)', "TJ_TERMINO = 'N' AND TJ_SITUACA <> 'C'", 'planned_start >= CONVERT(date, :cutoff, 112)',
+            "TJ_TERMINO = 'S' AND TJ_SITUACA <> 'C'", "NULLIF(j.TJ_DTMPINI, '')", 'GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO',
+            's.T4_FILIAL = c.TJ_FILIAL', "s.T4_FILIAL = ''"] as $expected) self::assertStringContainsString($expected, $sql);
+        self::assertSame(3, substr_count($sql, "D_E_L_E_T_ <> '*'"));
+        self::assertStringNotContainsString('STL010', $sql);
+        self::assertStringNotContainsString('SELECT *', $sql);
+    }
+
+    public function testUnconfirmedOrAmbiguousDataAndFailureNeverBecomeZero(): void
+    {
+        foreach ([null, 'identity_count', 'service_matches', 'unconfirmed_count', 'service_name'] as $problem) {
+            $row = $this->row('X', 'ENTRESSAFRA', 1, 0);
+            if ($problem !== null) $row[$problem] = $problem === 'service_name' ? null : 2;
             $calls = [];
-            $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+            $result = (new ProtheusDashboardService($this->repository($problem === null ? null : [$row], $calls)))->load();
             self::assertFalse($result['available']);
             self::assertNull($result['record_count']);
             self::assertNull($result['queried_at']);
-            self::assertSame([], $result['groups']);
+            self::assertSame([], $result['screens']);
+            self::assertSame(array_fill(0, 9, null), array_values($result['indicators']));
             self::assertStringNotContainsString('SQLSTATE', json_encode($result));
         }
     }
 
-    public function testTrueEmptyPortfolioIsZeroOnlyAfterSuccessfulQuery(): void
+    public function testEmptyAndTruncatedAggregateAreDifferent(): void
     {
         $calls = [];
-        $result = (new ProtheusDashboardService($this->repository([$this->row('total', 0)], $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load();
         self::assertTrue($result['available']);
-        self::assertSame(0, $result['record_count']);
+        self::assertSame(0, $result['indicators']['safra_open']);
+        $rows = array_fill(0, 2001, $this->row('X', 'SERVICO', 1, 0));
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        self::assertFalse($result['available']);
     }
 
-    private function row(string $dimension, int $quantity, string $code = ''): array
+    private function row(string $code, string $name, int $open, int $closed): array
     {
-        return compact('dimension', 'quantity', 'code') + ['branch' => '01', 'ending' => '', 'identity_count' => 1];
+        return ['TJ_FILIAL' => '01', 'TJ_CODAREA' => 'ELETRI', 'TJ_SERVICO' => $code,
+            'service_name' => $name, 'quantity' => $open + $closed, 'open_count' => $open, 'closed_count' => $closed,
+            'identity_count' => 1, 'service_matches' => 1, 'unconfirmed_count' => 0];
     }
 
     private function repository(?array $rows, array &$calls): ProtheusRepository

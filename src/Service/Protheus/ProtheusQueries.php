@@ -8,6 +8,54 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    /** Aggregate before master lookup: no individual OS hydration or guessed maintenance type. */
+    public const MANAGEMENT = <<<'SQL'
+WITH base AS (
+    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_SERVICO, j.TJ_SITUACA, j.TJ_TERMINO,
+           TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_start,
+           COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
+    FROM dbo.STJ010 j
+    CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial, CAST(:area AS VARCHAR(100)) AS area,
+        CAST(:bem AS VARCHAR(100)) AS bem, CAST(:servico AS VARCHAR(100)) AS servico,
+        CAST(:centro AS VARCHAR(100)) AS centro, CAST(:tipo AS VARCHAR(100)) AS tipo,
+        CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino) f
+    WHERE j.D_E_L_E_T_ <> '*'
+      AND (f.filial = '' OR j.TJ_FILIAL = f.filial)
+      AND (f.area = '' OR j.TJ_CODAREA = f.area)
+      AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
+      AND (f.servico = '' OR j.TJ_SERVICO = f.servico)
+      AND (f.centro = '' OR j.TJ_CCUSTO = f.centro)
+      AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)
+      AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
+      AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
+), counts AS (
+    SELECT TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, COUNT_BIG(*) AS quantity,
+        MAX(identity_count) AS identity_count,
+        SUM(CAST(CASE WHEN TJ_TERMINO = 'N' AND TJ_SITUACA <> 'C'
+            AND planned_start >= CONVERT(date, :cutoff, 112) THEN 1 ELSE 0 END AS BIGINT)) AS open_count,
+        SUM(CAST(CASE WHEN TJ_TERMINO = 'S' AND TJ_SITUACA <> 'C' THEN 1 ELSE 0 END AS BIGINT)) AS closed_count,
+        SUM(CAST(CASE WHEN TJ_SITUACA IS NULL OR TJ_SITUACA NOT IN ('C', 'L', 'P')
+            OR TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S')
+            OR (TJ_SITUACA = 'C' AND TJ_TERMINO = 'S') THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
+    FROM base GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO
+)
+SELECT TOP (2001) c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.quantity,
+    c.identity_count, c.open_count, c.closed_count, c.unconfirmed_count,
+    CASE WHEN local_service.matches > 0 THEN local_service.name ELSE shared_service.name END AS service_name,
+    CASE WHEN local_service.matches > 0 THEN local_service.matches ELSE shared_service.matches END AS service_matches
+FROM counts c
+OUTER APPLY (
+    SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = c.TJ_SERVICO AND s.T4_FILIAL = c.TJ_FILIAL AND s.D_E_L_E_T_ <> '*'
+) local_service
+OUTER APPLY (
+    SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = c.TJ_SERVICO AND s.T4_FILIAL = '' AND s.D_E_L_E_T_ <> '*'
+) shared_service
+ORDER BY c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO
+OPTION (RECOMPILE)
+SQL;
+
     /** One bounded aggregate result; all filtering precedes aggregation on SQL Server. */
     public const DASHBOARD = <<<'SQL'
 WITH base AS (
@@ -238,7 +286,7 @@ SQL;
             }
         }
         return in_array($sql, [
-            self::DASHBOARD,
+            self::DASHBOARD, self::MANAGEMENT,
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
             self::HISTORY_USER_COLUMNS,

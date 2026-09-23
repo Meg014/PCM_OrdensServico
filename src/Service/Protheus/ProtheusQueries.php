@@ -22,8 +22,31 @@ SQL;
     public static function equipmentHistory(bool $branch, bool $startUser = false, bool $endUser = false): string
     {
         $branchFilter = $branch ? ' AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))' : '';
+        return self::orderPage("j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}", $startUser, $endUser);
+    }
+
+    /** Eight closed variants: exact order, branch and equipment filters. */
+    public static function orders(bool $number, bool $branch, bool $equipment): string
+    {
+        $where = "j.D_E_L_E_T_ <> '*'";
+        if ($number) {
+            $where .= ' AND j.TJ_ORDEM = CAST(:numero AS VARCHAR(100))';
+        }
+        if ($branch) {
+            $where .= ' AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))';
+        }
+        if ($equipment) {
+            $where .= ' AND j.TJ_CODBEM = CAST(:bem AS VARCHAR(100))';
+        }
+
+        return self::orderPage($where, false, false, false);
+    }
+
+    private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true): string
+    {
         $start = $startUser ? 'j.TJ_USUAINI' : 'CAST(NULL AS VARCHAR(25))';
         $end = $endUser ? 'j.TJ_USUAFIM' : 'CAST(NULL AS VARCHAR(25))';
+        $descriptionColumn = $description ? 'CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,' : '';
 
         return <<<SQL
 WITH page_keys AS (
@@ -34,7 +57,7 @@ WITH page_keys AS (
            ) AS reference_date,
            COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
-    WHERE j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}
+    WHERE {$where}
     ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC
     OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 )
@@ -45,7 +68,7 @@ SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.T
        CASE WHEN s_local.matches > 0 THEN s_local.name ELSE s_shared.name END AS service_name,
        CASE WHEN s_local.matches > 0 THEN s_local.matches ELSE s_shared.matches END AS service_matches,
        j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
-       CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
+       {$descriptionColumn}
        j.TJ_DTORIGI, j.TJ_DTPPINI, j.TJ_HOPPINI, j.TJ_DTPPFIM, j.TJ_HOPPFIM,
        j.TJ_DTPRINI, j.TJ_HOPRINI, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
        j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
@@ -137,6 +160,15 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        foreach ([false, true] as $number) {
+            foreach ([false, true] as $branch) {
+                foreach ([false, true] as $equipment) {
+                    if ($sql === self::orders($number, $branch, $equipment)) {
+                        return true;
+                    }
+                }
+            }
+        }
         foreach ([false, true] as $branch) {
             foreach ([false, true] as $startUser) {
                 foreach ([false, true] as $endUser) {

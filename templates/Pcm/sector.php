@@ -1,7 +1,7 @@
 <?php
 $this->assign('title', $area->display_name);
 $categories = ['COR' => 'Corretivas', 'PRE' => 'Preventivas', 'MEL' => 'Melhorias'];
-$cardRoute = $area->source_code ? ['_name' => 'pcm-sector', 'code' => $area->source_code] : ['_name' => 'pcm-orders'];
+$cardRoute = $area->source_code ? ['_name' => 'pcm-sector', 'code' => $area->source_code] : ['_name' => 'pcm-orders-legacy'];
 $chartPayload = ['status' => $dashboard['status'], 'maintenance' => array_map(static function (array $row) use ($categories): array { $row['label'] = $categories[$row['key']] ?? $row['label']; return $row; }, $dashboard['maintenanceProfile']), 'equipment' => $dashboard['equipment'], 'services' => $dashboard['services'], 'costCenters' => $dashboard['costCenters']];
 $this->Html->script(['chart.umd.min', 'pcm-sector', 'pcm-history'], ['block' => true]);
 ?>

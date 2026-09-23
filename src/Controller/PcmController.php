@@ -10,6 +10,8 @@ use App\Service\PcmIndicatorService;
 use App\Service\PcmPresentationService;
 use App\Service\PcmTimeFormatter;
 use App\Service\Protheus\OrderProtheusService;
+use App\Service\Protheus\OrderListingService;
+use Cake\Http\Exception\BadRequestException;
 use App\Service\SectorDashboardService;
 use Cake\Datasource\FactoryLocator;
 use Cake\Http\Exception\NotFoundException;
@@ -28,8 +30,20 @@ final class PcmController extends AppController
         $this->set(['indicators' => $indicators] + $this->currentContext($snapshot));
     }
 
-    /** Reuses the sector analytical view for a paginated company-wide current report. */
     public function orders(): void
+    {
+        $this->request->getSession()->close();
+        try {
+            $listing = (new OrderListingService())->load($this->request->getQueryParams());
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros ou paginação inválidos.');
+        }
+        $this->set(['listing' => $listing, 'navigationAreas' => []]);
+        $this->response = $this->response->withHeader('Cache-Control', 'no-store');
+    }
+
+    /** Legacy report and dashboard drilldowns retain their original snapshot rules. */
+    public function ordersLegacy(): void
     {
         $snapshot = new CurrentSnapshotService();
         $service = new SectorDashboardService($snapshot);
@@ -181,6 +195,35 @@ final class PcmController extends AppController
         if ($snapshot === null) {
             throw new NotFoundException('Ordem de Serviço não encontrada no snapshot atual.');
         }
+        return $this->protheusPayload($snapshot->toArray());
+    }
+
+    public function protheusOrder(string $number): void
+    {
+        $identity = $this->protheusIdentity($number);
+        $this->set(['identity' => $identity, 'navigationAreas' => []]);
+        $this->response = $this->response->withHeader('Cache-Control', 'no-store');
+    }
+
+    public function protheusOrderData(string $number): Response
+    {
+        $this->request->allowMethod(['get']);
+
+        return $this->protheusPayload($this->protheusIdentity($number));
+    }
+
+    private function protheusIdentity(string $number): array
+    {
+        $branch = $this->request->getQuery('filial');
+        if (!preg_match('/^[A-Za-z0-9]{1,50}$/D', $number) || !is_string($branch) || strlen($branch) > 100) {
+            throw new BadRequestException('Informe número da OS e filial válidos.');
+        }
+
+        return ['source_order_number' => $number, 'branch_code' => rtrim($branch, ' ')];
+    }
+
+    private function protheusPayload(array $identity): Response
+    {
         $part = $this->request->getQuery('part', 'all');
         $selected = $this->request->getQuery('os');
         $page = filter_var($this->request->getQuery('page', '1'), FILTER_VALIDATE_INT,
@@ -192,7 +235,7 @@ final class PcmController extends AppController
         }
         // Do not hold the user's session lock while waiting for the complementary server.
         $this->request->getSession()->close();
-        $payload = (new OrderProtheusService())->load($snapshot->toArray(), $part, $page, $selected);
+        $payload = (new OrderProtheusService())->load($identity, $part, $page, $selected);
 
         return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
             ->withStringBody((string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));

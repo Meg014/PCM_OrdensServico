@@ -94,4 +94,51 @@ final class ProtheusOrderAccessTest extends TestCase
             'params' => ['controller' => 'Pcm', 'action' => 'orderProtheus', 'pass' => ['42']],
         ]);
     }
+
+    public function testDirectDetailRouteAndPageNeedNoSnapshot(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $request = new ServerRequest(['url' => '/pcm/protheus/os/004368',
+            'environment' => ['REQUEST_METHOD' => 'GET'], 'query' => ['filial' => '01'],
+            'params' => ['controller' => 'Pcm', 'action' => 'protheusOrder', 'pass' => ['004368']]]);
+        self::assertSame('protheusOrder', Router::parseRequest($request)['action']);
+        $controller = new PcmController($request);
+        $controller->protheusOrder('004368');
+        self::assertSame(['source_order_number' => '004368', 'branch_code' => '01'], $controller->viewBuilder()->getVar('identity'));
+        $view = new View($request);
+        $view->setTemplatePath('Pcm');
+        $view->set('identity', $controller->viewBuilder()->getVar('identity'));
+        $html = $view->render('protheus_order', false);
+        self::assertStringContainsString('/pcm/protheus/os/004368/dados?filial=01', $html);
+        self::assertStringNotContainsString('/pcm/os/42', $html);
+        self::assertStringContainsString('Fonte: Protheus', $html);
+    }
+
+    public function testListingEscapesSourceValuesAndKeepsFallbackExplicit(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $row = array_fill_keys(['reference_date', 'equipment_name', 'TJ_CODBEM', 'TJ_SERVICO',
+            'service_name', 'TJ_CODAREA', 'TJ_CCUSTO', 'TJ_TIPO', 'TJ_SITUACA', 'TJ_TERMINO'], '<script>alert(1)</script>');
+        $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01'];
+        $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => ''],
+            'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
+        $view->set('listing', $listing);
+        $html = $view->render('orders', false);
+        self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
+        self::assertStringContainsString('page=2', $html);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        $listing['available'] = false;
+        $view->set('listing', $listing);
+        $html = $view->render('orders', false);
+        self::assertStringContainsString('temporariamente indisponíveis', $html);
+        self::assertStringContainsString('/pcm/ordens/legado', $html);
+        self::assertStringNotContainsString('/pcm/protheus/os/004368?', $html);
+    }
 }

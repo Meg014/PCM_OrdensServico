@@ -52,12 +52,12 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseContains('Corretivas Emergenciais');
         $this->assertResponseContains('Corretivas Programadas');
         $this->assertResponseContains('Entressafra');
-        $this->assertResponseContains('/pcm/ordens?');
+        $this->assertResponseContains('/pcm/ordens/legado?');
     }
 
     public function testCompanyWideReportAndClassifiedEmptyResultsRender(): void
     {
-        $this->get('/pcm/ordens?classification=ENTRESSAFRA&status=EM%20ABERTO');
+        $this->get('/pcm/ordens/legado?classification=ENTRESSAFRA&status=EM%20ABERTO');
         $this->assertResponseOk();
         $this->assertResponseContains('Todas as áreas');
         $this->assertResponseContains('Resumo por serviço');

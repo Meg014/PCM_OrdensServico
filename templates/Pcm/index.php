@@ -42,4 +42,4 @@ $this->Html->script('pcm-auto-refresh', ['block' => true]);
     'largeCards' => true,
 ]) ?>
 
-<p class="mt-4"><?= $this->Html->link('Relatório completo — todas as áreas', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-primary']) ?></p>
+<p class="mt-4"><?= $this->Html->link('Relatório completo — todas as áreas', ['_name' => 'pcm-orders-legacy'], ['class' => 'btn btn-outline-primary']) ?></p>

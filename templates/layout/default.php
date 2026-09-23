@@ -53,6 +53,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
             <?php if (isset($currentUser) && !$isTv): ?>
             <div class="collapse navbar-collapse" id="pcmNavigation">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item"><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'nav-link']) ?></li>
                     <?php if ($currentUser->role === 'ADMIN'): ?>
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>

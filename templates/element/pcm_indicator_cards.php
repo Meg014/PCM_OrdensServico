@@ -7,7 +7,7 @@
  */
 $showCancelled ??= false;
 $largeCards ??= false;
-$cardRoute ??= ['_name' => 'pcm-orders'];
+$cardRoute ??= ['_name' => 'pcm-orders-legacy'];
 $filters ??= [];
 $cards = [];
 foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label) {
@@ -57,4 +57,4 @@ foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label
     <?php endforeach; ?>
 </div>
 <?= $this->element('pcm_service_cards', ['indicators' => $indicators,
-    'cardRoute' => $cardRoute ?? ['_name' => 'pcm-orders'], 'filters' => $filters ?? []]) ?>
+    'cardRoute' => $cardRoute ?? ['_name' => 'pcm-orders-legacy'], 'filters' => $filters ?? []]) ?>

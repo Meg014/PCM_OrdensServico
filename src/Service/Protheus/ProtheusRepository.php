@@ -35,6 +35,34 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
+    /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20): array
+    {
+        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+            throw new InvalidArgumentException('Paginação inválida.');
+        }
+        $params = ['offset' => ($page - 1) * $limit, 'fetch' => $limit + 1];
+        foreach (['numero' => $number, 'filial' => $branch, 'bem' => $equipment] as $key => $value) {
+            if ($value !== null) {
+                if (strlen($value) > 100) {
+                    throw new InvalidArgumentException('Filtro inválido.');
+                }
+                $params[$key] = rtrim($value, ' ');
+            }
+        }
+        $rows = $this->read(ProtheusQueries::orders($number !== null, $branch !== null, $equipment !== null),
+            $params, ['offset' => 'integer', 'fetch' => 'integer']);
+        foreach ($rows as &$row) {
+            if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
+                throw new RuntimeException('Identidade ou cadastro ambíguo no Protheus.');
+            }
+            unset($row['identity_count'], $row['equipment_matches'], $row['service_matches']);
+        }
+        unset($row);
+
+        return ['orders' => array_slice($rows, 0, $limit), 'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
+    }
+
     public function findOrderIdentity(string $numero, string $filial): ?array
     {
         return $this->one(ProtheusQueries::ORDER_IDENTITY, ['numero' => $numero, 'filial' => $filial]);

@@ -32,7 +32,7 @@ final class OrderPresentationTest extends TestCase
         $fallback = $presenter->present($snapshot, $supplement, Availability::Unavailable);
         self::assertSame($default['pcm'], $fallback['pcm']);
         self::assertSame([], $fallback['protheus']['labor']);
-        self::assertSame('Dados complementares indisponíveis no momento.', $fallback['protheus']['message']);
+        self::assertSame('Detalhes do Protheus temporariamente indisponíveis.', $fallback['protheus']['message']);
         foreach ([new OrderSupplement('004368', '01'), new OrderSupplement('004893', '02'), null] as $wrong) {
             self::assertSame('unavailable', $presenter->present($snapshot, $wrong, Availability::Available)['protheus']['state']);
         }

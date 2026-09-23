@@ -1,5 +1,9 @@
 # Preparação do detalhe da OS (integração ainda desativada)
 
+**Registro da etapa inicial:** a integração foi posteriormente ativada, conforme
+[protheus-interface.md](protheus-interface.md). As notas de desativação e campos
+pendentes abaixo descrevem a preparação anterior, não o comportamento atual.
+
 Nada foi conectado ao controller, template, container ou rotas. Não existe chamada
 automática ao Protheus. O detalhe atual e sua auditoria de snapshots permanecem
 iguais. As novas classes são funções/objetos em memória, sem persistência ou rede.

@@ -85,6 +85,8 @@ return function (RouteBuilder $routes): void {
             ['controller' => 'Pcm', 'action' => 'order'],
             ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_name' => 'pcm-order'],
         );
+        $builder->get('/pcm/os/{id}/protheus', ['controller' => 'Pcm', 'action' => 'orderProtheus'], 'pcm-order-protheus')
+            ->setPass(['id'])->setPatterns(['id' => '[1-9][0-9]*']);
         $builder->connect(
             '/pcm/movimentacao/{type}',
             ['controller' => 'Pcm', 'action' => 'movement'],

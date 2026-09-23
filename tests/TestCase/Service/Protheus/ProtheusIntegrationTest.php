@@ -53,23 +53,27 @@ final class ProtheusIntegrationTest extends TestCase
                 'TJ_SERVICO' => 'COROPE ', 'TJ_OBSERVA' => 'binary',
                 'pcm_descricao' => 'LAVAR TODOS 3 FILTRO COM SODA',
             ]],
-            Sql::EQUIPMENT => [['T9_CODBEM' => 'FTR 30 001 ']],
-            Sql::SERVICE => [['T4_SERVICO' => 'COROPE ']],
+            Sql::EQUIPMENT_BRANCH => [['T9_CODBEM' => 'FTR 30 001 ']],
+            Sql::SERVICE_BRANCH => [['T4_SERVICO' => 'COROPE ']],
             Sql::ENTRIES => [
+                ['TL_TIPOREG' => 'M ', 'TL_CODIGO' => '008382 '],
                 ['TL_TIPOREG' => 'M ', 'TL_CODIGO' => '008382 '],
                 ['TL_TIPOREG' => 'P ', 'TL_CODIGO' => '002075 '],
                 ['TL_TIPOREG' => 'P ', 'TL_CODIGO' => '000110 '],
                 ['TL_TIPOREG' => 'E ', 'TL_CODIGO' => 'ELE '],
                 ['TL_TIPOREG' => 'T ', 'TL_CODIGO' => 'UNKNOWN '],
             ],
-            Sql::PROFESSIONAL => [['T1_CODFUNC' => '008382 ']],
-            Sql::PRODUCT => [], // Missing/deleted master must not discard its entry.
+            Sql::PROFESSIONAL_BRANCH => [['T1_CODFUNC' => '008382 ']],
+            Sql::PRODUCT_BRANCH => [], // Missing/deleted master must not discard its entry.
         ], $calls);
         $order = $repository->findOrder('004893');
         self::assertSame('004893', $order['numero']);
         self::assertSame('LAVAR TODOS 3 FILTRO COM SODA', $order['descricao']);
         self::assertArrayNotHasKey('TJ_OBSERVA', $order['dados_principais']);
         self::assertSame('008382', $order['mao_de_obra'][0]['profissional']['T1_CODFUNC']);
+        self::assertCount(2, $order['mao_de_obra']);
+        self::assertCount(1, array_filter($calls, static fn(array $call): bool => $call[0] === Sql::PROFESSIONAL_BRANCH));
+        self::assertSame(['codigo' => '008382', 'filial' => '01'], $calls[4][1]);
         self::assertCount(2, $order['materiais']);
         self::assertNull($order['materiais'][0]['produto']);
         self::assertSame(['E', 'T'], array_column($order['outros_apontamentos'], 'TL_TIPOREG'));
@@ -96,6 +100,17 @@ final class ProtheusIntegrationTest extends TestCase
         $repository = $this->repository([Sql::ORDER => [['TJ_FILIAL' => '01'], ['TJ_FILIAL' => '02']]], $calls);
         $this->expectException(RuntimeException::class);
         $repository->findOrder('004893');
+    }
+
+    public function testWebDeadlineStopsBeforeExecutingSql(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
+        $connection->expects(self::never())->method('execute');
+        $repository = new ProtheusRepository($connection, 1);
+        (new \ReflectionProperty($repository, 'deadline'))->setValue($repository, 0.0);
+        $this->expectException(RuntimeException::class);
+        $repository->health();
     }
 
     private function repository(array $results, array &$calls): ProtheusRepository

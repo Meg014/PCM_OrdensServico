@@ -90,6 +90,13 @@ SQL;
 
     public const ORDER_BRANCH = self::ORDER . ' AND RTRIM(j.TJ_FILIAL) = :filial';
 
+    public const ORDER_IDENTITY = <<<'SQL'
+SELECT TOP (2) j.TJ_ORDEM, j.TJ_FILIAL, j.TJ_CODBEM
+FROM dbo.STJ010 j
+WHERE j.TJ_ORDEM = CAST(:numero AS VARCHAR(100))
+    AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'
+SQL;
+
     public const EQUIPMENT = <<<'SQL'
 SELECT TOP (2) b.*
 FROM dbo.ST9010 b
@@ -123,6 +130,11 @@ FROM dbo.SB1010 p
 WHERE RTRIM(p.B1_COD) = :codigo AND p.D_E_L_E_T_ <> '*'
 SQL;
 
+    public const EQUIPMENT_BRANCH = self::EQUIPMENT . ' AND b.T9_FILIAL = CAST(:filial AS VARCHAR(100))';
+    public const SERVICE_BRANCH = self::SERVICE . ' AND s.T4_FILIAL = CAST(:filial AS VARCHAR(100))';
+    public const PROFESSIONAL_BRANCH = self::PROFESSIONAL . ' AND p.T1_FILIAL = CAST(:filial AS VARCHAR(100))';
+    public const PRODUCT_BRANCH = self::PRODUCT . ' AND p.B1_FILIAL = CAST(:filial AS VARCHAR(100))';
+
     public static function allows(string $sql): bool
     {
         foreach ([false, true] as $branch) {
@@ -135,6 +147,8 @@ SQL;
             }
         }
         return in_array($sql, [
+            self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
+            self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
             self::HISTORY_USER_COLUMNS,
             self::HEALTH, self::ORDER, self::ORDER_BRANCH, self::EQUIPMENT,
             self::SERVICE, self::ENTRIES, self::PROFESSIONAL, self::PRODUCT,

@@ -8,11 +8,26 @@ use Cake\Database\Driver\Sqlserver;
 use Cake\Database\Query;
 use Cake\Database\StatementInterface;
 use LogicException;
+use PDO;
 use RuntimeException;
 
 /** Defense in depth; SQL Server credentials must also have SELECT-only permissions. */
 final class ProtheusReadOnly extends Sqlserver
 {
+    private ?int $queryTimeout = null;
+
+    /** Web reads are bounded without introducing session SQL or changing the allowlist. */
+    public function limitQueryTime(int $seconds): void
+    {
+        $this->queryTimeout = max(1, min(5, $seconds));
+        if (!defined('PDO::SQLSRV_ATTR_QUERY_TIMEOUT')) {
+            return;
+        }
+        if ($this->pdo !== null) {
+            $this->pdo->setAttribute(PDO::SQLSRV_ATTR_QUERY_TIMEOUT, $this->queryTimeout);
+        }
+    }
+
     public function connect(): void
     {
         foreach (['host', 'database', 'username', 'password'] as $key) {
@@ -27,6 +42,9 @@ final class ProtheusReadOnly extends Sqlserver
             }
         }
         parent::connect();
+        if ($this->queryTimeout !== null) {
+            $this->pdo->setAttribute(PDO::SQLSRV_ATTR_QUERY_TIMEOUT, $this->queryTimeout);
+        }
     }
 
     public function prepare(Query|string $query): StatementInterface

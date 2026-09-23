@@ -9,24 +9,35 @@ use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use RuntimeException;
 
-final class ProtheusRepository
+final class ProtheusRepository implements ProtheusReaderInterface
 {
     private Connection $connection;
 
     private ?array $historyUserColumns = null;
 
-    public function __construct(?Connection $connection = null)
+    private ?float $deadline;
+
+    public function __construct(?Connection $connection = null, ?int $budgetSeconds = null)
     {
         $connection ??= ConnectionManager::get('protheus');
         if (!$connection instanceof Connection || !$connection->getDriver() instanceof ProtheusReadOnly) {
             throw new RuntimeException('O datasource protheus exige o driver ProtheusReadOnly.');
         }
         $this->connection = $connection;
+        $this->deadline = $budgetSeconds === null ? null : microtime(true) + max(1, $budgetSeconds);
+        if ($budgetSeconds !== null) {
+            $connection->getDriver()->limitQueryTime(min(5, max(1, $budgetSeconds)));
+        }
     }
 
     public function health(): bool
     {
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
+    }
+
+    public function findOrderIdentity(string $numero, string $filial): ?array
+    {
+        return $this->one(ProtheusQueries::ORDER_IDENTITY, ['numero' => $numero, 'filial' => $filial]);
     }
 
     /** Returns original Protheus fields; unknown field semantics are deliberately not inferred. */
@@ -52,25 +63,34 @@ final class ProtheusRepository
             'numero' => $numero,
             'dados_principais' => $order,
             'descricao' => $description,
-            'equipamento' => $this->one(ProtheusQueries::EQUIPMENT, ['codigo' => $order['TJ_CODBEM']]),
-            'servico' => $this->one(ProtheusQueries::SERVICE, ['codigo' => $order['TJ_SERVICO']]),
+            'equipamento' => $this->master(ProtheusQueries::EQUIPMENT_BRANCH, $order['TJ_CODBEM'], $order['TJ_FILIAL']),
+            'servico' => $this->master(ProtheusQueries::SERVICE_BRANCH, $order['TJ_SERVICO'], $order['TJ_FILIAL']),
             'mao_de_obra' => [],
             'materiais' => [],
             'outros_apontamentos' => [],
         ];
         $entries = $this->read(ProtheusQueries::ENTRIES, ['numero' => $numero, 'filial' => $order['TJ_FILIAL']]);
+        $professionals = [];
+        $products = [];
         foreach ($entries as $entry) {
+            $code = $entry['TL_CODIGO'];
             switch ($entry['TL_TIPOREG']) {
                 case 'M':
+                    if (!array_key_exists($code, $professionals)) {
+                        $professionals[$code] = $this->master(ProtheusQueries::PROFESSIONAL_BRANCH, $code, $order['TJ_FILIAL']);
+                    }
                     $result['mao_de_obra'][] = [
                         'apontamento' => $entry,
-                        'profissional' => $this->one(ProtheusQueries::PROFESSIONAL, ['codigo' => $entry['TL_CODIGO']]),
+                        'profissional' => $professionals[$code],
                     ];
                     break;
                 case 'P':
+                    if (!array_key_exists($code, $products)) {
+                        $products[$code] = $this->master(ProtheusQueries::PRODUCT_BRANCH, $code, $order['TJ_FILIAL']);
+                    }
                     $result['materiais'][] = [
                         'apontamento' => $entry,
-                        'produto' => $this->one(ProtheusQueries::PRODUCT, ['codigo' => $entry['TL_CODIGO']]),
+                        'produto' => $products[$code],
                     ];
                     break;
                 default:
@@ -133,6 +153,14 @@ final class ProtheusRepository
         ];
     }
 
+    /** Same local/shared priority as history, never another nonblank branch. */
+    private function master(string $sql, string $code, string $branch): ?array
+    {
+        $row = $this->one($sql, ['codigo' => $code, 'filial' => $branch]);
+
+        return $row ?? ($branch !== '' ? $this->one($sql, ['codigo' => $code, 'filial' => '']) : null);
+    }
+
     private function one(string $sql, array $params): ?array
     {
         $rows = $this->read($sql, $params);
@@ -150,6 +178,9 @@ final class ProtheusRepository
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->deadline !== null && microtime(true) >= $this->deadline) {
+            throw new RuntimeException('Tempo de consulta complementar excedido.');
+        }
         $statement = $this->connection->execute($sql, $params, $types + array_fill_keys(array_keys($params), 'string'));
         try {
             $rows = $statement->fetchAll('assoc');

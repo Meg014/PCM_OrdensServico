@@ -1,5 +1,8 @@
 # Histórico de manutenção por equipamento
 
+O histórico também está disponível no detalhe da OS; veja
+[protheus-interface.md](protheus-interface.md) para fluxo, permissões e fallback web.
+
 Implementado em `ProtheusRepository::findEquipmentHistory($equipmentCode,
 $branch = null, $page = 1, $limit = 20)`. Retorna `equipment_code`, `branch`,
 `page`, `limit`, `has_more`, `orders` e disponibilidade das colunas de usuários.
@@ -111,8 +114,8 @@ O teste real de conexão/OS informado pelo usuário confirma a infraestrutura, m
 não a nova consulta. Conferir esta consulta no PC da empresa: presença dos campos
 explícitos, nomes, filial 01, usuários opcionais, datas inválidas/vazias, desempates,
 última página e tempo de resposta. Os campos adicionais não foram obtidos do JSON
-real nesta etapa. A interface de apresentação futura e seus links continuam
-desativados; o método aqui retorna uma página bruta isolada do MariaDB.
+real nesta etapa inicial. O método retorna uma página bruta isolada do MariaDB;
+a integração web posterior seleciona os campos públicos e abre detalhes sob demanda.
 
 Referências para os campos padrão e comparação de espaços (não substituem a
 validação do dicionário local):

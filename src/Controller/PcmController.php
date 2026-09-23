@@ -9,6 +9,7 @@ use App\Service\PcmHistoryService;
 use App\Service\PcmIndicatorService;
 use App\Service\PcmPresentationService;
 use App\Service\PcmTimeFormatter;
+use App\Service\Protheus\OrderProtheusService;
 use App\Service\SectorDashboardService;
 use Cake\Datasource\FactoryLocator;
 use Cake\Http\Exception\NotFoundException;
@@ -170,6 +171,31 @@ final class PcmController extends AppController
         $navigationAreas = $snapshotService->areas();
 
         $this->set(compact('snapshot', 'history', 'changes', 'currentImport', 'lastUpdatedAt', 'navigationAreas'));
+    }
+
+    /** Optional JSON supplement, protected by the same login/TV rules and snapshot scope. */
+    public function orderProtheus(int $id): Response
+    {
+        $this->request->allowMethod(['get']);
+        $snapshot = (new CurrentSnapshotService())->order($id);
+        if ($snapshot === null) {
+            throw new NotFoundException('Ordem de Serviço não encontrada no snapshot atual.');
+        }
+        $part = $this->request->getQuery('part', 'all');
+        $selected = $this->request->getQuery('os');
+        $page = filter_var($this->request->getQuery('page', '1'), FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
+        if (!is_string($part) || !in_array($part, ['all', 'history', 'detail'], true)
+            || ($selected !== null && !is_string($selected)) || $page === false) {
+            return $this->response->withStatus(400)->withType('application/json')
+                ->withStringBody('{"message":"Parâmetros inválidos."}');
+        }
+        // Do not hold the user's session lock while waiting for the complementary server.
+        $this->request->getSession()->close();
+        $payload = (new OrderProtheusService())->load($snapshot->toArray(), $part, $page, $selected);
+
+        return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
+            ->withStringBody((string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
     }
 
     /** Lists OS identities involved in the latest real snapshot movement. */

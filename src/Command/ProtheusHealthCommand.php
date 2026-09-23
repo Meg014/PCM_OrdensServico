@@ -8,6 +8,9 @@ use Cake\Command\Command;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOptionParser;
+use Cake\Core\Configure;
+use Cake\Datasource\ConnectionManager;
+use PDOException;
 use Throwable;
 
 final class ProtheusHealthCommand extends Command
@@ -37,6 +40,7 @@ final class ProtheusHealthCommand extends Command
 
             return static::CODE_ERROR;
         }
+        $historyQuery = false;
         try {
             $repository = new ProtheusRepository();
             if (!$repository->health()) {
@@ -45,6 +49,7 @@ final class ProtheusHealthCommand extends Command
                 return static::CODE_ERROR;
             }
             if ($args->getOption('bem') !== null) {
+                $historyQuery = true;
                 $history = $repository->findEquipmentHistory(
                     (string)$args->getOption('bem'), $args->getOption('filial'), $page, $limit,
                 );
@@ -73,12 +78,51 @@ final class ProtheusHealthCommand extends Command
             $io->out(json_encode($order, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
 
             return static::CODE_SUCCESS;
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
             // Driver exceptions may contain server names, SQL or connection details.
             $io->error('Falha no Protheus. Verifique PROTHEUS_DB_*, pdo_sqlsrv/ODBC, rede, TLS e SELECT nas seis tabelas.');
             $io->error('Verifique também --os/--bem, --filial, campos e chaves duplicadas. Consulte docs/protheus-historico.md.');
+            if ($historyQuery && PHP_SAPI === 'cli' && Configure::read('debug') === true) {
+                $io->err($this->sanitizedHistoryError($exception, ConnectionManager::getConfig('protheus') ?? []));
+            }
 
             return static::CODE_ERROR;
         }
+    }
+
+    /** Temporary development-only CLI diagnostic; never output query text or a trace. */
+    private function sanitizedHistoryError(Throwable $exception, array $config): string
+    {
+        $state = null;
+        do {
+            if ($exception instanceof PDOException && isset($exception->errorInfo[0])) {
+                $state = (string)$exception->errorInfo[0];
+            } elseif (preg_match('/SQLSTATE\[([A-Z0-9]{5})\]/', $exception->getMessage(), $match)) {
+                $state = $match[1];
+            }
+            $cause = $exception;
+            $exception = $exception->getPrevious();
+        } while ($exception !== null);
+
+        $message = $cause instanceof PDOException && isset($cause->errorInfo[2])
+            ? (string)$cause->errorInfo[2] : $cause->getMessage();
+        $message = preg_split('/(?:\r?\n\s*Query:|\bSQL:\s|\bStack trace:)/i', $message, 2)[0];
+        // Mask configured values first, including DSNs and encoded credentials.
+        foreach (['password', 'username', 'host', 'database', 'url', 'dsn'] as $key) {
+            $value = (string)($config[$key] ?? '');
+            if ($value !== '') {
+                $message = str_ireplace([$value, rawurlencode($value), urlencode($value)], '[redigido]', $message);
+            }
+        }
+        $message = preg_replace(
+            '/\b(password|pwd|username|user(?:\s+id)?|uid|host|server|database|senha|usuário|servidor)(?:\s*[=:]\s*|\s+)(?:\x27[^\x27]*\x27|"[^"]*"|[^\s;,]+)/iu',
+            '$1 [redigido]',
+            $message,
+        ) ?? 'Mensagem técnica indisponível.';
+        $message = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $message) ?? '';
+        $message = str_replace(['<', '>'], ['[', ']'], $message);
+        $state = is_string($state) && preg_match('/^[A-Z0-9]{5}$/D', $state) ? $state : 'indisponível';
+
+        return 'Histórico Protheus — SQLSTATE: ' . $state . '; causa: ' . mb_substr($message, 0, 1200);
     }
 }

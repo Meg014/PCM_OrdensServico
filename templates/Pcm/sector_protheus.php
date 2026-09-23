@@ -11,6 +11,8 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
 <section class="pcm-panel pcm-filter-panel"><h2>Filtros do setor</h2>
 <p>Carteira operacional: abertas elegíveis desde 01/01/2026 e fechadas, sem canceladas.</p>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?>
+<?= $this->Form->hidden('card', ['value' => $sector['filters']['card']]) ?>
+<?= $this->Form->hidden('card_status', ['value' => $sector['filters']['card_status']]) ?>
 <div class="row g-3">
 <?php foreach (['filial' => 'Filial', 'status' => 'Status', 'equipment' => 'Equipamento/Bem (código)', 'service' => 'Serviço (código)',
     'service_name' => 'Nome do serviço (exato)', 'cost_center' => 'Centro de custo', 'maintenance_type' => 'Tipo Manut.',

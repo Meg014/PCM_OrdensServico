@@ -49,6 +49,11 @@ final class ProtheusSectorTest extends TestCase
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
         self::assertStringContainsString('data-sector-chart="equipment"', $html);
         self::assertStringContainsString('Fonte: Protheus', $html);
+        self::assertStringContainsString('Total operacional', $html);
+        self::assertStringContainsString('Paradas por Oportunidade', $html);
+        self::assertStringContainsString('card=corrective', $html);
+        self::assertStringContainsString('card_status=FECHADA', $html);
+        self::assertStringContainsString('pcm-sector-table-scroll', $html);
         self::assertStringNotContainsString('<script>unsafe</script>', $html);
     }
 
@@ -63,11 +68,46 @@ final class ProtheusSectorTest extends TestCase
         self::assertStringNotContainsString('SQLSTATE', json_encode($result));
     }
 
-    private function repository(array &$calls, bool $fail = false): ProtheusRepository
+    public function testManagementBreakdownDoesNotDoubleCountAndCardFiltersOnlyThePage(): void
+    {
+        $base = ['identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1, 'missing_start' => 0];
+        $aggregate = [['dimension' => 'total', 'quantity' => 10] + $base];
+        foreach ([['COR', 'MECOPO', 'EM ABERTO', 3], ['COR', 'MECOPO', 'FECHADA', 2],
+            ['PRE', 'PRE01', 'EM ABERTO', 1], ['PRE', 'PRE01', 'FECHADA', 1],
+            ['MEL', 'COREME', 'EM ABERTO', 2], ['COR', 'CORPRO', 'EM ABERTO', 1]] as [$type, $service, $status, $count]) {
+            $aggregate[] = ['dimension' => 'cards', 'quantity' => $count, 'TJ_TIPO' => $type, 'TJ_SERVICO' => $service,
+                'service_name' => 'SERVICO', 'status' => $status] + $base;
+        }
+        $calls = [];
+        $result = (new ProtheusSectorService($this->repository($calls, false, $aggregate)))->load('MECANI',
+            ['card' => 'opportunity', 'card_status' => 'EM ABERTO', 'equipment' => 'BEM01', 'page' => 2, 'limit' => 1]);
+        self::assertTrue($result['available']);
+        self::assertSame(['total' => 10, 'open' => 7, 'closed' => 3], $result['operational']);
+        self::assertSame(['open' => 4, 'closed' => 2], $result['breakdown']['corrective']);
+        self::assertSame(['open' => 3, 'closed' => 2], $result['breakdown']['opportunity']);
+        self::assertSame(['open' => 2, 'closed' => 0], $result['breakdown']['emergency']);
+        self::assertArrayNotHasKey('card_status', $calls[0][1]);
+        self::assertSame('EM ABERTO', $calls[1][1]['card_status']);
+        self::assertSame('MECOPO', $calls[1][1]['card_service1']);
+        self::assertSame('ELECOP', $calls[1][1]['card_service2']);
+        self::assertSame('BEM01', $calls[1][1]['equipment']);
+        self::assertSame(1, $calls[1][1]['offset']);
+        self::assertStringContainsString('filtered.status = card.status', $calls[1][0]);
+
+        $calls = [];
+        (new ProtheusSectorService($this->repository($calls)))->load('ELETRI', ['card' => 'corrective', 'card_status' => 'FECHADA']);
+        self::assertSame('COR', $calls[1][1]['card_type']);
+        self::assertSame('FECHADA', $calls[1][1]['card_status']);
+        $calls = [];
+        (new ProtheusSectorService($this->repository($calls)))->load('ELETRI', ['card' => 'safra']);
+        self::assertSame([['code' => 'ELEPRE', 'name' => 'PREVENTIVA ELETRICA']], json_decode($calls[1][1]['season_services'], true));
+    }
+
+    private function repository(array &$calls, bool $fail = false, ?array $aggregate = null): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail, $aggregate) {
             $calls[] = [$sql, $params, $types];
             self::assertTrue(ProtheusQueries::allows($sql));
             if ($fail && count($calls) === 2) throw new \RuntimeException('SQLSTATE private server');
@@ -77,6 +117,7 @@ final class ProtheusSectorTest extends TestCase
                 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'status' => 'FECHADA', 'planned_date' => '2026-01-01',
                 'TJ_HOMPINI' => '', 'TJ_DTPRINI' => '', 'TJ_HOPRINI' => ''] + $base;
             $rows = count($calls) === 1 ? [['dimension' => 'total'] + $base, ['dimension' => 'cards'] + $order] : [$order, $order];
+            if (count($calls) === 1 && $aggregate !== null) $rows = $aggregate;
             $statement = $this->createMock(StatementInterface::class);
             $statement->method('fetchAll')->willReturn($rows);
             $statement->expects(self::once())->method('closeCursor');

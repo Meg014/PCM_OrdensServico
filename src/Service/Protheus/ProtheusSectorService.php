@@ -12,7 +12,11 @@ use Throwable;
 
 final class ProtheusSectorService
 {
-    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end'];
+    public const CATEGORIES = ['preventive' => 'Preventivas', 'corrective' => 'Corretivas', 'improvement' => 'Melhorias',
+        'emergency' => 'Corretivas Emergenciais', 'scheduled' => 'Corretivas Programadas', 'opportunity' => 'Paradas por Oportunidade'];
+    public const TYPES = ['preventive' => 'PRE', 'corrective' => 'COR', 'improvement' => 'MEL'];
+    public const SERVICES = ['emergency' => ['COREME'], 'scheduled' => ['CORPRO'], 'opportunity' => ['MECOPO', 'ELECOP']];
+    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status'];
     public function __construct(private ?ProtheusRepository $repository = null)
     {
     }
@@ -27,6 +31,8 @@ final class ProtheusSectorService
             $filters[$key] = trim($value);
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
+        if (!in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(self::CATEGORIES)], true)
+            || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] !== '') {
                 $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters[$key]);
@@ -40,12 +46,17 @@ final class ProtheusSectorService
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
             'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
-        $params = array_diff_key($filters, array_flip(['date_start', 'date_end']));
+        $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status']));
         $params += ['area' => $area, 'cutoff' => str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START)];
         if ($params['q'] !== '') $params['q'] = '%' . strtr($params['q'], ['~' => '~~', '%' => '~%', '_' => '~_', '[' => '~[']) . '%';
         try {
-            $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 10))->sector($params, $page, $limit, $filters['date_start'], $filters['date_end']);
+            $selection = ['status' => $filters['card_status'], 'type' => self::TYPES[$filters['card']] ?? '',
+                'services' => self::SERVICES[$filters['card']] ?? [],
+                'season' => in_array($filters['card'], ['safra', 'offseason'], true) ? $filters['card'] : ''];
+            $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 10))->sector($params, $page, $limit, $filters['date_start'], $filters['date_end'], $selection);
             $cards = array_fill_keys(ProtheusDashboardService::CARDS, 0);
+            $breakdown = array_fill_keys(array_keys(self::CATEGORIES), ['open' => 0, 'closed' => 0]);
+            $operational = ['total' => 0, 'open' => 0, 'closed' => 0];
             $charts = array_fill_keys(['status', 'maintenance', 'equipment', 'services', 'costCenters'], []);
             $total = null;
             $missing = 0;
@@ -57,13 +68,17 @@ final class ProtheusSectorService
                 if ($dimension === 'cards') {
                     if ($row['service_name'] === null) throw new RuntimeException('Cadastro de serviço ausente.');
                     $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
-                    $cards[$season . ($row['status'] === 'EM ABERTO' ? '_open' : '_completed')] += $quantity;
-                    if ($row['status'] === 'EM ABERTO') {
-                        $type = ['PRE' => 'preventive', 'COR' => 'corrective', 'MEL' => 'improvement'][$row['TJ_TIPO']] ?? null;
-                        $service = ['COREME' => 'emergency', 'CORPRO' => 'scheduled'][$row['TJ_SERVICO']] ?? null;
-                        if ($type !== null) $cards[$type] += $quantity;
-                        if ($service !== null) $cards[$service] += $quantity;
+                    $statusKey = $row['status'] === 'EM ABERTO' ? 'open' : 'closed';
+                    $operational[$statusKey] += $quantity;
+                    foreach (self::CATEGORIES as $category => $_label) {
+                        $matches = isset(self::TYPES[$category]) ? $row['TJ_TIPO'] === self::TYPES[$category]
+                            : in_array($row['TJ_SERVICO'], self::SERVICES[$category], true);
+                        if ($matches) {
+                            $breakdown[$category][$statusKey] += $quantity;
+                            if ($statusKey === 'open') $cards[$category] += $quantity;
+                        }
                     }
+                    $cards[$season . ($row['status'] === 'EM ABERTO' ? '_open' : '_completed')] += $quantity;
                     continue;
                 }
                 [$key, $label] = match ($dimension) {
@@ -78,10 +93,13 @@ final class ProtheusSectorService
                     'branch' => $branch, 'quantity' => $quantity];
             }
             if ($total === null) throw new RuntimeException('Resultado incompleto.');
+            $operational['total'] = $total;
+            if ($total !== $operational['open'] + $operational['closed']) throw new RuntimeException('Contagens inconsistentes.');
             foreach ($charts as &$rows) foreach ($rows as &$row) $row['percentage'] = $total > 0 ? $row['quantity'] / $total * 100 : 0;
             unset($rows, $row);
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),
-                'orders' => $data['orders'], 'cards' => $cards, 'charts' => $charts, 'missing_start' => $missing, 'has_more' => $data['has_more']]);
+                'orders' => $data['orders'], 'cards' => $cards, 'breakdown' => $breakdown, 'operational' => $operational,
+                'charts' => $charts, 'missing_start' => $missing, 'has_more' => $data['has_more']]);
         } catch (Throwable) {
             return $result;
         }

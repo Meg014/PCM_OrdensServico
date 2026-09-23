@@ -17,8 +17,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     private ?float $deadline;
 
-    public function __construct(?Connection $connection = null, ?int $budgetSeconds = null)
+    public function __construct(?Connection $connection = null, ?int $budgetSeconds = null, private readonly ?string $areaScope = null)
     {
+        if ($areaScope !== null && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $areaScope)) {
+            throw new InvalidArgumentException('Escopo de área inválido.');
+        }
         $connection ??= ConnectionManager::get('protheus');
         if (!$connection instanceof Connection || !$connection->getDriver() instanceof ProtheusReadOnly) {
             throw new RuntimeException('O datasource protheus exige o driver ProtheusReadOnly.');
@@ -41,14 +44,32 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Two bounded reads, never hydration of resources or snapshots. */
-    public function sector(array $params, int $page, int $limit, string $start, string $end): array
+    public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = []): array
     {
         if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
         $aggregate = $this->read(ProtheusSectorQueries::aggregates(), $params);
+        $season = $selection['season'] ?? '';
+        $seasonServices = [];
+        if ($season !== '') {
+            $classifier = new \App\Service\PcmServiceClassifier();
+            $groupCount = 0;
+            foreach ($aggregate as $row) {
+                if (($row['dimension'] ?? '') !== 'cards') continue;
+                if (++$groupCount > 2000 || $row['service_name'] === null) throw new RuntimeException('Classificação incompleta.');
+                $resolved = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                if ($resolved === $season) {
+                    $pair = ['code' => $row['TJ_SERVICO'], 'name' => $row['service_name']];
+                    $seasonServices[json_encode($pair, JSON_THROW_ON_ERROR)] = $pair;
+                }
+            }
+        }
         $rows = $this->read(ProtheusSectorQueries::page(), $params + ['date_start' => $start,
-            'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1],
+            'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
+            'card_status' => $selection['status'] ?? '', 'card_type' => $selection['type'] ?? '',
+            'card_service1' => $selection['services'][0] ?? '', 'card_service2' => $selection['services'][1] ?? '',
+            'card_season' => $season, 'season_services' => json_encode(array_values($seasonServices), JSON_THROW_ON_ERROR)],
             ['offset' => 'integer', 'fetch' => 'integer']);
         $cardGroups = 0;
         foreach (array_merge($aggregate, $rows) as $row) {
@@ -270,6 +291,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->areaScope !== null) {
+            $scopedSql = ProtheusQueries::withAreaScope($sql);
+            if ($scopedSql !== $sql) {
+                $sql = $scopedSql;
+                $params['scope_area'] = $this->areaScope;
+            }
+        }
         if ($this->deadline !== null && microtime(true) >= $this->deadline) {
             throw new RuntimeException('Tempo de consulta complementar excedido.');
         }

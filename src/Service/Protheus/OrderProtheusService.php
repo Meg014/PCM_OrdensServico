@@ -14,7 +14,7 @@ final class OrderProtheusService
 {
     public const UNAVAILABLE = 'Detalhes do Protheus temporariamente indisponíveis.';
 
-    public function __construct(private ?ProtheusReaderInterface $reader = null)
+    public function __construct(private ?ProtheusReaderInterface $reader = null, private readonly ?string $areaScope = null)
     {
     }
 
@@ -30,7 +30,7 @@ final class OrderProtheusService
                 throw new RuntimeException('Missing identity.');
             }
             $branch = rtrim((string)$snapshot['branch_code'], ' ');
-            $this->reader ??= new ProtheusRepository(budgetSeconds: 8);
+            $this->reader ??= new ProtheusRepository(budgetSeconds: 8, areaScope: $this->areaScope);
             $mapper = new OrderSupplementMapper();
             $presenter = new OrderDetailPresenter();
             if ($part === 'all') {

@@ -9,7 +9,7 @@ use Throwable;
 /** Web boundary: validates input before querying and never exposes driver exceptions. */
 final class OrderListingService
 {
-    public function __construct(private ?ProtheusRepository $repository = null)
+    public function __construct(private ?ProtheusRepository $repository = null, private readonly ?string $areaScope = null)
     {
     }
 
@@ -43,7 +43,7 @@ final class OrderListingService
             throw new InvalidArgumentException('Paginação inválida.');
         }
         try {
-            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5);
+            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope);
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
                 $filters['filial'] === '' ? null : $filters['filial'],

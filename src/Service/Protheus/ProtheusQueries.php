@@ -9,9 +9,9 @@ final class ProtheusQueries
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
     public const AREAS = <<<'SQL'
-SELECT DISTINCT RTRIM(TJ_CODAREA) AS code
-FROM dbo.STJ010
-WHERE D_E_L_E_T_ <> '*' AND NULLIF(LTRIM(RTRIM(TJ_CODAREA)), '') IS NOT NULL
+SELECT DISTINCT RTRIM(j.TJ_CODAREA) AS code
+FROM dbo.STJ010 j
+WHERE j.D_E_L_E_T_ <> '*' AND NULLIF(LTRIM(RTRIM(j.TJ_CODAREA)), '') IS NOT NULL
 ORDER BY code
 SQL;
 
@@ -286,6 +286,25 @@ SQL;
     public const PRODUCT_BRANCH = self::PRODUCT . ' AND p.B1_FILIAL = CAST(:filial AS VARCHAR(100))';
 
     public static function allows(string $sql): bool
+    {
+        if (self::allowsBase($sql)) return true;
+        $base = str_replace(self::AREA_SCOPE, '', $sql);
+
+        return $base !== $sql && self::allowsBase($base) && self::withAreaScope($base) === $sql;
+    }
+
+    private const AREA_SCOPE = ' AND j.TJ_CODAREA = CAST(:scope_area AS VARCHAR(100))';
+
+    /** Fixed transformation of allowlisted SQL; first STJ source, before pagination/aggregation. */
+    public static function withAreaScope(string $sql): string
+    {
+        $anchor = "j.D_E_L_E_T_ <> '*'";
+        $position = strpos($sql, $anchor);
+
+        return $position === false ? $sql : substr_replace($sql, $anchor . self::AREA_SCOPE, $position, strlen($anchor));
+    }
+
+    private static function allowsBase(string $sql): bool
     {
         if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()) {
             return true;

@@ -84,13 +84,23 @@ SQL;
         return self::BASE . <<<'SQL'
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
-    TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, status,
+    TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
     identity_count, equipment_matches, service_matches
 FROM filtered
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date) d
+CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type AS VARCHAR(100)) AS type,
+    CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,
+    CAST(:card_season AS VARCHAR(20)) AS season) card
 WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
     AND (d.end_date = '' OR planned_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
+    AND (card.status = '' OR filtered.status = card.status)
+    AND (card.type = '' OR TJ_TIPO = card.type)
+    AND (card.service1 = '' OR TJ_SERVICO IN (card.service1, card.service2))
+    AND (card.season = '' OR EXISTS (
+        SELECT 1 FROM OPENJSON(:season_services) WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
+        WHERE allowed.code = filtered.TJ_SERVICO AND allowed.name = filtered.service_name
+    ))
 ORDER BY planned_date DESC, record_id DESC
 OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 OPTION (RECOMPILE)

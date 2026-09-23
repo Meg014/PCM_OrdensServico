@@ -57,12 +57,20 @@ class AppController extends Controller
     public function beforeFilter(EventInterface $event): void
     {
         parent::beforeFilter($event);
+        $controller = $this->request->getParam('controller');
+        $action = $this->request->getParam('action');
+        if ($controller === 'ReportImports' || ($controller === 'Pcm' && !in_array($action, [
+            'index', 'orders', 'presentation', 'presentationData', 'dashboardData',
+            'sector', 'sectorData', 'sectorOptions', 'protheusOrder', 'protheusOrderData',
+        ], true))) {
+            throw new \Cake\Http\Exception\NotFoundException('Recurso indisponível.');
+        }
         $this->response = $this->response->withHeader('Cache-Control', 'no-store');
         $identity = $this->request->getAttribute('identity');
         $currentUser = null;
         if ($identity !== null) {
             $currentUser = $this->fetchTable('Users')->find('active')
-                ->where(['Users.id' => $identity->getIdentifier()])->first();
+                ->contain(['MaintenanceAreas'])->where(['Users.id' => $identity->getIdentifier()])->first();
             // Recheck status, role and password on every request, including existing sessions.
             if ($currentUser === null || !hash_equals($currentUser->password, (string)$identity->get('password'))) {
                 $this->Authentication->logout();
@@ -72,6 +80,23 @@ class AppController extends Controller
             }
         }
         $this->set(compact('currentUser'));
+        if ($currentUser !== null && $currentUser->role === 'USUARIO' && $controller === 'Pcm') {
+            $area = $currentUser->maintenance_area?->source_code;
+            if (!is_string($area) || !preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) {
+                throw new ForbiddenException('Solicite ao administrador a configuração do seu setor.');
+            }
+            if (in_array($action, ['presentation', 'presentationData', 'dashboardData'], true)) {
+                throw new ForbiddenException('Acesso restrito ao seu setor.');
+            }
+            if (in_array($action, ['sector', 'sectorData'], true)
+                && strtoupper((string)($this->request->getParam('pass')[0] ?? '')) !== $area) {
+                throw new ForbiddenException('Acesso restrito ao seu setor.');
+            }
+            $this->request = $this->request->withAttribute('pcmAreaScope', $area);
+        }
+        if ($currentUser !== null && !in_array($currentUser->role, ['ADMIN', 'USUARIO', 'TV'], true)) {
+            throw new ForbiddenException('Perfil sem acesso.');
+        }
         if ($currentUser !== null && $currentUser->role === 'TV') {
             $path = $this->request->getUri()->getPath();
             if ($identity->get('role') !== 'TV') {

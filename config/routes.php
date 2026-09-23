@@ -58,6 +58,10 @@ return function (RouteBuilder $routes): void {
         $builder->connect('/usuarios/{id}/editar', ['controller' => 'Users', 'action' => 'edit'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
         $builder->connect('/usuarios/{id}/senha', ['controller' => 'Users', 'action' => 'password'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
         $builder->connect('/pcm', ['controller' => 'Pcm', 'action' => 'index'], ['_name' => 'pcm']);
+        $builder->get('/pcm/data', ['controller' => 'Pcm', 'action' => 'dashboardData'], 'pcm-data');
+        $builder->get('/pcm/legado', ['controller' => 'Pcm', 'action' => 'indexLegacy'], 'pcm-legacy');
+        $builder->get('/pcm/apresentacao/legado', ['controller' => 'Pcm', 'action' => 'presentationLegacy'], 'pcm-presentation-legacy');
+        $builder->get('/pcm/apresentacao/legado/data', ['controller' => 'Pcm', 'action' => 'presentationLegacyData'], 'pcm-presentation-legacy-data');
         $builder->get('/pcm/ordens', ['controller' => 'Pcm', 'action' => 'orders'], 'pcm-orders');
         $builder->get('/pcm/ordens/legado', ['controller' => 'Pcm', 'action' => 'ordersLegacy'], 'pcm-orders-legacy');
         $builder->get('/pcm/protheus/os/{number}', ['controller' => 'Pcm', 'action' => 'protheusOrder'], 'pcm-protheus-order')

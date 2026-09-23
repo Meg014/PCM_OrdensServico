@@ -8,6 +8,65 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    /** One bounded aggregate result; all filtering precedes aggregation on SQL Server. */
+    public const DASHBOARD = <<<'SQL'
+WITH base AS (
+    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_CODBEM, j.TJ_SERVICO,
+           j.TJ_CCUSTO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
+           COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
+    FROM dbo.STJ010 j
+    CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial,
+                       CAST(:area AS VARCHAR(100)) AS area,
+                       CAST(:bem AS VARCHAR(100)) AS bem,
+                       CAST(:servico AS VARCHAR(100)) AS servico,
+                       CAST(:centro AS VARCHAR(100)) AS centro,
+                       CAST(:tipo AS VARCHAR(100)) AS tipo,
+                       CAST(:situacao AS VARCHAR(100)) AS situacao,
+                       CAST(:termino AS VARCHAR(100)) AS termino) f
+    WHERE j.D_E_L_E_T_ <> '*'
+      AND (f.filial = '' OR j.TJ_FILIAL = f.filial)
+      AND (f.area = '' OR j.TJ_CODAREA = f.area)
+      AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
+      AND (f.servico = '' OR j.TJ_SERVICO = f.servico)
+      AND (f.centro = '' OR j.TJ_CCUSTO = f.centro)
+      AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)
+      AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
+      AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
+), grouped AS (
+    SELECT CASE
+        WHEN GROUPING(TJ_CODAREA) = 0 THEN 'area'
+        WHEN GROUPING(TJ_CODBEM) = 0 THEN 'equipment'
+        WHEN GROUPING(TJ_SERVICO) = 0 THEN 'service'
+        WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'cost_center'
+        WHEN GROUPING(TJ_TIPO) = 0 THEN 'type'
+        WHEN GROUPING(TJ_SITUACA) = 0 THEN 'status_raw'
+        ELSE 'total' END AS dimension,
+        CASE
+        WHEN GROUPING(TJ_CODAREA) = 0 THEN TJ_CODAREA
+        WHEN GROUPING(TJ_CODBEM) = 0 THEN TJ_CODBEM
+        WHEN GROUPING(TJ_SERVICO) = 0 THEN TJ_SERVICO
+        WHEN GROUPING(TJ_CCUSTO) = 0 THEN TJ_CCUSTO
+        WHEN GROUPING(TJ_TIPO) = 0 THEN TJ_TIPO
+        WHEN GROUPING(TJ_SITUACA) = 0 THEN TJ_SITUACA
+        ELSE '' END AS code,
+        CASE WHEN GROUPING(TJ_SITUACA) = 0 THEN TJ_TERMINO ELSE '' END AS ending,
+        CASE WHEN GROUPING(TJ_FILIAL) = 0 THEN TJ_FILIAL ELSE '' END AS branch,
+        COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count
+    FROM base
+    GROUP BY GROUPING SETS ((), (TJ_FILIAL, TJ_CODAREA), (TJ_FILIAL, TJ_CODBEM),
+        (TJ_FILIAL, TJ_SERVICO), (TJ_FILIAL, TJ_CCUSTO), (TJ_FILIAL, TJ_TIPO),
+        (TJ_FILIAL, TJ_SITUACA, TJ_TERMINO))
+), ranked AS (
+    SELECT dimension, code, ending, branch, quantity, identity_count,
+        ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, branch, code, ending) AS position
+    FROM grouped
+)
+SELECT dimension, code, ending, branch, quantity, identity_count
+FROM ranked WHERE position <= 10
+ORDER BY dimension, position
+OPTION (RECOMPILE)
+SQL;
+
     /** Optional columns are probed without executing arbitrary SQL or scanning STJ010. */
     public const HISTORY_USER_COLUMNS = <<<'SQL'
 SELECT COL_LENGTH('dbo.STJ010', 'TJ_USUAINI') AS inicio,
@@ -179,6 +238,7 @@ SQL;
             }
         }
         return in_array($sql, [
+            self::DASHBOARD,
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
             self::HISTORY_USER_COLUMNS,

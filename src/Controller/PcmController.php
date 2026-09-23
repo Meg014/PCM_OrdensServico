@@ -11,6 +11,7 @@ use App\Service\PcmPresentationService;
 use App\Service\PcmTimeFormatter;
 use App\Service\Protheus\OrderProtheusService;
 use App\Service\Protheus\OrderListingService;
+use App\Service\Protheus\ProtheusDashboardService;
 use Cake\Http\Exception\BadRequestException;
 use App\Service\SectorDashboardService;
 use Cake\Datasource\FactoryLocator;
@@ -24,10 +25,16 @@ final class PcmController extends AppController
     /** Displays the company-wide current PCM snapshot. */
     public function index(): void
     {
+        $this->directDashboard(false);
+    }
+
+    public function indexLegacy(): void
+    {
         $snapshot = new CurrentSnapshotService();
         $indicators = (new PcmIndicatorService($snapshot))->calculate();
 
         $this->set(['indicators' => $indicators] + $this->currentContext($snapshot));
+        $this->viewBuilder()->setTemplate('index_legacy');
     }
 
     public function orders(): void
@@ -75,16 +82,27 @@ final class PcmController extends AppController
     /** Displays the lightweight TV presentation without detailed sector content. */
     public function presentation(): void
     {
+        $this->directDashboard(true);
+    }
+
+    public function presentationLegacy(): void
+    {
         $snapshot = new CurrentSnapshotService();
         $payload = (new PcmPresentationService($snapshot))->payload();
         $lastUpdatedAt = $snapshot->lastSuccessfulImportAt();
         $navigationAreas = [];
 
         $this->set(compact('payload', 'lastUpdatedAt', 'navigationAreas'));
+        $this->viewBuilder()->setTemplate('presentation_legacy');
     }
 
     /** Returns only the current presentation counters and snapshot identity. */
     public function presentationData(): Response
+    {
+        return $this->dashboardData();
+    }
+
+    public function presentationLegacyData(): Response
     {
         $payload = (new PcmPresentationService())->payload();
 
@@ -92,6 +110,34 @@ final class PcmController extends AppController
             ->withType('application/json')
             ->withHeader('Cache-Control', 'no-store')
             ->withStringBody((string)json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    public function dashboardData(): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        try {
+            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams());
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros inválidos.');
+        }
+
+        return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
+            ->withStatus($payload['available'] ? 200 : 503)
+            ->withStringBody((string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
+    private function directDashboard(bool $presentation): void
+    {
+        $this->request->getSession()->close();
+        try {
+            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams());
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros inválidos.');
+        }
+        $this->set(compact('payload', 'presentation') + ['navigationAreas' => []]);
+        $this->viewBuilder()->setTemplate('protheus_dashboard');
+        $this->response = $this->response->withHeader('Cache-Control', 'no-store');
     }
 
     /** Displays company-wide operational and sector comparison analysis. */

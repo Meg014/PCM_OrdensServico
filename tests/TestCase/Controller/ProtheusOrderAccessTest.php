@@ -95,6 +95,29 @@ final class ProtheusOrderAccessTest extends TestCase
         ]);
     }
 
+    public function testDashboardRoutesAndTemplateDoNotRequireAnImport(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        foreach (['/pcm/data' => 'dashboardData', '/pcm/apresentacao/data' => 'presentationData',
+            '/pcm/legado' => 'indexLegacy', '/pcm/apresentacao/legado/data' => 'presentationLegacyData'] as $url => $action) {
+            $request = new ServerRequest(['url' => $url, 'environment' => ['REQUEST_METHOD' => 'GET']]);
+            self::assertSame($action, Router::parseRequest($request)['action']);
+        }
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $view->set(['presentation' => true, 'payload' => ['available' => false,
+            'filters' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::FILTERS, ''),
+            'record_count' => null, 'groups' => [], 'queried_at' => null]]);
+        $html = $view->render('protheus_dashboard', false);
+        self::assertStringContainsString('/pcm/apresentacao/data', $html);
+        self::assertStringContainsString('Aguardando validação da regra', $html);
+        self::assertStringContainsString('Fonte: Protheus', $html);
+        self::assertStringNotContainsString('data-pcm-current-version', $html);
+        self::assertStringNotContainsString('Importe um XLSX', $html);
+    }
+
     public function testDirectDetailRouteAndPageNeedNoSnapshot(): void
     {
         Router::reload();

@@ -28,9 +28,9 @@ final class PcmControllerTest extends TestCase
         parent::tearDownAfterClass();
     }
 
-    public function testDashboardReturnsHttp200(): void
+    public function testLegacyDashboardReturnsHttp200(): void
     {
-        $this->get('/pcm');
+        $this->get('/pcm/legado');
         $this->assertResponseOk();
         $this->assertResponseContains('Visão Geral');
         $this->assertResponseContains('O.S. Em Aberto');
@@ -114,9 +114,9 @@ final class PcmControllerTest extends TestCase
         }
     }
 
-    public function testPresentationPageContainsOnlySummaryCardsAndControls(): void
+    public function testLegacyPresentationPageContainsOnlySummaryCardsAndControls(): void
     {
-        $this->get('/pcm/apresentacao');
+        $this->get('/pcm/apresentacao/legado');
         $this->assertResponseOk();
         $this->assertResponseContains('PCM - VISÃO GERAL');
         $this->assertResponseContains('O.S. EM ABERTO');
@@ -130,9 +130,9 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseNotContains('Top 10 equipamentos');
     }
 
-    public function testPresentationDataReturnsLightweightOrderedScreens(): void
+    public function testLegacyPresentationDataReturnsLightweightOrderedScreens(): void
     {
-        $this->get('/pcm/apresentacao/data');
+        $this->get('/pcm/apresentacao/legado/data');
         $this->assertResponseOk();
         $this->assertContentType('application/json');
         $payload = json_decode((string)$this->_response->getBody(), true, flags: JSON_THROW_ON_ERROR);

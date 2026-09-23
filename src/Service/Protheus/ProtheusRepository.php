@@ -35,6 +35,30 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
+    /** Aggregated on SQL Server, at most 61 rows, never individual orders. */
+    public function dashboard(array $filters): array
+    {
+        $params = [];
+        foreach (['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'] as $key) {
+            $value = $filters[$key] ?? '';
+            if (!is_string($value) || strlen($value) > 100) {
+                throw new InvalidArgumentException('Filtro inválido.');
+            }
+            $params[$key] = trim($value);
+        }
+        $rows = $this->read(ProtheusQueries::DASHBOARD, $params);
+        foreach ($rows as &$row) {
+            if ((int)$row['identity_count'] > 1) {
+                throw new RuntimeException('Identidade de OS ambígua.');
+            }
+            unset($row['identity_count']);
+            $row['quantity'] = (int)$row['quantity'];
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
     public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20): array
     {

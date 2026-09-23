@@ -35,11 +35,11 @@ WITH page_keys AS (
     OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 )
 SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM,
-       CASE WHEN b.local_count > 0 THEN b.local_name ELSE b.shared_name END AS equipment_name,
-       CASE WHEN b.local_count > 0 THEN b.local_count ELSE b.shared_count END AS equipment_matches,
+       CASE WHEN b_local.matches > 0 THEN b_local.name ELSE b_shared.name END AS equipment_name,
+       CASE WHEN b_local.matches > 0 THEN b_local.matches ELSE b_shared.matches END AS equipment_matches,
        j.TJ_SERVICO,
-       CASE WHEN s.local_count > 0 THEN s.local_name ELSE s.shared_name END AS service_name,
-       CASE WHEN s.local_count > 0 THEN s.local_count ELSE s.shared_count END AS service_matches,
+       CASE WHEN s_local.matches > 0 THEN s_local.name ELSE s_shared.name END AS service_name,
+       CASE WHEN s_local.matches > 0 THEN s_local.matches ELSE s_shared.matches END AS service_matches,
        j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
        CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
        j.TJ_DTORIGI, j.TJ_DTPPINI, j.TJ_HOPPINI, j.TJ_DTPPFIM, j.TJ_HOPPFIM,
@@ -51,23 +51,29 @@ SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.T
 FROM page_keys p
 INNER JOIN dbo.STJ010 j ON j.R_E_C_N_O_ = p.R_E_C_N_O_ AND j.D_E_L_E_T_ <> '*'
 OUTER APPLY (
-    SELECT COUNT(CASE WHEN b.T9_FILIAL = j.TJ_FILIAL THEN 1 END) AS local_count,
-           MAX(CASE WHEN b.T9_FILIAL = j.TJ_FILIAL THEN b.T9_NOME END) AS local_name,
-           COUNT(CASE WHEN b.T9_FILIAL = '' THEN 1 END) AS shared_count,
-           MAX(CASE WHEN b.T9_FILIAL = '' THEN b.T9_NOME END) AS shared_name
+    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name
     FROM dbo.ST9010 b
     WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*'
-      AND (b.T9_FILIAL = j.TJ_FILIAL OR b.T9_FILIAL = '')
-) b
+      AND b.T9_FILIAL = j.TJ_FILIAL
+) b_local
 OUTER APPLY (
-    SELECT COUNT(CASE WHEN s.T4_FILIAL = j.TJ_FILIAL THEN 1 END) AS local_count,
-           MAX(CASE WHEN s.T4_FILIAL = j.TJ_FILIAL THEN s.T4_NOME END) AS local_name,
-           COUNT(CASE WHEN s.T4_FILIAL = '' THEN 1 END) AS shared_count,
-           MAX(CASE WHEN s.T4_FILIAL = '' THEN s.T4_NOME END) AS shared_name
+    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name
+    FROM dbo.ST9010 b
+    WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*'
+      AND b.T9_FILIAL = ''
+) b_shared
+OUTER APPLY (
+    SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name
     FROM dbo.ST4010 s
     WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.D_E_L_E_T_ <> '*'
-      AND (s.T4_FILIAL = j.TJ_FILIAL OR s.T4_FILIAL = '')
-) s
+      AND s.T4_FILIAL = j.TJ_FILIAL
+) s_local
+OUTER APPLY (
+    SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name
+    FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.D_E_L_E_T_ <> '*'
+      AND s.T4_FILIAL = ''
+) s_shared
 ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC
 SQL;
     }

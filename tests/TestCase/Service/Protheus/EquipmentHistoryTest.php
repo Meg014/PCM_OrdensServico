@@ -103,7 +103,16 @@ final class EquipmentHistoryTest extends TestCase
                     self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)", $sql);
                     self::assertStringContainsString('ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC', $sql);
                     self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $sql);
-                    self::assertSame(4, substr_count($sql, "D_E_L_E_T_ <> '*'"));
+                    self::assertSame(6, substr_count($sql, "D_E_L_E_T_ <> '*'"));
+                    // Correlation belongs in WHERE, never inside MAX/COUNT expressions.
+                    self::assertSame(4, substr_count($sql, 'OUTER APPLY'));
+                    self::assertSame(2, substr_count($sql, 'SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name'));
+                    self::assertSame(2, substr_count($sql, 'SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name'));
+                    self::assertDoesNotMatchRegularExpression('/(?:MAX|MIN|COUNT)\([^)]*j\./i', $sql);
+                    self::assertStringContainsString('b.T9_FILIAL = j.TJ_FILIAL', $sql);
+                    self::assertStringContainsString("b.T9_FILIAL = ''", $sql);
+                    self::assertStringContainsString('s.T4_FILIAL = j.TJ_FILIAL', $sql);
+                    self::assertStringContainsString("s.T4_FILIAL = ''", $sql);
                     self::assertLessThan(strpos($sql, 'OUTER APPLY'), strpos($sql, 'FETCH NEXT'));
                 }
             }

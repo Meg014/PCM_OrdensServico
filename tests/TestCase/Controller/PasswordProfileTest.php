@@ -104,6 +104,78 @@ final class PasswordProfileTest extends TestCase
         }
     }
 
+    public function testRenderedProfileFormSubmitsThroughHttpUsingItsGeneratedMethod(): void
+    {
+        $previousConfig = Configure::read();
+        Configure::write('App.fullBaseUrl', 'http://localhost');
+        Configure::write('App.paths.templates', [ROOT . '/templates/']);
+        Configure::write('App.webroot', 'webroot');
+        Configure::write('App.jsBaseUrl', 'js/');
+        Configure::write('App.cssBaseUrl', 'css/');
+        Configure::write('debug', true);
+        Configure::write('Error', ['log' => false]);
+        \Cake\Utility\Security::setSalt(str_repeat('test-only-salt-', 4));
+        foreach (['_cake_core_', '_cake_routes_'] as $cache) {
+            if (!Cache::getConfig($cache)) Cache::setConfig($cache, ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        }
+        $app = new class(CONFIG) extends Application {
+            public function bootstrap(): void
+            {
+                // Real routes/middleware/controllers; only production bootstrap/database are excluded.
+                if (!$this->getPlugins()->has('Authentication')) $this->addPlugin('Authentication');
+            }
+        };
+        $server = new \Cake\Http\Server($app);
+        $httpError = null;
+        $observer = static function ($event) use (&$httpError): void { $httpError = $event->getData('exception'); };
+        \Cake\Event\EventManager::instance()->on('Exception.beforeRender', $observer);
+        try {
+            foreach ([true, false] as $required) {
+                $user = $this->user('USUARIO', $required ? 'first@example.com' : 'voluntary@example.com');
+                $this->users->updateAll(['must_change_password' => $required], ['id' => $user->id]);
+                $user = $this->users->get($user->id);
+                $session = $this->session($user);
+                \Cake\Routing\Router::reload();
+                $response = $server->run(new ServerRequest(['url' => '/meu-perfil',
+                    'environment' => ['REQUEST_METHOD' => 'GET'], 'session' => $session]));
+                self::assertSame(200, $response->getStatusCode(), 'Profile GET failed');
+                $document = new \DOMDocument();
+                @$document->loadHTML((string)$response->getBody(), LIBXML_NONET);
+                $xpath = new \DOMXPath($document);
+                $form = $xpath->query('//form[@action="/meu-perfil"]')->item(0);
+                self::assertNotNull($form);
+                $post = [];
+                foreach ($xpath->query('.//input[@name]', $form) as $input) {
+                    $post[$input->getAttribute('name')] = $input->getAttribute('value');
+                }
+                self::assertSame(!$required, array_key_exists('current_password', $post));
+                if (!$required) $post['current_password'] = 'Initial-password-2026';
+                $post['new_password'] = $post['password_confirm'] = 'Http-new-password-2026';
+                $cookie = $response->getCookieCollection()->get('csrfToken');
+                // Includes the emitted CSRF token and any _method override, exactly as a browser form does.
+                $request = \Cake\Http\ServerRequestFactory::fromGlobals([
+                    'REQUEST_METHOD' => strtoupper($form->getAttribute('method')), 'REQUEST_URI' => '/meu-perfil',
+                    'HTTP_HOST' => 'localhost', 'SERVER_NAME' => 'localhost', 'SERVER_PORT' => 80,
+                    'SCRIPT_NAME' => '/index.php', 'PHP_SELF' => '/index.php', 'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+                ], [], $post, ['csrfToken' => $cookie->getValue()], [])
+                    ->withAttribute('session', $session);
+                $response = $server->run($request);
+                self::assertSame(302, $response->getStatusCode(), 'Generated effective method: ' . $request->getMethod() . '; ' . ($httpError ? get_class($httpError) . ': ' . $httpError->getMessage() : ''));
+                self::assertSame('/pcm', parse_url($response->getHeaderLine('Location'), PHP_URL_PATH));
+                self::assertSame('POST', $request->getMethod());
+                $saved = $this->users->get($user->id);
+                self::assertFalse($saved->must_change_password);
+                self::assertTrue(password_verify('Http-new-password-2026', $saved->password));
+                self::assertSame($saved->password, $session->read('Auth')->password);
+            }
+        } finally {
+            \Cake\Event\EventManager::instance()->off('Exception.beforeRender', $observer);
+            \Cake\Routing\Router::reload();
+            Configure::clear();
+            Configure::write($previousConfig);
+        }
+    }
+
     public function testForcedPasswordCannotBeBypassedAndDoesNotAffectTv(): void
     {
         foreach (['ADMIN','USUARIO'] as $role) {

@@ -172,6 +172,25 @@ final class ProtheusSectorTest extends TestCase
         }
     }
 
+    public function testBacklogSqlEmitsExactlyOneScalarTotalForEmptyAndPopulatedInput(): void
+    {
+        $sql = ProtheusSectorQueries::backlog();
+        self::assertTrue(ProtheusQueries::allows($sql));
+        self::assertStringNotContainsString('GROUPING SETS ((),', $sql);
+        self::assertSame(1, preg_match("/SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,.*?FROM bucketed/s", $sql, $match));
+        self::assertStringNotContainsString('GROUP BY', $match[0]);
+        // Execute the actual scalar branch offline; SQLite's COUNT is SQL Server's COUNT_BIG here.
+        $db = new \PDO('sqlite::memory:');
+        $db->exec('CREATE TABLE bucketed (identity_count INTEGER, equipment_matches INTEGER, service_matches INTEGER)');
+        $scalarSql = str_replace('COUNT_BIG(*)', 'COUNT(*)', $match[0]);
+        foreach ([0, 3] as $expected) {
+            if ($expected > 0) $db->exec('INSERT INTO bucketed VALUES (1,1,1), (1,1,1), (1,1,1)');
+            $rows = $db->query($scalarSql)->fetchAll(\PDO::FETCH_ASSOC);
+            self::assertCount(1, $rows);
+            self::assertSame($expected, (int)$rows[0]['quantity']);
+        }
+    }
+
     public function testBacklogPartialAgeDimensionsIncludingInvalidAndFutureCloseWithTotal(): void
     {
         $calls = [];

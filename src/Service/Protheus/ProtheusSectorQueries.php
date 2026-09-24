@@ -112,7 +112,13 @@ SQL;
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
     FROM bucketed
-    GROUP BY GROUPING SETS ((), (age_bucket), (TJ_TIPO), (TJ_FILIAL, TJ_CODBEM, equipment_name), (TJ_FILIAL, TJ_CCUSTO))
+    GROUP BY GROUPING SETS ((age_bucket), (TJ_TIPO), (TJ_FILIAL, TJ_CODBEM, equipment_name), (TJ_FILIAL, TJ_CCUSTO))
+    UNION ALL
+    -- A scalar aggregate always emits one total row, including an empty backlog.
+    SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,
+        COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
+        MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
+    FROM bucketed
 ), ranked AS (
     SELECT g.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC,
         age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, TJ_CCUSTO) AS position FROM grouped g

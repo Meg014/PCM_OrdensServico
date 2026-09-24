@@ -107,7 +107,12 @@ final class ProtheusSectorTest extends TestCase
     public function testFailureDoesNotPublishPartialAggregates(): void
     {
         $calls = [];
-        $result = (new ProtheusSectorService($this->repository($calls, true)))->load('MECANI', []);
+        $diagnostic = [];
+        $result = (new ProtheusSectorService($this->repository($calls, true),
+            static function (\Throwable $exception, string $stage) use (&$diagnostic): void {
+                $diagnostic = [$stage, $exception->getMessage()];
+            }))->load('MECANI', []);
+        self::assertSame(['SQL: ProtheusSectorQueries::backlog()', 'SQLSTATE private server'], $diagnostic);
         self::assertFalse($result['available']);
         self::assertSame([], $result['cards']);
         self::assertSame([], $result['orders']);

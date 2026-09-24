@@ -43,12 +43,12 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
     $cardUrl($category, $state === 'open' ? 'EM ABERTO' : 'FECHADA'), ['class' => 'btn btn-outline-primary']) ?>
 <?php endforeach; ?></div></article></div>
 <?php endforeach; ?></div></section>
-<h2>Safra / Entressafra</h2>
-<div class="row g-3 mt-3">
+<section class="pcm-dashboard-section"><h2>Safra / Entressafra</h2>
+<div class="row g-3">
 <?php foreach ($labels as $key => $label): ?><div class="<?= str_starts_with($key, 'safra_') || str_starts_with($key, 'offseason_') ? 'col-sm-6' : 'col-sm-4' ?>">
 <?php [$season, $state] = explode('_', $key, 2); ?>
 <a class="pcm-kpi-card text-decoration-none" href="<?= h($this->Url->build($cardUrl($season, $state === 'open' ? 'EM ABERTO' : 'FECHADA'))) ?>"><p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($sector['cards'][$key], 0, ',', '.')) ?></strong></a>
-</div><?php endforeach; ?></div>
+</div><?php endforeach; ?></div></section>
 <section class="pcm-dashboard-section"><div class="pcm-section-title"><h2>Situação da carteira</h2></div><div class="row g-4">
 <?php foreach (['status' => 'Distribuição por status', 'maintenance' => 'Perfil de manutenção', 'equipment' => 'Top 10 equipamentos',
     'services' => 'Top 10 serviços', 'costCenters' => 'Ranking de centros de custo'] as $key => $label): ?>

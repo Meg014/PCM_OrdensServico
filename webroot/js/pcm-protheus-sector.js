@@ -31,7 +31,7 @@
             const response = await fetch(root.dataset.url, {signal: controller.signal, credentials: 'same-origin', cache: 'no-store', headers: {'Accept': 'application/json'}});
             if (!response.ok || response.redirected || !response.headers.get('content-type')?.includes('application/json')) throw Error('Unavailable');
             const data = await response.json();
-            if (!data.available || typeof data.html !== 'string' || !data.charts || !Number.isFinite(Date.parse(data.queried_at))) throw Error('Incomplete');
+            if (!data.available || typeof data.html !== 'string' || !data.charts || !Number.isFinite(Date.parse(data.queried_at)) || typeof data.queried_at_display !== 'string') throw Error('Incomplete');
             for (const key of Object.keys(filters)) {
                 if (!Array.isArray(data.charts[key]) || data.charts[key].some(row => !Number.isSafeInteger(row.quantity) || row.quantity < 0)) throw Error('Incomplete charts');
             }
@@ -41,7 +41,7 @@
             charts.splice(0).forEach(chart => chart.destroy());
             content.replaceChildren(fragment.content);
             draw(data.charts);
-            updated.textContent = 'Dados atualizados em: ' + new Date(data.queried_at).toLocaleString('pt-BR') + ' · Protheus';
+            updated.textContent = 'Dados atualizados em: ' + data.queried_at_display;
             notice.textContent = '';
         } catch (_) { notice.textContent = 'Protheus temporariamente indisponível. Mantida a última visualização válida, quando disponível.'; }
         finally { clearTimeout(timer); busy = false; }

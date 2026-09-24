@@ -211,7 +211,10 @@ final class PcmController extends AppController
         return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
             ->withStatus($sector['available'] ? 200 : 503)
             ->withStringBody((string)json_encode(['available' => $sector['available'], 'html' => $html,
-                'charts' => $sector['charts'], 'queried_at' => $sector['queried_at']], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
+                'charts' => $sector['charts'], 'queried_at' => $sector['queried_at'],
+                'queried_at_display' => (new PcmTimeFormatter())->format(
+                    $sector['queried_at'] ? new \DateTimeImmutable($sector['queried_at']) : null, 'd/m/Y, H:i:s',
+                )], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
     }
 
     public function sectorOptions(): Response

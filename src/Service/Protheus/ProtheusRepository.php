@@ -17,6 +17,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     private ?float $deadline;
 
+    private string $sectorStage = 'connection';
+
+    /** Technical stage only; used by the explicit CLI diagnostic, never web payloads. */
+    public function sectorDiagnosticStage(): string
+    {
+        return $this->sectorStage;
+    }
+
     public function __construct(?Connection $connection = null, ?int $budgetSeconds = null, private readonly ?string $areaScope = null)
     {
         if ($areaScope !== null && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $areaScope)) {
@@ -49,16 +57,19 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
+        $this->sectorStage = 'SQL: ProtheusSectorQueries::aggregates()';
         $aggregate = $this->read(ProtheusSectorQueries::aggregates(), $params);
         $backlogParams = $params;
         unset($backlogParams['cutoff']);
         $backlogParams['as_of'] = $selection['as_of'] ?? (new \DateTimeImmutable())->format('Y-m-d');
+        $this->sectorStage = 'SQL: ProtheusSectorQueries::backlog()';
         $backlogRows = $this->read(ProtheusSectorQueries::backlog(), $backlogParams);
         $backlogAge = $selection['backlog_age'] ?? '';
         $pageParams = $backlogAge === '' ? $params : $backlogParams + ['backlog_age' => $backlogAge, 'backlog_bucket' => $backlogAge];
         $season = $selection['season'] ?? '';
         $seasonServices = [];
         if ($season !== '') {
+            $this->sectorStage = 'validation: aggregates / season';
             $classifier = new \App\Service\PcmServiceClassifier();
             $groupCount = 0;
             foreach ($aggregate as $row) {
@@ -71,6 +82,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 }
             }
         }
+        $this->sectorStage = $backlogAge === '' ? 'SQL: ProtheusSectorQueries::page(false)' : 'SQL: ProtheusSectorQueries::page(true)';
         $rows = $this->read(ProtheusSectorQueries::page($backlogAge !== ''), $pageParams + ['date_start' => $start,
             'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
             'card_status' => $selection['status'] ?? '', 'card_type' => $selection['type'] ?? '',
@@ -78,13 +90,18 @@ final class ProtheusRepository implements ProtheusReaderInterface
             'card_season' => $season, 'season_services' => json_encode(array_values($seasonServices), JSON_THROW_ON_ERROR)],
             ['offset' => 'integer', 'fetch' => 'integer']);
         $cardGroups = 0;
-        foreach (array_merge($aggregate, $backlogRows, $rows) as $row) {
+        foreach (array_merge($aggregate, $backlogRows, $rows) as $index => $row) {
+            $this->sectorStage = 'validation: ' . ($index < count($aggregate) ? 'aggregates'
+                : ($index < count($aggregate) + count($backlogRows) ? 'backlog' : 'page'));
             $cardGroups += ($row['dimension'] ?? '') === 'cards' ? 1 : 0;
             if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
+                $this->sectorStage .= sprintf(' / identity_count=%d equipment_matches=%d service_matches=%d',
+                    $row['identity_count'], $row['equipment_matches'], $row['service_matches']);
                 throw new RuntimeException('Identidade ou cadastro ambíguo.');
             }
         }
         if ($cardGroups > 2000) {
+            $this->sectorStage = 'validation: aggregates / group limit';
             throw new RuntimeException('Agregação incompleta.');
         }
 

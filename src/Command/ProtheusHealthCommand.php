@@ -20,6 +20,7 @@ final class ProtheusHealthCommand extends Command
         return parent::buildOptionParser($parser)
             ->setDescription('Testa somente leitura no Protheus; opcionalmente consulta uma OS em JSON.')
             ->addOption('os', ['help' => 'Número da OS, preservando zeros à esquerda.'])
+            ->addOption('setor', ['help' => 'Diagnóstico de desenvolvimento: mesmas consultas e validações da tela setorial.'])
             ->addOption('bem', ['help' => 'Código exato do equipamento para consultar seu histórico.'])
             ->addOption('pagina', ['help' => 'Página do histórico (a partir de 1).', 'default' => '1'])
             ->addOption('limite', ['help' => 'OS por página (1 a 100).', 'default' => '20'])
@@ -28,6 +29,34 @@ final class ProtheusHealthCommand extends Command
 
     public function execute(Arguments $args, ConsoleIo $io): ?int
     {
+        if ($args->getOption('setor') !== null) {
+            if (PHP_SAPI !== 'cli' || Configure::read('debug') !== true) {
+                $io->error('Diagnóstico setorial disponível somente em CLI de desenvolvimento (debug=true).');
+                return static::CODE_ERROR;
+            }
+            if ($args->getOption('os') !== null || $args->getOption('bem') !== null) {
+                $io->error('Use --setor separadamente de --os e --bem.');
+                return static::CODE_ERROR;
+            }
+            try {
+                $query = ['page' => $args->getOption('pagina'), 'limit' => $args->getOption('limite')];
+                if ($args->getOption('filial') !== null) $query['filial'] = $args->getOption('filial');
+                $service = new \App\Service\Protheus\ProtheusSectorService(diagnostic: function (Throwable $exception, string $stage) use ($io): void {
+                    $io->err('Etapa: ' . $stage);
+                    $io->err($this->sanitizedHistoryError($exception, ConnectionManager::getConfig('protheus') ?? [], 'Setor Protheus'));
+                });
+                $result = $service->load(strtoupper(trim((string)$args->getOption('setor'))), $query);
+                if (!$result['available']) {
+                    $io->error('Falha setorial. Nenhum fallback aplicado.');
+                    return static::CODE_ERROR;
+                }
+                $io->success('Setor OK: aggregates(), backlog(), page() e validações concluídas.');
+                return static::CODE_SUCCESS;
+            } catch (Throwable $exception) {
+                $io->err($this->sanitizedHistoryError($exception, ConnectionManager::getConfig('protheus') ?? [], 'Setor Protheus'));
+                return static::CODE_ERROR;
+            }
+        }
         if ($args->getOption('os') !== null && $args->getOption('bem') !== null) {
             $io->error('Use --os ou --bem, separadamente.');
 
@@ -91,7 +120,7 @@ final class ProtheusHealthCommand extends Command
     }
 
     /** Temporary development-only CLI diagnostic; never output query text or a trace. */
-    private function sanitizedHistoryError(Throwable $exception, array $config): string
+    private function sanitizedHistoryError(Throwable $exception, array $config, string $label = 'Histórico Protheus'): string
     {
         $state = null;
         do {
@@ -123,6 +152,6 @@ final class ProtheusHealthCommand extends Command
         $message = str_replace(['<', '>'], ['[', ']'], $message);
         $state = is_string($state) && preg_match('/^[A-Z0-9]{5}$/D', $state) ? $state : 'indisponível';
 
-        return 'Histórico Protheus — SQLSTATE: ' . $state . '; causa: ' . mb_substr($message, 0, 1200);
+        return $label . ' — SQLSTATE: ' . $state . '; causa: ' . mb_substr($message, 0, 1200);
     }
 }

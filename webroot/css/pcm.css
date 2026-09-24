@@ -168,6 +168,36 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-secondary-action { background: #f8fafc; border: 1px solid #d5dde6; color: #49637e; font-weight: 600; }
 .pcm-secondary-action:hover, .pcm-secondary-action:focus { background: #eef3f7; border-color: #aebdcb; color: #244f7b; }
 .pcm-dashboard-section { margin-top: 3rem; scroll-margin-top: 1rem; }
+/* Normal sector screens only; presentation cards retain their existing layout. */
+[data-protheus-sector] a.pcm-kpi-card {
+    flex-direction: column;
+    gap: .85rem;
+    padding: 1.5rem 1.25rem;
+    height: 100%;
+}
+[data-protheus-sector] a.pcm-kpi-card .pcm-kpi-label { margin: 0; }
+[data-protheus-sector] a.pcm-kpi-card .pcm-kpi-value { display: block; }
+[data-protheus-sector] .pcm-dashboard-section > h2 { margin: 0 0 1.25rem; }
+[data-protheus-sector] .pcm-filter-panel > h2 { margin-bottom: 1.25rem; }
+[data-protheus-sector] .pcm-dashboard-section { margin-top: 3rem; }
+[data-protheus-sector] .pcm-filter-form input[type="date"] {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 2.8rem;
+    padding: .55rem .75rem;
+    border: 1px solid var(--border-secondary);
+    border-radius: .55rem;
+    background-color: var(--input-bg);
+    color: var(--text-body);
+    font: inherit;
+}
+[data-protheus-sector] .pcm-filter-form input[type="date"]:focus {
+    border-color: #356796;
+    box-shadow: 0 0 0 .2rem rgba(53, 103, 150, .14);
+    outline: 0;
+}
 .pcm-section-title { border-bottom: 1px solid #dfe5ec; margin-bottom: 1.25rem; padding-bottom: .75rem; }
 .pcm-section-title p { color: #58708f; font-size: .72rem; font-weight: 700; letter-spacing: .12em; margin: 0 0 .25rem; }
 .pcm-section-title h2 { font-size: 1.45rem; font-weight: 700; margin: 0; }

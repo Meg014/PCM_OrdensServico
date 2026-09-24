@@ -5,7 +5,7 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
 <section data-protheus-sector data-url="<?= h($this->Url->build(['_name' => 'pcm-sector-data', 'code' => $sector['code'], '?' => $sector['filters'] + ['page' => $sector['page'], 'limit' => $sector['limit']]])) ?>">
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($sector['name']) ?></h1>
 <span class="badge text-bg-secondary">Fonte: Protheus</span>
-<p class="pcm-updated" data-sector-updated><?= h($sector['queried_at'] ? 'Dados atualizados em: ' . $sector['queried_at'] : 'Consulta indisponível') ?></p></div>
+<p class="pcm-updated" data-sector-updated><?= h($sector['queried_at'] ? 'Dados atualizados em: ' . (new \App\Service\PcmTimeFormatter())->format(new \DateTimeImmutable($sector['queried_at']), 'd/m/Y, H:i:s') : 'Consulta indisponível') ?></p></div>
 </header>
 <p data-sector-notice role="status" class="text-body-secondary"><?= $sector['available'] ? '' : 'Dados do Protheus temporariamente indisponíveis.' ?></p>
 <section class="pcm-panel pcm-filter-panel"><h2>Filtros do setor</h2>

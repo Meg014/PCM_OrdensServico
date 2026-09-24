@@ -155,11 +155,53 @@ final class ProtheusSectorTest extends TestCase
         self::assertSame([['code' => 'ELEPRE', 'name' => 'PREVENTIVA ELETRICA']], json_decode($calls[2][1]['season_services'], true));
     }
 
-    private function repository(array &$calls, bool $fail = false, ?array $aggregate = null): ProtheusRepository
+    public function testBacklogZeroAndAbsentDimensionsAreValid(): void
+    {
+        foreach ([
+            [['dimension' => 'total', 'quantity' => '0']],
+            [['dimension' => 'total', 'quantity' => '0'], ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => '0']],
+        ] as $backlog) {
+            $calls = [];
+            $result = (new ProtheusSectorService($this->repository($calls, backlog: $backlog)))->load('INSTRU', []);
+            self::assertTrue($result['available']);
+            self::assertSame(0, $result['backlog']['total']);
+            self::assertSame(0, array_sum($result['backlog']['ages']));
+            self::assertSame([], $result['backlog']['equipment']);
+            self::assertSame([], $result['backlog']['costCenters']);
+            self::assertSame([], $result['backlog']['maintenance']);
+        }
+    }
+
+    public function testBacklogPartialAgeDimensionsIncludingInvalidAndFutureCloseWithTotal(): void
+    {
+        $calls = [];
+        $backlog = [['dimension' => 'total', 'quantity' => '6'],
+            ['dimension' => 'age', 'age_bucket' => 'over_60', 'quantity' => '3'],
+            ['dimension' => 'age', 'age_bucket' => 'unknown', 'quantity' => '2'],
+            ['dimension' => 'age', 'age_bucket' => 'future', 'quantity' => '1']];
+        $result = (new ProtheusSectorService($this->repository($calls, backlog: $backlog)))->load('ELETRI', []);
+        self::assertTrue($result['available']);
+        self::assertSame(6, $result['backlog']['total']);
+        self::assertSame(['0_7' => 0, '8_15' => 0, '16_30' => 0, '31_60' => 0,
+            'over_60' => 3, 'unknown' => 2, 'future' => 1], $result['backlog']['ages']);
+    }
+
+    public function testBacklogMissingTotalOrDifferentAgeSumRemainsUnavailable(): void
+    {
+        foreach ([[], [['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => '0']],
+            [['dimension' => 'total', 'quantity' => '2'], ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => '1']]] as $backlog) {
+            $calls = [];
+            $result = (new ProtheusSectorService($this->repository($calls, backlog: $backlog)))->load('USINAG', []);
+            self::assertFalse($result['available']);
+            self::assertArrayNotHasKey('backlog', $result);
+        }
+    }
+
+    private function repository(array &$calls, bool $fail = false, ?array $aggregate = null, ?array $backlog = null): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail, $aggregate) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail, $aggregate, $backlog) {
             $calls[] = [$sql, $params, $types];
             self::assertTrue(ProtheusQueries::allows($sql));
             if ($fail && count($calls) === 2) throw new \RuntimeException('SQLSTATE private server');
@@ -170,6 +212,9 @@ final class ProtheusSectorTest extends TestCase
                 'TJ_HOMPINI' => '', 'TJ_DTPRINI' => '', 'TJ_HOPRINI' => ''] + $base;
             $rows = count($calls) === 1 ? [['dimension' => 'total'] + $base, ['dimension' => 'cards'] + $order] : [$order, $order];
             if ($sql === ProtheusSectorQueries::backlog()) $rows = [['dimension' => 'total', 'quantity' => 2] + $base, ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base];
+            if ($sql === ProtheusSectorQueries::backlog() && $backlog !== null) {
+                $rows = array_map(static fn (array $row): array => $row + $base, $backlog);
+            }
             if (count($calls) === 1 && $aggregate !== null) $rows = $aggregate;
             $statement = $this->createMock(StatementInterface::class);
             $statement->method('fetchAll')->willReturn($rows);

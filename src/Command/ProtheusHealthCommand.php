@@ -51,6 +51,12 @@ final class ProtheusHealthCommand extends Command
                     return static::CODE_ERROR;
                 }
                 $io->success('Setor OK: aggregates(), backlog(), page() e validações concluídas.');
+                $io->out('Backlog: ' . json_encode([
+                    'total' => $result['backlog']['total'], 'faixas' => $result['backlog']['ages'],
+                    'linhas_equipamentos' => count($result['backlog']['equipment']),
+                    'linhas_centros_custo' => count($result['backlog']['costCenters']),
+                    'linhas_tipos' => count($result['backlog']['maintenance']),
+                ], JSON_THROW_ON_ERROR));
                 return static::CODE_SUCCESS;
             } catch (Throwable $exception) {
                 $io->err($this->sanitizedHistoryError($exception, ConnectionManager::getConfig('protheus') ?? [], 'Setor Protheus'));

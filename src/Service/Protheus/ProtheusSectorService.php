@@ -120,7 +120,21 @@ final class ProtheusSectorService
                 };
                 $backlog[$dimension][] = ['label' => $label, 'quantity' => $quantity, 'branch' => $row['TJ_FILIAL'] ?? ''];
             }
-            if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) throw new RuntimeException('Backlog incompleto.');
+            if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) {
+                // Counts only: enough to diagnose the SQL result contract without exposing OS data.
+                $dimensions = array_fill_keys(['total', 'age', 'equipment', 'costCenters', 'maintenance'], 0);
+                $ageRowsSum = 0;
+                foreach ($data['backlog'] as $row) {
+                    if (isset($dimensions[$row['dimension']])) $dimensions[$row['dimension']]++;
+                    if ($row['dimension'] === 'age') $ageRowsSum += (int)$row['quantity'];
+                }
+                throw new RuntimeException(sprintf(
+                    'Backlog incompleto. total=%s; soma_faixas=%d; soma_linhas_age=%d; dimensoes=%s; faixas=%s.',
+                    $backlog['total'] === null ? 'ausente' : (string)$backlog['total'],
+                    array_sum($backlog['ages']), $ageRowsSum,
+                    json_encode($dimensions, JSON_THROW_ON_ERROR), json_encode($backlog['ages'], JSON_THROW_ON_ERROR),
+                ));
+            }
             foreach ($charts as &$rows) foreach ($rows as &$row) $row['percentage'] = $total > 0 ? $row['quantity'] / $total * 100 : 0;
             unset($rows, $row);
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),

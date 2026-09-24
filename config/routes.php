@@ -62,22 +62,11 @@ return function (RouteBuilder $routes): void {
         $builder->get('/pcm/setores/data', ['controller' => 'Pcm', 'action' => 'sectorOptions'], 'pcm-sector-options');
         $builder->get('/pcm/setor/{code}/data', ['controller' => 'Pcm', 'action' => 'sectorData'], 'pcm-sector-data')
             ->setPass(['code'])->setPatterns(['code' => '[A-Za-z0-9_-]+']);
-        $builder->get('/pcm/setor/{code}/legado', ['controller' => 'Pcm', 'action' => 'sectorLegacy'], 'pcm-sector-legacy')
-            ->setPass(['code'])->setPatterns(['code' => '[A-Za-z0-9_-]+']);
-        $builder->get('/pcm/legado', ['controller' => 'Pcm', 'action' => 'indexLegacy'], 'pcm-legacy');
-        $builder->get('/pcm/apresentacao/legado', ['controller' => 'Pcm', 'action' => 'presentationLegacy'], 'pcm-presentation-legacy');
-        $builder->get('/pcm/apresentacao/legado/data', ['controller' => 'Pcm', 'action' => 'presentationLegacyData'], 'pcm-presentation-legacy-data');
         $builder->get('/pcm/ordens', ['controller' => 'Pcm', 'action' => 'orders'], 'pcm-orders');
-        $builder->get('/pcm/ordens/legado', ['controller' => 'Pcm', 'action' => 'ordersLegacy'], 'pcm-orders-legacy');
         $builder->get('/pcm/protheus/os/{number}', ['controller' => 'Pcm', 'action' => 'protheusOrder'], 'pcm-protheus-order')
             ->setPass(['number'])->setPatterns(['number' => '[A-Za-z0-9]{1,50}']);
         $builder->get('/pcm/protheus/os/{number}/dados', ['controller' => 'Pcm', 'action' => 'protheusOrderData'], 'pcm-protheus-order-data')
             ->setPass(['number'])->setPatterns(['number' => '[A-Za-z0-9]{1,50}']);
-        $builder->get(
-            '/pcm/current-version',
-            ['controller' => 'Pcm', 'action' => 'currentVersion'],
-            'pcm-current-version',
-        );
         $builder->get(
             '/pcm/apresentacao',
             ['controller' => 'Pcm', 'action' => 'presentation'],
@@ -88,57 +77,13 @@ return function (RouteBuilder $routes): void {
             ['controller' => 'Pcm', 'action' => 'presentationData'],
             'pcm-presentation-data',
         );
-        $builder->connect('/pcm/analises', ['controller' => 'Pcm', 'action' => 'analyses'], ['_name' => 'pcm-analyses']);
-        $builder->connect(
-            '/pcm/analises/qualidade/{type}',
-            ['controller' => 'Pcm', 'action' => 'quality'],
-            ['pass' => ['type'], 'type' => '[a-z_]+', '_name' => 'pcm-data-quality'],
-        );
-        $builder->connect(
-            '/pcm/os/{id}',
-            ['controller' => 'Pcm', 'action' => 'order'],
-            ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_name' => 'pcm-order'],
-        );
-        $builder->get('/pcm/os/{id}/protheus', ['controller' => 'Pcm', 'action' => 'orderProtheus'], 'pcm-order-protheus')
-            ->setPass(['id'])->setPatterns(['id' => '[1-9][0-9]*']);
-        $builder->connect(
-            '/pcm/movimentacao/{type}',
-            ['controller' => 'Pcm', 'action' => 'movement'],
-            ['pass' => ['type'], 'type' => '[a-z]+', '_name' => 'pcm-movement'],
-        );
         $builder->connect(
             '/pcm/setor/{code}',
             ['controller' => 'Pcm', 'action' => 'sector'],
             ['pass' => ['code'], 'code' => '[A-Za-z0-9_-]+', '_name' => 'pcm-sector'],
         );
-        $builder->connect('/importacoes', ['controller' => 'ReportImports', 'action' => 'index']);
-        $builder->connect('/importacoes/manual', ['controller' => 'ReportImports', 'action' => 'manual']);
-        /*
-         * Here, we are connecting '/' (base path) to a controller called 'Pages',
-         * its action called 'display', and we pass a param to select the view file
-         * to use (in this case, templates/Pages/home.php)...
-         */
         $builder->connect('/', ['controller' => 'Pcm', 'action' => 'index']);
-
-        /*
-         * ...and connect the rest of 'Pages' controller's URLs.
-         */
-        $builder->connect('/pages/*', 'Pages::display');
-
-        /*
-         * Connect catchall routes for all controllers.
-         *
-         * The `fallbacks` method is a shortcut for
-         *
-         * ```
-         * $builder->connect('/{controller}', ['action' => 'index']);
-         * $builder->connect('/{controller}/{action}/*', []);
-         * ```
-         *
-         * It is NOT recommended to use fallback routes after your initial prototyping phase!
-         * See https://book.cakephp.org/5/en/development/routing.html#fallbacks-method for more information
-         */
-        $builder->fallbacks();
+        // Only explicitly registered operational routes are exposed.
     });
 
     /*

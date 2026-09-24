@@ -16,7 +16,9 @@ final class ProtheusSectorService
         'emergency' => 'Corretivas Emergenciais', 'scheduled' => 'Corretivas Programadas', 'opportunity' => 'Paradas por Oportunidade'];
     public const TYPES = ['preventive' => 'PRE', 'corrective' => 'COR', 'improvement' => 'MEL'];
     public const SERVICES = ['emergency' => ['COREME'], 'scheduled' => ['CORPRO'], 'opportunity' => ['MECOPO', 'ELECOP']];
-    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status'];
+    public const BACKLOG_AGES = ['0_7' => '0–7 dias', '8_15' => '8–15 dias', '16_30' => '16–30 dias',
+        '31_60' => '31–60 dias', 'over_60' => '+60 dias', 'unknown' => 'Sem data válida', 'future' => 'Data futura'];
+    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age'];
     public function __construct(private ?ProtheusRepository $repository = null)
     {
     }
@@ -31,6 +33,7 @@ final class ProtheusSectorService
             $filters[$key] = trim($value);
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
+        if (!in_array($filters['backlog_age'], ['', 'all', ...array_keys(self::BACKLOG_AGES)], true)) throw new InvalidArgumentException('Faixa de backlog inválida.');
         if (!in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(self::CATEGORIES)], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
         foreach (['date_start', 'date_end'] as $key) {
@@ -46,11 +49,12 @@ final class ProtheusSectorService
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
             'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
-        $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status']));
+        $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status', 'backlog_age']));
         $params += ['area' => $area, 'cutoff' => str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START)];
         if ($params['q'] !== '') $params['q'] = '%' . strtr($params['q'], ['~' => '~~', '%' => '~%', '_' => '~_', '[' => '~[']) . '%';
         try {
-            $selection = ['status' => $filters['card_status'], 'type' => self::TYPES[$filters['card']] ?? '',
+            $selection = ['backlog_age' => $filters['backlog_age'], 'as_of' => (new DateTimeImmutable())->format('Y-m-d'),
+                'status' => $filters['card_status'], 'type' => self::TYPES[$filters['card']] ?? '',
                 'services' => self::SERVICES[$filters['card']] ?? [],
                 'season' => in_array($filters['card'], ['safra', 'offseason'], true) ? $filters['card'] : ''];
             $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 10))->sector($params, $page, $limit, $filters['date_start'], $filters['date_end'], $selection);
@@ -95,11 +99,26 @@ final class ProtheusSectorService
             if ($total === null) throw new RuntimeException('Resultado incompleto.');
             $operational['total'] = $total;
             if ($total !== $operational['open'] + $operational['closed']) throw new RuntimeException('Contagens inconsistentes.');
+            $backlog = ['total' => null, 'ages' => array_fill_keys(array_keys(self::BACKLOG_AGES), 0),
+                'equipment' => [], 'costCenters' => [], 'maintenance' => [], 'as_of' => $selection['as_of']];
+            foreach ($data['backlog'] as $row) {
+                $quantity = (int)$row['quantity'];
+                $dimension = $row['dimension'];
+                if ($dimension === 'total') { $backlog['total'] = $quantity; continue; }
+                if ($dimension === 'age') { $backlog['ages'][$row['age_bucket']] = $quantity; continue; }
+                $label = match ($dimension) {
+                    'equipment' => ($row['TJ_CODBEM'] ?: 'Sem código') . ' — ' . ($row['equipment_name'] ?? 'Sem nome'),
+                    'costCenters' => $row['TJ_CCUSTO'] ?: 'Não informado',
+                    'maintenance' => ['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? ($row['TJ_TIPO'] ?: 'Não informado'),
+                };
+                $backlog[$dimension][] = ['label' => $label, 'quantity' => $quantity, 'branch' => $row['TJ_FILIAL'] ?? ''];
+            }
+            if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) throw new RuntimeException('Backlog incompleto.');
             foreach ($charts as &$rows) foreach ($rows as &$row) $row['percentage'] = $total > 0 ? $row['quantity'] / $total * 100 : 0;
             unset($rows, $row);
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),
                 'orders' => $data['orders'], 'cards' => $cards, 'breakdown' => $breakdown, 'operational' => $operational,
-                'charts' => $charts, 'missing_start' => $missing, 'has_more' => $data['has_more']]);
+                'charts' => $charts, 'backlog' => $backlog, 'missing_start' => $missing, 'has_more' => $data['has_more']]);
         } catch (Throwable) {
             return $result;
         }

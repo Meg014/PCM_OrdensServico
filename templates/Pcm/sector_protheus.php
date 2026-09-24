@@ -6,13 +6,14 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($sector['name']) ?></h1>
 <span class="badge text-bg-secondary">Fonte: Protheus</span>
 <p class="pcm-updated" data-sector-updated><?= h($sector['queried_at'] ? 'Dados atualizados em: ' . $sector['queried_at'] : 'Consulta indisponível') ?></p></div>
-<?= $this->Html->link('Comparar legado Excel', ['_name' => 'pcm-sector-legacy', 'code' => $sector['code']], ['class' => 'btn btn-outline-secondary']) ?></header>
+</header>
 <p data-sector-notice role="status" class="text-body-secondary"><?= $sector['available'] ? '' : 'Dados do Protheus temporariamente indisponíveis.' ?></p>
 <section class="pcm-panel pcm-filter-panel"><h2>Filtros do setor</h2>
 <p>Carteira operacional: abertas elegíveis desde 01/01/2026 e fechadas, sem canceladas.</p>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?>
 <?= $this->Form->hidden('card', ['value' => $sector['filters']['card']]) ?>
 <?= $this->Form->hidden('card_status', ['value' => $sector['filters']['card_status']]) ?>
+<?= $this->Form->hidden('backlog_age', ['value' => $sector['filters']['backlog_age']]) ?>
 <div class="row g-3">
 <?php foreach (['filial' => 'Filial', 'status' => 'Status', 'equipment' => 'Equipamento/Bem (código)', 'service' => 'Serviço (código)',
     'service_name' => 'Nome do serviço (exato)', 'cost_center' => 'Centro de custo', 'maintenance_type' => 'Tipo Manut.',
@@ -23,7 +24,7 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
     + ($key === 'maintenance_type' ? ['empty' => 'Todos', 'options' => ['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria']] : [])) ?></div>
 <?php endforeach; ?></div>
 <p class="text-body-secondary mt-2">Códigos e nome do serviço: correspondência exata. Pesquisa: parte do número, código ou nome.
-O período planejado filtra somente a tabela, como no legado.</p>
+O período planejado filtra somente a tabela.</p>
 <button class="btn pcm-primary-action">Aplicar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-sector', 'code' => $sector['code']], ['class' => 'btn pcm-secondary-action']) ?>
 <?= $this->Form->end() ?></section>

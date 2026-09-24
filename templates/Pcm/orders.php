@@ -7,7 +7,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | ORDENS DE SERVIÇO</p>
 <h1>Ordens de Serviço</h1><span class="badge text-bg-secondary">Fonte: Protheus</span>
 <p class="text-body-secondary mt-2">Consulta direta ao TOTVS. Códigos de tipo, situação e término são exibidos sem interpretação.</p></div>
-<?= $this->Html->link('Consultar legado Excel', ['_name' => 'pcm-orders-legacy'], ['class' => 'btn btn-outline-secondary']) ?></header>
+</header>
 <section class="pcm-panel p-3 mb-4">
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-3']) ?>
 <?php if (!empty($filters['filial'])): ?><?= $this->Form->hidden('filial', ['value' => $filters['filial']]) ?><?php endif; ?>
@@ -25,7 +25,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <span class="text-body-secondary ms-2">Pesquisa por códigos exatos.</span></div>
 <?= $this->Form->end() ?></section>
 <?php if (!$listing['available']): ?>
-<div class="alert alert-secondary" role="status">Ordens do Protheus temporariamente indisponíveis. O legado Excel permanece disponível pelo link acima e pode estar desatualizado.</div>
+<div class="alert alert-secondary" role="status">Ordens do Protheus temporariamente indisponíveis. Tente novamente em instantes.</div>
 <?php else: ?>
 <section class="pcm-panel p-3"><div class="table-responsive"><table class="table table-hover align-middle">
 <thead><tr><th>Filial / OS</th><th>Data de referência</th><th>Equipamento</th><th>Serviço</th><th>Área / centro de custo</th><th>Tipo / situação / término (brutos)</th></tr></thead>

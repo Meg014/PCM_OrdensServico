@@ -13,25 +13,72 @@ use PHPUnit\Framework\TestCase;
 
 final class ProtheusSectorTest extends TestCase
 {
+    public function testBacklogUsesOpenScopeOriginAndReusesPaginatedTable(): void
+    {
+        $calls = [];
+        $sector = (new ProtheusSectorService($this->repository($calls)))->load('ELETRI',
+            ['backlog_age' => '0_7', 'area' => 'MECANI', 'page' => 2, 'limit' => 1]);
+        self::assertTrue($sector['available']);
+        self::assertSame(2, $sector['backlog']['total']);
+        self::assertSame(2, $sector['backlog']['ages']['0_7']);
+        self::assertCount(3, $calls);
+        foreach ([1, 2] as $index) {
+            self::assertSame('ELETRI', $calls[$index][1]['area']);
+            self::assertArrayNotHasKey('cutoff', $calls[$index][1]);
+            self::assertStringContainsString("TJ_SITUACA = 'L' AND TJ_TERMINO = 'N'", $calls[$index][0]);
+            self::assertStringNotContainsString(':cutoff', $calls[$index][0]);
+            self::assertStringContainsString('DATEDIFF(day, origin_date, CONVERT(date, :as_of, 23))', $calls[$index][0]);
+            self::assertStringContainsString('TRY_CONVERT(date, j.TJ_DTORIGI, 112)', $calls[$index][0]);
+            self::assertStringNotContainsString('STL010', $calls[$index][0]);
+            self::assertTrue(ProtheusQueries::allows(ProtheusQueries::withAreaScope($calls[$index][0])));
+            self::assertFalse(ProtheusQueries::allows($calls[$index][0] . '; DELETE FROM STJ010'));
+        }
+        self::assertSame($calls[1][1]['as_of'], $calls[2][1]['as_of']);
+        self::assertSame('0_7', $calls[2][1]['backlog_bucket']);
+        self::assertSame(1, $calls[2][1]['offset']);
+        self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $calls[2][0]);
+        $this->expectException(\InvalidArgumentException::class);
+        (new ProtheusSectorService())->load('ELETRI', ['backlog_age' => 'anything']);
+    }
+
+    public function testBacklogAgeBoundariesAndSectorOpenPredicateOffline(): void
+    {
+        // Execute the actual CASE and centralized predicate using an in-memory SQL engine.
+        $db = new \PDO('sqlite::memory:');
+        preg_match('/CASE WHEN age_days IS NULL.*?END/s', ProtheusSectorQueries::backlog(), $match);
+        $statement = $db->prepare('SELECT ' . $match[0] . ' FROM (SELECT CAST(:age AS INTEGER) AS age_days)');
+        foreach ([[null, 'unknown'], [-1, 'future'], [0, '0_7'], [7, '0_7'], [8, '8_15'], [15, '8_15'],
+            [16, '16_30'], [30, '16_30'], [31, '31_60'], [60, '31_60'], [61, 'over_60']] as [$age, $bucket]) {
+            $statement->execute(['age' => $age]);
+            self::assertSame($bucket, $statement->fetchColumn());
+        }
+        $db->exec('CREATE TABLE orders (TJ_CODAREA TEXT, TJ_SITUACA TEXT, TJ_TERMINO TEXT, D_E_L_E_T_ TEXT)');
+        $db->exec("INSERT INTO orders VALUES ('ELETRI','L','N',''), ('ELETRI','L','S',''), ('ELETRI','P','N',''), ('ELETRI','C','N',''), ('MECANI','L','N',''), ('ELETRI','L','N','*')");
+        $sql = 'SELECT COUNT(*) FROM orders WHERE ' . \App\Service\Protheus\ProtheusOperationalEligibility::OPEN . " AND TJ_CODAREA = :area AND D_E_L_E_T_ <> '*'";
+        $statement = $db->prepare($sql);
+        $statement->execute(['area' => 'ELETRI']);
+        self::assertSame(1, (int)$statement->fetchColumn());
+    }
+
     public function testScopedAggregatesPaginationAndTemplateWithoutDatabase(): void
     {
         $calls = [];
         $sector = (new ProtheusSectorService($this->repository($calls)))->load('ELETRI',
             ['q' => "004368%';--", 'filial' => '01', 'status' => 'FECHADA', 'page' => '2', 'limit' => '1', 'date_start' => '2026-01-01']);
         self::assertTrue($sector['available']);
-        self::assertCount(2, $calls);
+        self::assertCount(3, $calls);
         self::assertSame('ELETRI', $calls[0][1]['area']);
         self::assertSame("%004368~%';--%", $calls[0][1]['q']);
         self::assertArrayNotHasKey('date_start', $calls[0][1]);
-        self::assertSame('2026-01-01', $calls[1][1]['date_start']);
-        self::assertSame(1, $calls[1][1]['offset']);
-        self::assertSame('integer', $calls[1][2]['fetch']);
+        self::assertSame('2026-01-01', $calls[2][1]['date_start']);
+        self::assertSame(1, $calls[2][1]['offset']);
+        self::assertSame('integer', $calls[2][2]['fetch']);
         self::assertTrue($sector['has_more']);
         self::assertSame(1, $sector['cards']['safra_completed']);
         self::assertSame(0, $sector['cards']['corrective']);
         self::assertFalse(ProtheusQueries::allows(ProtheusSectorQueries::page() . '; SELECT 2'));
         self::assertStringContainsString("TJ_SITUACA = 'L' AND TJ_TERMINO = 'N'", $calls[0][0]);
-        self::assertStringContainsString('ORDER BY planned_date DESC, record_id DESC', $calls[1][0]);
+        self::assertStringContainsString('ORDER BY planned_date DESC, record_id DESC', $calls[2][0]);
 
         if (!defined('ROOT')) require dirname(__DIR__, 4) . '/config/paths.php';
         require_once CAKE . 'Core/functions_global.php';
@@ -87,20 +134,20 @@ final class ProtheusSectorTest extends TestCase
         self::assertSame(['open' => 3, 'closed' => 2], $result['breakdown']['opportunity']);
         self::assertSame(['open' => 2, 'closed' => 0], $result['breakdown']['emergency']);
         self::assertArrayNotHasKey('card_status', $calls[0][1]);
-        self::assertSame('EM ABERTO', $calls[1][1]['card_status']);
-        self::assertSame('MECOPO', $calls[1][1]['card_service1']);
-        self::assertSame('ELECOP', $calls[1][1]['card_service2']);
-        self::assertSame('BEM01', $calls[1][1]['equipment']);
-        self::assertSame(1, $calls[1][1]['offset']);
-        self::assertStringContainsString('filtered.status = card.status', $calls[1][0]);
+        self::assertSame('EM ABERTO', $calls[2][1]['card_status']);
+        self::assertSame('MECOPO', $calls[2][1]['card_service1']);
+        self::assertSame('ELECOP', $calls[2][1]['card_service2']);
+        self::assertSame('BEM01', $calls[2][1]['equipment']);
+        self::assertSame(1, $calls[2][1]['offset']);
+        self::assertStringContainsString('filtered.status = card.status', $calls[2][0]);
 
         $calls = [];
         (new ProtheusSectorService($this->repository($calls)))->load('ELETRI', ['card' => 'corrective', 'card_status' => 'FECHADA']);
-        self::assertSame('COR', $calls[1][1]['card_type']);
-        self::assertSame('FECHADA', $calls[1][1]['card_status']);
+        self::assertSame('COR', $calls[2][1]['card_type']);
+        self::assertSame('FECHADA', $calls[2][1]['card_status']);
         $calls = [];
         (new ProtheusSectorService($this->repository($calls)))->load('ELETRI', ['card' => 'safra']);
-        self::assertSame([['code' => 'ELEPRE', 'name' => 'PREVENTIVA ELETRICA']], json_decode($calls[1][1]['season_services'], true));
+        self::assertSame([['code' => 'ELEPRE', 'name' => 'PREVENTIVA ELETRICA']], json_decode($calls[2][1]['season_services'], true));
     }
 
     private function repository(array &$calls, bool $fail = false, ?array $aggregate = null): ProtheusRepository
@@ -117,6 +164,7 @@ final class ProtheusSectorTest extends TestCase
                 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'status' => 'FECHADA', 'planned_date' => '2026-01-01',
                 'TJ_HOMPINI' => '', 'TJ_DTPRINI' => '', 'TJ_HOPRINI' => ''] + $base;
             $rows = count($calls) === 1 ? [['dimension' => 'total'] + $base, ['dimension' => 'cards'] + $order] : [$order, $order];
+            if ($sql === ProtheusSectorQueries::backlog()) $rows = [['dimension' => 'total', 'quantity' => 2] + $base, ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base];
             if (count($calls) === 1 && $aggregate !== null) $rows = $aggregate;
             $statement = $this->createMock(StatementInterface::class);
             $statement->method('fetchAll')->willReturn($rows);

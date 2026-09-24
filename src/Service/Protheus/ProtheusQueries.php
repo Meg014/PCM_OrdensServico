@@ -306,7 +306,8 @@ SQL;
 
     private static function allowsBase(string $sql): bool
     {
-        if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()) {
+        if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()
+            || $sql === ProtheusSectorQueries::page(true) || $sql === ProtheusSectorQueries::backlog()) {
             return true;
         }
         foreach ([false, true] as $number) {

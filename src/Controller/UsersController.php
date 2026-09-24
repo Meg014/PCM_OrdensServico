@@ -45,8 +45,22 @@ class UsersController extends AppController
         $this->request->allowMethod(['get', 'post', 'put', 'patch']);
         $table = $this->fetchTable('Users');
         $user = $id === null ? $table->newEmptyEntity() : $table->get($id);
+        $areaTable = $this->fetchTable('MaintenanceAreas');
+        $selectedAreaCode = $user->maintenance_area_id ? $areaTable->get($user->maintenance_area_id)->source_code : '';
+        $areas = [];
+        $areasAvailable = true;
+        try {
+            foreach ((new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5))->findAreas() as $row) {
+                $code = $row['code'];
+                if (is_string($code) && preg_match('/^[A-Z0-9_-]{1,30}$/D', $code)) {
+                    $areas[$code] = $code . ' — ' . (\App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$code] ?? $code);
+                }
+            }
+        } catch (\Throwable) {
+            $areasAvailable = false;
+        }
         if ($this->request->is(['post', 'put', 'patch'])) {
-            $fields = ['nome', 'email', 'role', 'maintenance_area_id', 'ativo'];
+            $fields = ['nome', 'email', 'role', 'ativo'];
             if ($id === null) {
                 $fields[] = 'password';
             }
@@ -55,6 +69,13 @@ class UsersController extends AppController
                 $data['email'] = mb_strtolower(trim($data['email']));
             }
             $table->patchEntity($user, $data, ['fields' => $fields]);
+            $selectedAreaCode = $this->request->getData('area_code', '');
+            if (!is_string($selectedAreaCode)) {
+                $selectedAreaCode = '';
+            }
+            if ($user->role === 'USUARIO' && (!isset($areas[$selectedAreaCode]) || !$areasAvailable)) {
+                $user->setError('area_code', 'Selecione um setor válido do Protheus. Se a consulta estiver indisponível, tente novamente.');
+            }
             // Prevent administrators from accidentally locking themselves out.
             if (
                 $id === (int)$this->request->getAttribute('identity')->getIdentifier()
@@ -62,15 +83,34 @@ class UsersController extends AppController
             ) {
                 $user->setError('role', 'Você não pode desativar ou remover seu próprio perfil ADMIN.');
             }
-            if (!$user->hasErrors() && $table->save($user)) {
+            $saved = false;
+            if (!$user->hasErrors()) {
+                try {
+                    $saved = $table->getConnection()->transactional(function () use ($table, $user, $areaTable, $selectedAreaCode) {
+                        if ($user->role === 'USUARIO') {
+                            $area = $areaTable->find()->where(['source_code' => $selectedAreaCode])->first();
+                            if ($area === null) {
+                                $area = $areaTable->newEntity(['source_code' => $selectedAreaCode,
+                                    'display_name' => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$selectedAreaCode] ?? $selectedAreaCode,
+                                    'slug' => 'protheus-' . strtolower($selectedAreaCode), 'active' => true]);
+                                $areaTable->saveOrFail($area);
+                            }
+                            $user->maintenance_area_id = $area->id;
+                        }
+                        return (bool)$table->save($user);
+                    });
+                } catch (\Throwable) {
+                    $saved = false;
+                }
+            }
+            if ($saved) {
                 $this->Flash->success('Usuário salvo.');
 
                 return $this->redirect('/usuarios');
             }
             $this->Flash->error('Revise os campos informados.');
         }
-        $areas = $this->fetchTable('MaintenanceAreas')->find()->all()->combine('id', 'display_name')->toArray();
-        $this->set(compact('user', 'areas'));
+        $this->set(compact('user', 'areas', 'selectedAreaCode', 'areasAvailable'));
         $this->viewBuilder()->setTemplate('form');
 
         return null;

@@ -43,13 +43,19 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return $this->read(ProtheusQueries::AREAS);
     }
 
-    /** Two bounded reads, never hydration of resources or snapshots. */
+    /** Two aggregate reads and one bounded page, never hydration of resources or snapshots. */
     public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = []): array
     {
         if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
         $aggregate = $this->read(ProtheusSectorQueries::aggregates(), $params);
+        $backlogParams = $params;
+        unset($backlogParams['cutoff']);
+        $backlogParams['as_of'] = $selection['as_of'] ?? (new \DateTimeImmutable())->format('Y-m-d');
+        $backlogRows = $this->read(ProtheusSectorQueries::backlog(), $backlogParams);
+        $backlogAge = $selection['backlog_age'] ?? '';
+        $pageParams = $backlogAge === '' ? $params : $backlogParams + ['backlog_age' => $backlogAge, 'backlog_bucket' => $backlogAge];
         $season = $selection['season'] ?? '';
         $seasonServices = [];
         if ($season !== '') {
@@ -65,14 +71,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 }
             }
         }
-        $rows = $this->read(ProtheusSectorQueries::page(), $params + ['date_start' => $start,
+        $rows = $this->read(ProtheusSectorQueries::page($backlogAge !== ''), $pageParams + ['date_start' => $start,
             'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
             'card_status' => $selection['status'] ?? '', 'card_type' => $selection['type'] ?? '',
             'card_service1' => $selection['services'][0] ?? '', 'card_service2' => $selection['services'][1] ?? '',
             'card_season' => $season, 'season_services' => json_encode(array_values($seasonServices), JSON_THROW_ON_ERROR)],
             ['offset' => 'integer', 'fetch' => 'integer']);
         $cardGroups = 0;
-        foreach (array_merge($aggregate, $rows) as $row) {
+        foreach (array_merge($aggregate, $backlogRows, $rows) as $row) {
             $cardGroups += ($row['dimension'] ?? '') === 'cards' ? 1 : 0;
             if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
                 throw new RuntimeException('Identidade ou cadastro ambíguo.');
@@ -82,7 +88,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
             throw new RuntimeException('Agregação incompleta.');
         }
 
-        return ['aggregates' => $aggregate, 'orders' => array_slice($rows, 0, $limit),
+        return ['aggregates' => $aggregate, 'backlog' => $backlogRows, 'orders' => array_slice($rows, 0, $limit),
             'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
     }
 

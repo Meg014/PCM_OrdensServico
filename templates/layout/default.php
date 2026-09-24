@@ -59,7 +59,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>
                     <li class="nav-item">
-                        <?= $this->Html->link('PCM Geral', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
+                        <?= $this->Html->link($currentUser->role === 'ADMIN' ? 'PCM Geral' : 'Meu setor', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
                     </li>
                     <li class="nav-item dropdown" data-sectors-menu data-url="<?= h($this->Url->build(['_name' => 'pcm-sector-options'])) ?>">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
@@ -67,13 +67,6 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                         <ul class="dropdown-menu dropdown-menu-end" data-sectors-items aria-live="polite">
                             <li><span class="dropdown-item-text text-body-secondary">Abra para consultar os setores.</span></li>
                         </ul>
-                    </li>
-                    <li class="nav-item">
-                        <?= $this->Html->link(
-                            'Importações',
-                            ['controller' => 'ReportImports', 'action' => 'index'],
-                            ['class' => 'nav-link'],
-                        ) ?>
                     </li>
                 </ul>
             </div>

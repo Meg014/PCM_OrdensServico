@@ -10,6 +10,8 @@ WITH scoped AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
         j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
         TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_date,
+        CASE WHEN LEN(RTRIM(j.TJ_DTORIGI)) = 8 AND RTRIM(j.TJ_DTORIGI) NOT LIKE '%[^0-9]%'
+            THEN TRY_CONVERT(date, j.TJ_DTORIGI, 112) END AS origin_date,
         j.TJ_HOMPINI, j.TJ_DTPRINI, j.TJ_HOPRINI,
         CASE WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
@@ -79,15 +81,62 @@ OPTION (RECOMPILE)
 SQL;
     }
 
-    public static function page(): string
+    private const AGE = <<<'SQL'
+
+, aged AS (
+    SELECT filtered.*, DATEDIFF(day, origin_date, CONVERT(date, :as_of, 23)) AS age_days
+    FROM filtered
+), bucketed AS (
+    SELECT aged.*, CASE WHEN age_days IS NULL THEN 'unknown' WHEN age_days < 0 THEN 'future'
+        WHEN age_days <= 7 THEN '0_7' WHEN age_days <= 15 THEN '8_15'
+        WHEN age_days <= 30 THEN '16_30' WHEN age_days <= 60 THEN '31_60'
+        ELSE 'over_60' END AS age_bucket FROM aged
+)
+SQL;
+
+    /** Same sector/master/manual-filter scope, exclusively L/N, with no planned-date cutoff. */
+    private static function backlogBase(): string
     {
-        return self::BASE . <<<'SQL'
+        return str_replace(ProtheusOperationalEligibility::OPERATIONAL, ProtheusOperationalEligibility::OPEN, self::BASE) . self::AGE;
+    }
+
+    public static function backlog(): string
+    {
+        return self::backlogBase() . <<<'SQL'
+
+, grouped AS (
+    SELECT CASE WHEN GROUPING(age_bucket) = 0 THEN 'age' WHEN GROUPING(TJ_TIPO) = 0 THEN 'maintenance'
+        WHEN GROUPING(TJ_CODBEM) = 0 THEN 'equipment' WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters'
+        ELSE 'total' END AS dimension,
+        age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_CCUSTO,
+        COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
+        MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
+    FROM bucketed
+    GROUP BY GROUPING SETS ((), (age_bucket), (TJ_TIPO), (TJ_FILIAL, TJ_CODBEM, equipment_name), (TJ_FILIAL, TJ_CCUSTO))
+), ranked AS (
+    SELECT g.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC,
+        age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, TJ_CCUSTO) AS position FROM grouped g
+)
+SELECT dimension, age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_CCUSTO,
+    quantity, identity_count, equipment_matches, service_matches
+FROM ranked WHERE dimension IN ('total', 'age', 'maintenance') OR position <= 10
+ORDER BY dimension, position
+OPTION (RECOMPILE)
+SQL;
+    }
+
+    public static function page(bool $backlog = false): string
+    {
+        $source = $backlog ? 'bucketed' : 'filtered';
+        $ageColumns = $backlog ? ', CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, age_days' : '';
+        $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+        return ($backlog ? self::backlogBase() : self::BASE) . <<<SQL
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
-    identity_count, equipment_matches, service_matches
-FROM filtered
+    identity_count, equipment_matches, service_matches {$ageColumns}
+FROM {$source} filtered
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date) d
 CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type AS VARCHAR(100)) AS type,
     CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,
@@ -101,6 +150,7 @@ WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, '
         SELECT 1 FROM OPENJSON(:season_services) WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
         WHERE allowed.code = filtered.TJ_SERVICO AND allowed.name = filtered.service_name
     ))
+{$ageFilter}
 ORDER BY planned_date DESC, record_id DESC
 OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 OPTION (RECOMPILE)

@@ -53,6 +53,7 @@ final class ProtheusOrderAccessTest extends TestCase
             $request = $this->request()->withAttribute('identity', new Identity($user));
             $controller = new PcmController($request);
             $query = $this->createMock(SelectQuery::class);
+            $query->method('contain')->willReturnSelf();
             $query->method('where')->willReturnSelf();
             $query->method('first')->willReturn($user);
             $table = $this->createMock(Table::class);
@@ -76,12 +77,12 @@ final class ProtheusOrderAccessTest extends TestCase
         $routes = require ROOT . '/config/routes.php';
         $routes(Router::createRouteBuilder('/'));
         $params = Router::parseRequest($this->request());
-        self::assertSame('orderProtheus', $params['action']);
+        self::assertSame('protheusOrderData', $params['action']);
         self::assertSame(['42'], $params['pass']);
         $view = new View($this->request());
         $view->setTemplatePath('Pcm');
-        $html = $view->element('protheus_order', ['snapshotId' => 42]);
-        self::assertStringContainsString('data-url="/pcm/os/42/protheus"', $html);
+        $html = $view->element('protheus_order', ['protheusUrl' => '/pcm/protheus/os/42/dados?filial=01']);
+        self::assertStringContainsString('data-url="/pcm/protheus/os/42/dados?filial=01"', $html);
         self::assertStringContainsString('Detalhes da manutenção', $html);
         self::assertStringContainsString('data-protheus-dialog', $html);
         self::assertStringContainsString('pcm-protheus-order.js', $view->fetch('script'));
@@ -90,8 +91,8 @@ final class ProtheusOrderAccessTest extends TestCase
     private function request(): ServerRequest
     {
         return new ServerRequest([
-            'url' => '/pcm/os/42/protheus', 'environment' => ['REQUEST_METHOD' => 'GET'],
-            'params' => ['controller' => 'Pcm', 'action' => 'orderProtheus', 'pass' => ['42']],
+            'url' => '/pcm/protheus/os/42/dados', 'environment' => ['REQUEST_METHOD' => 'GET'],
+            'params' => ['controller' => 'Pcm', 'action' => 'protheusOrderData', 'pass' => ['42']],
         ]);
     }
 
@@ -100,8 +101,7 @@ final class ProtheusOrderAccessTest extends TestCase
         Router::reload();
         $routes = require ROOT . '/config/routes.php';
         $routes(Router::createRouteBuilder('/'));
-        foreach (['/pcm/data' => 'dashboardData', '/pcm/apresentacao/data' => 'presentationData',
-            '/pcm/legado' => 'indexLegacy', '/pcm/apresentacao/legado/data' => 'presentationLegacyData'] as $url => $action) {
+        foreach (['/pcm/data' => 'dashboardData', '/pcm/apresentacao/data' => 'presentationData'] as $url => $action) {
             $request = new ServerRequest(['url' => $url, 'environment' => ['REQUEST_METHOD' => 'GET']]);
             self::assertSame($action, Router::parseRequest($request)['action']);
         }
@@ -139,6 +139,12 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringNotContainsString('href="/pcm/analises"', $page);
         self::assertStringNotContainsString('>Análises<', $page);
         self::assertStringContainsString('href="/pcm/ordens"', $page);
+        self::assertStringContainsString('href="/usuarios"', $page);
+        self::assertStringNotContainsString('/importacoes', $page);
+        self::assertStringNotContainsString('legado Excel', $page);
+        $view->set('currentUser', new Entity(['nome' => 'Teste', 'role' => 'USUARIO']));
+        $page = $view->render('protheus_dashboard', 'default');
+        self::assertStringNotContainsString('href="/usuarios"', $page);
     }
 
     public function testDirectDetailRouteAndPageNeedNoSnapshot(): void
@@ -184,7 +190,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $view->set('listing', $listing);
         $html = $view->render('orders', false);
         self::assertStringContainsString('temporariamente indisponíveis', $html);
-        self::assertStringContainsString('/pcm/ordens/legado', $html);
+        self::assertStringNotContainsString('/pcm/ordens/legado', $html);
         self::assertStringNotContainsString('/pcm/protheus/os/004368?', $html);
     }
 }

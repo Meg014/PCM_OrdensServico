@@ -15,7 +15,7 @@ $isTv = isset($currentUser) && $currentUser->role === 'TV';
 <?php endif; ?>
 <?php if (!$presentation && !$isTv): ?><div class="d-flex gap-2">
 <?= $this->Html->link($presentation ? 'Sair da apresentação' : 'Modo Apresentação', ['_name' => $presentation ? 'pcm' : 'pcm-presentation', '?' => $payload['filters']], ['class' => 'btn btn-outline-primary']) ?>
-<?= $this->Html->link('Comparar legado Excel', ['_name' => $presentation ? 'pcm-presentation-legacy' : 'pcm-legacy'], ['class' => 'btn btn-outline-secondary']) ?>
+
 </div><?php endif; ?></header>
 <p data-dashboard-notice role="status" aria-live="polite" class="text-body-secondary"></p>
 <?php if (!$presentation): ?>

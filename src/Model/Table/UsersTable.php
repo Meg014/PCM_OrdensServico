@@ -85,7 +85,7 @@ class UsersTable extends Table
         return $validator
             ->scalar('nome')->maxLength('nome', 150)->requirePresence('nome', 'create')->notEmptyString('nome')
             ->email('email')->maxLength('email', 254)->requirePresence('email', 'create')->notEmptyString('email')
-            ->scalar('password')->minLength('password', 12, 'Use pelo menos 12 caracteres.')
+            ->scalar('password')->minLength('password', 8, 'Use pelo menos 8 caracteres.')
             ->maxLength('password', 72, 'Use no máximo 72 caracteres.')
             ->add('password', 'bytes', ['rule' => static fn($value) => is_string($value) && strlen($value) <= 72,
                 'message' => 'A senha deve ter no máximo 72 bytes.'])

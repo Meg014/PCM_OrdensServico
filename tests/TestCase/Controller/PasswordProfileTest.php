@@ -87,6 +87,41 @@ final class PasswordProfileTest extends TestCase
         return $controller;
     }
 
+    public function testPasswordLengthPolicyIsSharedByCreationResetAndOwnChange(): void
+    {
+        $data = ['nome' => 'Test', 'email' => 'length@example.com', 'role' => 'USUARIO', 'ativo' => true];
+        foreach ([['1234567', false], ['12345678', true], [str_repeat('a', 72), true],
+            [str_repeat('a', 73), false], [str_repeat('é', 36), true], [str_repeat('é', 37), false]] as [$password, $valid]) {
+            $errors = $this->users->getValidator()->validate($data + ['password' => $password]);
+            self::assertSame(!$valid, isset($errors['password']));
+        }
+
+        $user = $this->users->newEntity($data + ['password' => 'Create08']);
+        $this->users->saveOrFail($user);
+        self::assertTrue(password_verify('Create08', $user->password));
+        self::assertTrue($user->must_change_password);
+
+        self::assertFalse($this->users->setTemporaryPassword($user, '1234567'));
+        $user = $this->users->get($user->id);
+        self::assertTrue(password_verify('Create08', $user->password));
+        self::assertTrue($this->users->setTemporaryPassword($user, 'Reset008'));
+        self::assertTrue($user->must_change_password);
+        self::assertTrue(password_verify('Reset008', $user->password));
+
+        self::assertFalse($this->users->changeOwnPassword($user, [
+            'new_password' => '1234567', 'password_confirm' => '1234567',
+        ]));
+        $user = $this->users->get($user->id);
+        self::assertTrue($this->users->changeOwnPassword($user, [
+            'new_password' => 'First008', 'password_confirm' => 'First008',
+        ]));
+        self::assertFalse($user->must_change_password);
+        self::assertTrue($this->users->changeOwnPassword($user, [
+            'current_password' => 'First008', 'new_password' => 'Own00008', 'password_confirm' => 'Own00008',
+        ]));
+        self::assertTrue(password_verify('Own00008', $this->users->get($user->id)->password));
+    }
+
     public function testEmailLoginForAdminUsuarioAndInvalidCredentials(): void
     {
         foreach (['ADMIN','USUARIO'] as $role) $this->user($role);
@@ -150,7 +185,7 @@ final class PasswordProfileTest extends TestCase
                 }
                 self::assertSame(!$required, array_key_exists('current_password', $post));
                 if (!$required) $post['current_password'] = 'Initial-password-2026';
-                $post['new_password'] = $post['password_confirm'] = 'Http-new-password-2026';
+                $post['new_password'] = $post['password_confirm'] = 'Http2026';
                 $cookie = $response->getCookieCollection()->get('csrfToken');
                 // Includes the emitted CSRF token and any _method override, exactly as a browser form does.
                 $request = \Cake\Http\ServerRequestFactory::fromGlobals([
@@ -165,7 +200,7 @@ final class PasswordProfileTest extends TestCase
                 self::assertSame('POST', $request->getMethod());
                 $saved = $this->users->get($user->id);
                 self::assertFalse($saved->must_change_password);
-                self::assertTrue(password_verify('Http-new-password-2026', $saved->password));
+                self::assertTrue(password_verify('Http2026', $saved->password));
                 self::assertSame($saved->password, $session->read('Auth')->password);
             }
         } finally {

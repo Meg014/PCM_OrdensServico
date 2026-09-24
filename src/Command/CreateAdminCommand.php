@@ -33,7 +33,7 @@ class CreateAdminCommand extends Command
         ]);
         if (!$users->save($user)) {
             $io->err('Não foi possível criar o ADMIN. Confira as variáveis PCM_ADMIN_*: '
-                . 'nome, e-mail único e senha de 12 a 72 caracteres (máximo 72 bytes).');
+                . 'nome, e-mail único e senha de 8 a 72 caracteres (máximo 72 bytes).');
 
             return self::CODE_ERROR;
         }

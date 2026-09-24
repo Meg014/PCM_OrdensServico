@@ -80,7 +80,16 @@
         ];
         fields.forEach(([label, text]) => {
             const line = node('div');
-            line.append(node('dt', label), node('dd', text));
+            const dd = node('dd', text);
+            if (label === 'Equipamento' && m.equipment_code && root.dataset.equipmentUrl) {
+                const link = node('a', text);
+                const url = new URL(root.dataset.equipmentUrl, window.location.origin);
+                url.searchParams.set('bem', m.equipment_code);
+                url.searchParams.set('filial', data.branch ?? '');
+                link.href = url.toString();
+                dd.replaceChildren(link);
+            }
+            line.append(node('dt', label), dd);
             list.append(line);
         });
         card.append(list);

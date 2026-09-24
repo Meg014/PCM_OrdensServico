@@ -77,7 +77,7 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <?php foreach ($sector['orders'] as $row): ?><tr>
 <td><?= h($value($row['TJ_FILIAL'])) ?> /
 <?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
-<td><?= h($value($row['TJ_CODBEM'])) ?><br><?= h($value($row['equipment_name'])) ?></td>
+<td><?php if (trim((string)$row['TJ_CODBEM']) !== ''): ?><?= $this->Html->link($value($row['TJ_CODBEM']) . ' — ' . $value($row['equipment_name']), ['_name' => 'pcm-equipment', '?' => ['bem' => $row['TJ_CODBEM'], 'filial' => $row['TJ_FILIAL']]]) ?><?php else: ?>—<?php endif; ?></td>
 <td><?= h($value($row['TJ_SERVICO'])) ?><br><?= h($value($row['service_name'])) ?></td>
 <td><?= h($value($row['TJ_CCUSTO'])) ?></td><td><?= h($value($row['TJ_TIPO'])) ?></td>
 <td><?= h($value($row['TJ_SITUACA'])) ?> / <?= h($value($row['TJ_TERMINO'])) ?></td>

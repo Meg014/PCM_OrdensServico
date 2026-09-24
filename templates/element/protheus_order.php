@@ -4,6 +4,7 @@
 echo $this->Html->script('pcm-protheus-order', ['block' => true, 'defer' => true]);
 ?>
 <section class="pcm-dashboard-section" data-protheus-order
+    data-equipment-url="<?= h($this->Url->build(['_name' => 'pcm-equipment'])) ?>"
     data-url="<?= h($protheusUrl ?? $this->Url->build(['_name' => 'pcm-order-protheus', 'id' => $snapshotId])) ?>">
     <div data-protheus-detail aria-live="polite" aria-busy="true">
         <div class="pcm-section-title"><p>PROTHEUS</p><h2>Detalhes da manutenção</h2></div>

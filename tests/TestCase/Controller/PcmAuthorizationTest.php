@@ -50,43 +50,59 @@ final class PcmAuthorizationTest extends TestCase
         return $instance;
     }
 
-    public function testSectorScopeUsesFreshUserAndCannotBeOverriddenByQuery(): void
+    public function testAdminAndUsuarioAccessAllAreasRegardlessOfAssignedSector(): void
     {
-        foreach (['orders', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'sector', 'sectorData'] as $action) {
-            $controller = $this->controller('USUARIO', 'Pcm', $action, pass: ['ELETRI'], sessionRole: 'ADMIN');
-            $controller->beforeFilter(new Event('Controller.initialize', $controller));
-            self::assertSame('ELETRI', $controller->getRequest()->getAttribute('pcmAreaScope'));
-        }
-    }
-
-    public function testOtherSectorsGlobalEndpointsAndUserAdministrationAreForbidden(): void
-    {
-        $cases = [['Pcm', 'sector', 'ELETRI'], ['Pcm', 'sectorData', 'ELETRI'],
-            ['Pcm', 'orders', null], ['Pcm', 'dashboardData', 'ELETRI'],
-            ['Pcm', 'presentation', 'ELETRI'], ['Pcm', 'presentationData', 'ELETRI']];
-        foreach (['index', 'add', 'edit', 'password', 'revokeTv'] as $action) $cases[] = ['Users', $action, 'ELETRI'];
-        foreach ($cases as [$name, $action, $area]) {
-            $controller = $this->controller('USUARIO', $name, $action, $area, ['MECANI']);
-            try {
-                $controller->beforeFilter(new Event('Controller.initialize', $controller));
-                self::fail("Access should be forbidden: $name/$action");
-            } catch (ForbiddenException) {
-                self::assertTrue(true);
+        foreach (['ADMIN', 'USUARIO'] as $role) {
+            foreach (['ELETRI', null] as $assignedArea) {
+                foreach (['index', 'dashboardData', 'orders', 'equipment', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'sector', 'sectorData', 'presentation', 'presentationData'] as $action) {
+                    foreach (['MECANI', 'CALDEI'] as $target) {
+                        $controller = $this->controller($role, 'Pcm', $action, $assignedArea, [$target]);
+                        $controller->beforeFilter(new Event('Controller.initialize', $controller));
+                        self::assertNull($controller->getRequest()->getAttribute('pcmAreaScope'));
+                    }
+                }
             }
         }
     }
 
-    public function testAdminAndExistingTvPresentationRemainAvailable(): void
+    public function testUserAdministrationRequiresFreshAdminRole(): void
     {
-        foreach ([['ADMIN', 'Users', 'edit', '/usuarios/7/editar'], ['ADMIN', 'Pcm', 'sector', '/pcm/setor/MECANI'],
-            ['TV', 'Pcm', 'presentation', '/pcm/apresentacao'], ['TV', 'Pcm', 'presentationData', '/pcm/apresentacao/data']] as [$role, $name, $action, $path]) {
-            $controller = $this->controller($role, $name, $action, null, ['MECANI'], $path);
+        foreach (['index', 'add', 'edit', 'password', 'revokeTv'] as $action) {
+            foreach (['ADMIN', 'USUARIO'] as $role) {
+                $controller = $this->controller($role, 'Users', $action, sessionRole: 'ADMIN');
+                try {
+                    $controller->beforeFilter(new Event('Controller.initialize', $controller));
+                    self::assertSame('ADMIN', $role);
+                } catch (ForbiddenException) {
+                    self::assertSame('USUARIO', $role);
+                }
+            }
+        }
+    }
+
+    public function testTvOnlyAccessesPresentationAndItsRefreshEndpoint(): void
+    {
+        foreach (['presentation' => '/pcm/apresentacao', 'presentationData' => '/pcm/apresentacao/data'] as $action => $path) {
+            $controller = $this->controller('TV', 'Pcm', $action, null, [], $path);
             $controller->beforeFilter(new Event('Controller.initialize', $controller));
             self::assertNull($controller->getRequest()->getAttribute('pcmAreaScope'));
         }
-        $controller = $this->controller('TV', 'Pcm', 'orders', path: '/pcm/ordens');
-        $this->expectException(ForbiddenException::class);
-        $controller->beforeFilter(new Event('Controller.initialize', $controller));
+        foreach ([['Pcm', 'index', '/pcm'], ['Pcm', 'dashboardData', '/pcm/data'],
+            ['Pcm', 'sector', '/pcm/setor/ELETRI'], ['Pcm', 'sectorData', '/pcm/setor/ELETRI/data'],
+            ['Pcm', 'sectorOptions', '/pcm/setores/data'], ['Pcm', 'orders', '/pcm/ordens'],
+            ['Pcm', 'equipment', '/pcm/equipamento'],
+            ['Pcm', 'protheusOrder', '/pcm/protheus/os/004368'],
+            ['Pcm', 'protheusOrderData', '/pcm/protheus/os/004368/dados'],
+            ['Users', 'index', '/usuarios'], ['Users', 'add', '/usuarios/novo'],
+            ['Users', 'edit', '/usuarios/7/editar']] as [$name, $action, $path]) {
+            $controller = $this->controller('TV', $name, $action, null, ['ELETRI'], $path);
+            try {
+                $controller->beforeFilter(new Event('Controller.initialize', $controller));
+                self::fail("TV should be forbidden: $path");
+            } catch (ForbiddenException) {
+                self::assertTrue(true);
+            }
+        }
     }
 
     public function testLegacyActionsAreBlockedEvenForAdminAndHaveNoRoutes(): void

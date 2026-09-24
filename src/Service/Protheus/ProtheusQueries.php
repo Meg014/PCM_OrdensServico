@@ -143,6 +143,13 @@ SQL;
         return self::orderPage("j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}", $startUser, $endUser);
     }
 
+    /** Dedicated equipment page, sharing the established history joins and ordering. */
+    public static function equipmentPortfolioPage(): string
+    {
+        return self::orderPage(ProtheusEquipmentQueries::SCOPE . ' AND ' . ProtheusEquipmentQueries::FILTER,
+            false, false, true, ProtheusEquipmentQueries::FILTER_JOIN);
+    }
+
     /** Eight closed variants: exact order, branch and equipment filters. */
     public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false): string
     {
@@ -169,7 +176,7 @@ SQL;
         return self::orderPage($where, false, false, false, $join);
     }
 
-    private const REFERENCE_DATE = "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))";
+    public const REFERENCE_DATE = "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))";
 
     private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true, string $join = ''): string
     {
@@ -306,6 +313,9 @@ SQL;
 
     private static function allowsBase(string $sql): bool
     {
+        if (in_array($sql, [self::equipmentPortfolioPage(), ProtheusEquipmentQueries::HEADER, ProtheusEquipmentQueries::summary()], true)) {
+            return true;
+        }
         if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()
             || $sql === ProtheusSectorQueries::page(true) || $sql === ProtheusSectorQueries::backlog()) {
             return true;

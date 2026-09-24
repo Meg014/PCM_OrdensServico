@@ -47,6 +47,7 @@ class UsersController extends AppController
         $user = $id === null ? $table->newEmptyEntity() : $table->get($id);
         $areaTable = $this->fetchTable('MaintenanceAreas');
         $selectedAreaCode = $user->maintenance_area_id ? $areaTable->get($user->maintenance_area_id)->source_code : '';
+        $storedAreaCode = $selectedAreaCode;
         $areas = [];
         $areasAvailable = true;
         try {
@@ -73,7 +74,7 @@ class UsersController extends AppController
             if (!is_string($selectedAreaCode)) {
                 $selectedAreaCode = '';
             }
-            if ($user->role === 'USUARIO' && (!isset($areas[$selectedAreaCode]) || !$areasAvailable)) {
+            if ($selectedAreaCode !== '' && $selectedAreaCode !== $storedAreaCode && (!isset($areas[$selectedAreaCode]) || !$areasAvailable)) {
                 $user->setError('area_code', 'Selecione um setor válido do Protheus. Se a consulta estiver indisponível, tente novamente.');
             }
             // Prevent administrators from accidentally locking themselves out.
@@ -86,8 +87,9 @@ class UsersController extends AppController
             $saved = false;
             if (!$user->hasErrors()) {
                 try {
-                    $saved = $table->getConnection()->transactional(function () use ($table, $user, $areaTable, $selectedAreaCode) {
-                        if ($user->role === 'USUARIO') {
+                    $saved = $table->getConnection()->transactional(function () use ($table, $user, $areaTable, $selectedAreaCode, $storedAreaCode) {
+                        // Optional metadata only; leaving it blank preserves any existing association.
+                        if ($selectedAreaCode !== '' && $selectedAreaCode !== $storedAreaCode) {
                             $area = $areaTable->find()->where(['source_code' => $selectedAreaCode])->first();
                             if ($area === null) {
                                 $area = $areaTable->newEntity(['source_code' => $selectedAreaCode,

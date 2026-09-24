@@ -59,7 +59,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>
                     <li class="nav-item">
-                        <?= $this->Html->link($currentUser->role === 'ADMIN' ? 'PCM Geral' : 'Meu setor', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
+                        <?= $this->Html->link('PCM Geral', ['_name' => 'pcm'], ['class' => 'nav-link']) ?>
                     </li>
                     <li class="nav-item dropdown" data-sectors-menu data-url="<?= h($this->Url->build(['_name' => 'pcm-sector-options'])) ?>">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"

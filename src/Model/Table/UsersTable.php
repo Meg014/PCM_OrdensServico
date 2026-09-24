@@ -44,8 +44,6 @@ class UsersTable extends Table
     /** Enforces unique email and valid sector references. */
     public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add(static fn ($entity) => $entity->role !== 'USUARIO' || !empty($entity->maintenance_area_id),
-            'userRequiresArea', ['errorField' => 'area_code', 'message' => 'Usuário comum precisa de setor.']);
         $rules->add($rules->isUnique(['email']), ['errorField' => 'email', 'message' => 'E-mail já cadastrado.']);
         $rules->add(
             $rules->existsIn(['maintenance_area_id'], 'MaintenanceAreas'),

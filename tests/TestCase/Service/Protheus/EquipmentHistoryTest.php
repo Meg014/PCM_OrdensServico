@@ -1,176 +1,136 @@
 <?php
 declare(strict_types=1);
-
 namespace App\Test\TestCase\Service\Protheus;
 
-use App\Command\ProtheusHealthCommand;
 use App\Database\Driver\ProtheusReadOnly;
-use App\Service\Protheus\ProtheusQueries as Sql;
+use App\Service\Protheus\EquipmentHistoryService;
+use App\Service\Protheus\ProtheusEquipmentQueries as Q;
+use App\Service\Protheus\ProtheusQueries;
 use App\Service\Protheus\ProtheusRepository;
-use Cake\Console\Arguments;
-use Cake\Console\ConsoleIo;
-use Cake\Console\ConsoleOptionParser;
 use Cake\Database\Connection;
 use Cake\Database\StatementInterface;
-use InvalidArgumentException;
-use LogicException;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class EquipmentHistoryTest extends TestCase
 {
-    public function testBoundedPagePreservesRawFieldsAndBindsKeysAndIntegers(): void
+    public function testBoundQueriesPaginationAndFailureWithoutRealConnection(): void
     {
         $calls = [];
-        $repository = $this->repository([
-            $this->row('004368'), $this->row('004367'), $this->row('004366'),
-        ], $calls, ['inicio' => 25, 'fim' => null]);
-        $result = $repository->findEquipmentHistory('MEL 80 115  ', '01 ', 2, 2);
-        self::assertSame(['004368', '004367'], array_column($result['orders'], 'TJ_ORDEM'));
-        self::assertSame('MOTOR ROSCA RO-02 - SILO 01', $result['orders'][0]['equipment_name']);
+        $service = new EquipmentHistoryService($this->repository($calls));
+        $result = $service->load(['bem' => 'MEL 80 115', 'filial' => '01', 'page' => 2, 'limit' => 1,
+            'type' => 'COR', 'status' => 'open', 'date_start' => '2026-01-01']);
+        self::assertTrue($result['available']);
+        self::assertFalse($result['not_found']);
         self::assertTrue($result['has_more']);
-        self::assertSame('X', $result['orders'][0]['TJ_SITUACA']);
-        self::assertSame('TROCA DOS ROLAMENTOS DO MOTOR', $result['orders'][0]['descricao']);
-        self::assertSame(['bem' => 'MEL 80 115', 'offset' => 2, 'fetch' => 3, 'filial' => '01'], $calls[1][1]);
-        self::assertSame('integer', $calls[1][2]['offset']);
-        self::assertSame('integer', $calls[1][2]['fetch']);
-        self::assertSame('string', $calls[1][2]['filial']);
-        self::assertSame(Sql::equipmentHistory(true, true, false), $calls[1][0]);
-        self::assertSame(['TJ_USUAINI' => true, 'TJ_USUAFIM' => false], $result['user_columns']);
-        self::assertArrayNotHasKey('equipment_matches', $result['orders'][0]);
-        self::assertCount(2, $calls); // Metadata plus history, never STL/ST1/SB1/detail.
-        $repository->findEquipmentHistory('MEL 80 115', '01', 3, 2);
-        self::assertCount(3, $calls); // Metadata cached within repository instance.
-    }
-
-    public function testEmptyHistoryAndAllBranches(): void
-    {
+        self::assertCount(1, $result['orders']);
+        self::assertCount(3, $calls);
+        self::assertSame('MEL 80 115', $calls[1][1]['bem']);
+        self::assertSame('01', $calls[1][1]['filial']);
+        self::assertSame('COR', $calls[1][1]['type']);
+        self::assertSame('open', $calls[1][1]['status']);
+        self::assertSame(1, $calls[2][1]['offset']);
+        self::assertSame('integer', $calls[2][2]['fetch']);
+        self::assertStringContainsString('j.R_E_C_N_O_ DESC', $calls[2][0]);
+        self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $calls[2][0]);
+        foreach ($calls as [$sql]) {
+            self::assertStringNotContainsString('STL010', $sql);
+            self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
+        }
         $calls = [];
-        $repository = $this->repository([], $calls);
-        $result = $repository->findEquipmentHistory('MEL 80 115');
-        self::assertSame([], $result['orders']);
-        self::assertFalse($result['has_more']);
-        self::assertNull($result['branch']);
-        self::assertArrayNotHasKey('filial', $calls[1][1]);
-        self::assertSame(Sql::equipmentHistory(false), $calls[1][0]);
+        $failure = (new EquipmentHistoryService($this->repository($calls, true)))->load(['bem' => 'MEL 80 115', 'filial' => '01']);
+        self::assertFalse($failure['available']);
+        self::assertArrayNotHasKey('summary', $failure);
+        self::assertStringNotContainsString('SQLSTATE', json_encode($failure));
     }
 
-    public function testParametersNeverBecomeSqlAndBadLimitsNeverQuery(): void
+    public function testSummaryRulesAndRecurrenceWindowBoundariesOffline(): void
     {
+        $sql = Q::summary();
+        self::assertSame(1, preg_match('/\), metrics AS \(\n(.*?)\n\), context AS/s', $sql, $match));
+        // Execute the actual metric expressions with equivalent SQLite COUNT/date functions.
+        $metrics = str_replace('COUNT_BIG(', 'COUNT(', $match[1]);
+        $metrics = preg_replace('/CONVERT\(date, (:[a-zA-Z0-9]+), 23\)/', 'date($1)', $metrics);
+        $db = new \PDO('sqlite::memory:');
+        $db->exec('CREATE TABLE filtered (TJ_SITUACA TEXT, TJ_TERMINO TEXT, TJ_TIPO TEXT, origin_date TEXT)');
+        $insert = $db->prepare('INSERT INTO filtered VALUES (?,?,?,?)');
+        $today = new \DateTimeImmutable('2026-09-24');
+        foreach ([0, 29, 30, 89, 90, 364, 365] as $i => $age) {
+            $insert->execute(['L', in_array($age, [29, 89, 364, 365], true) ? 'S' : 'N', 'COR', $today->modify("-$age days")->format('Y-m-d')]);
+        }
+        foreach ([['C','N','COR','2026-09-24'], ['P','N','COR','2026-09-24'], ['L','N','PRE','2026-09-24'],
+            ['L','S','MEL','2026-09-24'], ['L','N','COR','2026-09-25'], ['L','N','COR',null]] as $row) $insert->execute($row);
+        $params = [];
+        foreach ([30,90,365] as $days) {
+            $params['since'.$days] = $today->modify('-'.($days-1).' days')->format('Y-m-d');
+            $params['until'.$days] = '2026-09-24';
+        }
+        $statement = $db->prepare($metrics);
+        $statement->execute($params);
+        $row = $statement->fetch(\PDO::FETCH_ASSOC);
+        self::assertSame(['total'=>13, 'open_count'=>6, 'closed_count'=>5, 'canceled_count'=>1, 'pending_count'=>1,
+            'corrective'=>9, 'preventive'=>1, 'improvement'=>1, 'recurrence30'=>2, 'recurrence90'=>4, 'recurrence365'=>6], $row);
+        $db->exec('DELETE FROM filtered'); // Isolated in-memory fixture, never Protheus.
+        $statement->execute($params);
+        self::assertSame(array_fill_keys(array_keys($row), 0), $statement->fetch(\PDO::FETCH_ASSOC));
+    }
+
+    public function testInvalidDateRejectedBeforeAnyRead(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new EquipmentHistoryService())->load(['bem' => 'MEL 80 115', 'filial' => '01', 'date_start' => '2026-02-30']);
+    }
+
+    public function testEquipmentRouteAndEscapedPageKeepExistingOrderDetail(): void
+    {
+        if (!defined('ROOT')) require dirname(__DIR__, 4) . '/config/paths.php';
+        require_once CAKE . 'Core/functions_global.php';
+        \Cake\Core\Configure::write('App.namespace', 'App');
+        \Cake\Core\Configure::write('App.encoding', 'UTF-8');
+        \Cake\Core\Configure::write('App.paths.templates', [ROOT . '/templates/']);
+        \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        \Cake\Routing\Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(\Cake\Routing\Router::createRouteBuilder('/'));
+        $request = new \Cake\Http\ServerRequest(['url' => '/pcm/equipamento', 'environment' => ['REQUEST_METHOD' => 'GET']]);
+        self::assertSame('equipment', \Cake\Routing\Router::parseRequest($request)['action']);
         $calls = [];
-        $repository = $this->repository([], $calls);
-        $value = "X'; DELETE FROM STJ010;--";
-        $repository->findEquipmentHistory($value, '01');
-        self::assertSame($value, $calls[1][1]['bem']);
-        self::assertStringNotContainsString($value, $calls[1][0]);
-        foreach ([[0, 20], [1, 0], [1, 101], [PHP_INT_MAX, 100]] as [$page, $limit]) {
-            try {
-                $repository->findEquipmentHistory('MEL 80 115', '01', $page, $limit);
-                self::fail('Invalid pagination accepted.');
-            } catch (InvalidArgumentException) {
-                self::assertCount(2, $calls);
-            }
-        }
+        $data = (new EquipmentHistoryService($this->repository($calls)))->load(['bem' => 'MEL 80 115', 'filial' => '01']);
+        $data['summary'] += array_fill_keys(['total','open_count','closed_count','corrective','preventive','improvement',
+            'canceled_count','pending_count','recurrence30','recurrence90','recurrence365','cost_center_count','area_count'], 0)
+            + ['cost_center' => '', 'area' => 'ELETRI'];
+        $data['orders'] = [['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'reference_date' => '2026-08-18',
+            'TJ_TIPO' => 'COR', 'TJ_SERVICO' => 'ELEPRE', 'service_name' => 'PREVENTIVA ELETRICA',
+            'descricao' => '<script>unsafe</script>', 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'TJ_CCUSTO' => '', 'TJ_CODAREA' => 'ELETRI']];
+        $view = new \Cake\View\View($request);
+        $view->setTemplatePath('Pcm');
+        $view->set('equipment', $data);
+        $html = $view->render('equipment', false);
+        self::assertStringContainsString('18/08/2026', $html);
+        self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
+        self::assertStringNotContainsString('<script>unsafe</script>', $html);
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringContainsString('Corretiva', $html);
+        self::assertStringContainsString('PREVENTIVA ELETRICA', $html);
+        self::assertStringContainsString('pcm-sector-table-scroll', $html);
     }
 
-    public function testAmbiguousMastersOrDuplicateOsAreNotSilentlyChosen(): void
-    {
-        foreach (['equipment_matches', 'service_matches', 'identity_count'] as $field) {
-            $calls = [];
-            $row = $this->row('004368');
-            $row[$field] = 2;
-            $repository = $this->repository([$row], $calls);
-            try {
-                $repository->findEquipmentHistory('MEL 80 115', '01');
-                self::fail('Ambiguous result accepted.');
-            } catch (RuntimeException) {
-                self::assertCount(2, $calls);
-            }
-        }
-    }
-
-    public function testSqlTemplatesAreClosedAndKeepPaginationBeforeEnrichment(): void
-    {
-        foreach ([false, true] as $branch) {
-            foreach ([false, true] as $start) {
-                foreach ([false, true] as $end) {
-                    $sql = Sql::equipmentHistory($branch, $start, $end);
-                    self::assertTrue(Sql::allows($sql));
-                    self::assertFalse(Sql::allows($sql . '; DELETE FROM STJ010'));
-                    self::assertStringNotContainsString('SELECT *', $sql);
-                    self::assertStringNotContainsString('STL010', $sql);
-                    self::assertStringNotContainsString('RTRIM(j.TJ_CODBEM)', $sql);
-                    self::assertMatchesRegularExpression(
-                        '/COALESCE\(\s*'
-                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTMRFIM, ''\\), 112\\),\\s*"
-                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTMRINI, ''\\), 112\\),\\s*"
-                        . "TRY_CONVERT\\(date, NULLIF\\(j\\.TJ_DTORIGI, ''\\), 112\\)\\s*"
-                        . '\) AS reference_date/',
-                        $sql,
-                    );
-                    self::assertStringContainsString('ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC', $sql);
-                    self::assertStringContainsString('j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM', $sql);
-                    self::assertStringContainsString('j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM', $sql);
-                    self::assertStringContainsString('j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO', $sql);
-                    self::assertStringContainsString('ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC', $sql);
-                    self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $sql);
-                    self::assertSame(6, substr_count($sql, "D_E_L_E_T_ <> '*'"));
-                    // Correlation belongs in WHERE, never inside MAX/COUNT expressions.
-                    self::assertSame(4, substr_count($sql, 'OUTER APPLY'));
-                    self::assertSame(2, substr_count($sql, 'SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name'));
-                    self::assertSame(2, substr_count($sql, 'SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name'));
-                    self::assertDoesNotMatchRegularExpression('/(?:MAX|MIN|COUNT)\([^)]*j\./i', $sql);
-                    self::assertStringContainsString('b.T9_FILIAL = j.TJ_FILIAL', $sql);
-                    self::assertStringContainsString("b.T9_FILIAL = ''", $sql);
-                    self::assertStringContainsString('s.T4_FILIAL = j.TJ_FILIAL', $sql);
-                    self::assertStringContainsString("s.T4_FILIAL = ''", $sql);
-                    self::assertLessThan(strpos($sql, 'OUTER APPLY'), strpos($sql, 'FETCH NEXT'));
-                }
-            }
-        }
-        self::assertTrue(Sql::allows(Sql::HISTORY_USER_COLUMNS));
-        $this->expectException(LogicException::class);
-        (new ProtheusReadOnly())->prepare(Sql::equipmentHistory(true) . '; SELECT 2');
-    }
-
-    public function testCommandOptionsAndInvalidInputWithoutDatabase(): void
-    {
-        $command = new ProtheusHealthCommand();
-        $parser = $command->buildOptionParser(new ConsoleOptionParser('protheus_health'));
-        [$options] = $parser->parse(['--bem', 'MEL 80 115', '--filial', '01', '--pagina', '2', '--limite', '10']);
-        self::assertSame('MEL 80 115', $options['bem']);
-        self::assertSame('01', $options['filial']);
-        $io = $this->createMock(ConsoleIo::class);
-        $io->expects(self::exactly(2))->method('error');
-        self::assertSame(1, $command->execute(new Arguments([], $options + ['os' => '004368'], []), $io));
-        $options['limite'] = '101';
-        self::assertSame(1, $command->execute(new Arguments([], $options, []), $io));
-    }
-
-    private function row(string $number): array
-    {
-        return [
-            'TJ_FILIAL' => '01 ', 'TJ_ORDEM' => $number, 'TJ_CODBEM' => 'MEL 80 115 ',
-            'equipment_name' => 'MOTOR ROSCA RO-02 - SILO 01 ', 'equipment_matches' => 1,
-            'service_name' => 'PREVENTIVA ELETRICA ', 'service_matches' => 1, 'identity_count' => 1,
-            'TJ_SITUACA' => 'X', 'descricao' => 'TROCA DOS ROLAMENTOS DO MOTOR',
-        ];
-    }
-
-    private function repository(array $rows, array &$calls, array $columns = ['inicio' => null, 'fim' => null]): ProtheusRepository
+    private function repository(array &$calls, bool $fail = false): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, &$calls, $columns) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail) {
             $calls[] = [$sql, $params, $types];
-            self::assertTrue(Sql::allows($sql));
+            self::assertTrue(ProtheusQueries::allows($sql));
+            if ($fail) throw new \RuntimeException('SQLSTATE private host');
+            $rows = match ($sql) {
+                Q::HEADER => [['T9_CODBEM' => 'MEL 80 115', 'T9_NOME' => 'MOTOR']],
+                Q::summary() => [['identity_count' => 1, 'all_count' => 2]],
+                default => array_fill(0, 2, ['identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1, 'TJ_ORDEM' => '004368']),
+            };
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($sql === Sql::HISTORY_USER_COLUMNS ? [$columns] : $rows);
-            $statement->expects(self::once())->method('closeCursor');
-
+            $statement->method('fetchAll')->willReturn($rows);
             return $statement;
         });
-
         return new ProtheusRepository($connection);
     }
 }

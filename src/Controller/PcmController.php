@@ -25,11 +25,6 @@ final class PcmController extends AppController
     /** Displays the company-wide current PCM snapshot. */
     public function index(): void
     {
-        $area = $this->request->getAttribute('pcmAreaScope');
-        if ($area !== null) {
-            $this->redirect(['_name' => 'pcm-sector', 'code' => $area]);
-            return;
-        }
         $this->directDashboard(false);
     }
 
@@ -42,11 +37,25 @@ final class PcmController extends AppController
         $this->viewBuilder()->setTemplate('index_legacy');
     }
 
+    public function equipment(): void
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        try {
+            $equipment = (new \App\Service\Protheus\EquipmentHistoryService())->load($this->request->getQueryParams());
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Bem, filial ou filtros inválidos.');
+        }
+        if ($equipment['not_found']) throw new NotFoundException('Equipamento não encontrado no Protheus.');
+        if (!$equipment['available']) $this->response = $this->response->withStatus(503);
+        $this->set(compact('equipment'));
+    }
+
     public function orders(): void
     {
         $this->request->getSession()->close();
         try {
-            $listing = (new OrderListingService(areaScope: $this->request->getAttribute('pcmAreaScope')))->load($this->request->getQueryParams());
+            $listing = (new OrderListingService())->load($this->request->getQueryParams());
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros ou paginação inválidos.');
         }
@@ -222,7 +231,7 @@ final class PcmController extends AppController
         $this->request->allowMethod(['get']);
         $this->request->getSession()->close();
         try {
-            $areas = (new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5, areaScope: $this->request->getAttribute('pcmAreaScope')))->findAreas();
+            $areas = (new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5))->findAreas();
             $items = [];
             foreach ($areas as $area) {
                 $code = $area['code'];
@@ -349,7 +358,7 @@ final class PcmController extends AppController
         }
         // Do not hold the user's session lock while waiting for the complementary server.
         $this->request->getSession()->close();
-        $payload = (new OrderProtheusService(areaScope: $this->request->getAttribute('pcmAreaScope')))->load($identity, $part, $page, $selected);
+        $payload = (new OrderProtheusService())->load($identity, $part, $page, $selected);
 
         return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
             ->withStringBody((string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));

@@ -51,6 +51,30 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return $this->read(ProtheusQueries::AREAS);
     }
 
+    /** Fixed number of reads per equipment; no OS/resource hydration. */
+    public function equipmentPortfolio(string $code, string $branch, array $filters, array $windows, int $page, int $limit): array
+    {
+        if ($code === '' || strlen($code) > 100 || strlen($branch) > 100 || $page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+            throw new InvalidArgumentException('Equipamento ou paginação inválidos.');
+        }
+        $header = $this->master(ProtheusEquipmentQueries::HEADER, $code, $branch);
+        $params = ['bem' => $code, 'filial' => $branch] + $filters;
+        $summary = $this->read(ProtheusEquipmentQueries::summary(), $params + $windows);
+        if (count($summary) !== 1 || (int)$summary[0]['identity_count'] > 1) {
+            throw new RuntimeException('Histórico incompleto ou identidade ambígua.');
+        }
+        $rows = $this->read(ProtheusQueries::equipmentPortfolioPage(), $params + [
+            'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
+        ], ['offset' => 'integer', 'fetch' => 'integer']);
+        foreach ($rows as $row) {
+            if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
+                throw new RuntimeException('Histórico ambíguo.');
+            }
+        }
+        return ['header' => $header, 'summary' => $summary[0], 'orders' => array_slice($rows, 0, $limit),
+            'has_more' => count($rows) > $limit];
+    }
+
     /** Two aggregate reads and one bounded page, never hydration of resources or snapshots. */
     public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = []): array
     {

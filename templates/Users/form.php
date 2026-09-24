@@ -3,12 +3,12 @@
 <section class="pcm-panel p-4">
 <?= $this->Form->create($user) ?>
 <div class="row g-3">
-<?php foreach (['nome' => ['label' => 'Nome'], 'email' => ['label' => 'E-mail', 'type' => 'email'], 'role' => ['label' => 'Perfil', 'options' => ['USUARIO' => 'USUARIO', 'ADMIN' => 'ADMIN', 'TV' => 'TV']], 'area_code' => ['label' => 'Setor Protheus (obrigatório para USUARIO)', 'options' => $areas, 'value' => $selectedAreaCode, 'empty' => 'Selecione o setor']] as $field => $options): ?>
+<?php foreach (['nome' => ['label' => 'Nome'], 'email' => ['label' => 'E-mail', 'type' => 'email'], 'role' => ['label' => 'Perfil', 'options' => ['USUARIO' => 'USUARIO', 'ADMIN' => 'ADMIN', 'TV' => 'TV']], 'area_code' => ['label' => 'Setor Protheus (opcional, informativo)', 'options' => $areas, 'value' => $selectedAreaCode, 'empty' => 'Sem alteração de setor']] as $field => $options): ?>
 <div class="col-md-6"><?= $this->Form->control($field, $options + ['class' => 'form-control']) ?></div>
 <?php endforeach; ?>
 <?php if ($user->isNew()): ?><div class="col-md-6"><?= $this->Form->control('password', ['label' => 'Senha (12 a 72 caracteres)', 'type' => 'password', 'value' => '', 'autocomplete' => 'new-password', 'class' => 'form-control']) ?></div><?php endif; ?>
 <div class="col-12"><?= $this->Form->control('ativo', ['label' => 'Usuário ativo', 'type' => 'checkbox', 'default' => true]) ?></div>
-</div><p class="text-body-secondary mt-3">USUARIO acessa somente seu setor. ADMIN acessa todos os setores. O perfil TV mantém acesso exclusivo à apresentação atual.</p>
+</div><p class="text-body-secondary mt-3">ADMIN e USUARIO consultam todos os setores, O.S. e históricos. Somente ADMIN administra usuários. TV acessa exclusivamente o Modo Apresentação. O setor associado não restringe o acesso.</p>
 <?php if (!$areasAvailable): ?><p class="alert alert-secondary">Setores do Protheus temporariamente indisponíveis. Não é possível atribuir um setor agora.</p><?php endif; ?>
 <button class="btn pcm-primary-action">Salvar</button> <?= $this->Html->link('Voltar', '/usuarios', ['class' => 'btn pcm-secondary-action']) ?>
 <?= $this->Form->end() ?></section>

@@ -107,5 +107,13 @@ class AppController extends Controller
         ) {
             throw new ForbiddenException('Acesso exclusivo para administradores.');
         }
+        if ($currentUser !== null && in_array($currentUser->role, ['ADMIN', 'USUARIO'], true)
+            && $currentUser->must_change_password
+            && !($controller === 'Profile' && $action === 'index')
+            && !($controller === 'Auth' && $action === 'logout' && $this->request->is('post'))) {
+            $event->setResult($this->redirect('/meu-perfil', 303));
+            $event->stopPropagation();
+            return;
+        }
     }
 }

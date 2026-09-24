@@ -54,6 +54,8 @@ $title = trim($this->fetch('title')) ?: 'PCM';
             <?php if (isset($currentUser) && !$isTv): ?>
             <div class="collapse navbar-collapse" id="pcmNavigation">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item"><?= $this->Html->link('Meu Perfil', '/meu-perfil', ['class' => 'nav-link']) ?></li>
+                    <?php if (!$currentUser->must_change_password): ?>
                     <li class="nav-item"><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'nav-link']) ?></li>
                     <?php if ($currentUser->role === 'ADMIN'): ?>
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
@@ -68,6 +70,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                             <li><span class="dropdown-item-text text-body-secondary">Abra para consultar os setores.</span></li>
                         </ul>
                     </li>
+                    <?php endif; ?>
                 </ul>
             </div>
             <?php endif; ?>

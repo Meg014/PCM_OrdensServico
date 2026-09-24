@@ -101,6 +101,11 @@ final class EquipmentHistoryTest extends TestCase
         $data['orders'] = [['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'reference_date' => '2026-08-18',
             'TJ_TIPO' => 'COR', 'TJ_SERVICO' => 'ELEPRE', 'service_name' => 'PREVENTIVA ELETRICA',
             'descricao' => '<script>unsafe</script>', 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'TJ_CCUSTO' => '', 'TJ_CODAREA' => 'ELETRI']];
+        $data['summary']['area_count'] = 2;
+        $row = $data['orders'][0];
+        foreach ([['L', 'N'], ['C', 'N'], ['P', 'N']] as [$situation, $ending]) {
+            $data['orders'][] = array_replace($row, ['TJ_SITUACA' => $situation, 'TJ_TERMINO' => $ending, 'TJ_CODAREA' => 'MECANI']);
+        }
         $view = new \Cake\View\View($request);
         $view->setTemplatePath('Pcm');
         $view->set('equipment', $data);
@@ -112,6 +117,15 @@ final class EquipmentHistoryTest extends TestCase
         self::assertStringContainsString('Corretiva', $html);
         self::assertStringContainsString('PREVENTIVA ELETRICA', $html);
         self::assertStringContainsString('pcm-sector-table-scroll', $html);
+        self::assertStringContainsString('pcm-equipment-history', $html);
+        self::assertStringContainsString('Múltiplos — consulte a tabela', $html);
+        self::assertStringContainsString('Elétrica', $html);
+        self::assertStringContainsString('Mecânica', $html);
+        preg_match('/<tbody>(.*?)<\/tbody>/s', $html, $body);
+        foreach (['Aberta', 'Fechada', 'Cancelada', 'Pendente'] as $label) {
+            self::assertStringContainsString('<td>' . $label . '</td>', $body[1]);
+        }
+        foreach (['L/N', 'L/S', 'C/N', 'P/N'] as $code) self::assertStringNotContainsString($code, $body[1]);
     }
 
     private function repository(array &$calls, bool $fail = false): ProtheusRepository

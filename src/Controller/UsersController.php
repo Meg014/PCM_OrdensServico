@@ -125,9 +125,10 @@ class UsersController extends AppController
         $table = $this->fetchTable('Users');
         $user = $table->get($id);
         if ($this->request->is('post')) {
-            $table->patchEntity($user, ['password' => $this->request->getData('password')], ['fields' => ['password']]);
-            if ($table->save($user)) {
-                $this->Flash->success('Senha redefinida. As sessões anteriores serão encerradas.');
+            if ($table->setTemporaryPassword($user, $this->request->getData('password'))) {
+                $this->Flash->success($user->role === 'TV'
+                    ? 'Senha da TV redefinida. Entre novamente na TV; não haverá troca obrigatória.'
+                    : 'Senha temporária definida. O usuário deverá entrar novamente e criar sua própria senha.');
 
                 return $this->redirect('/usuarios');
             }

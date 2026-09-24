@@ -10,7 +10,7 @@ $area = static fn ($code) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NA
 $status = static function (array $row): string {
     if ($row['TJ_SITUACA'] === 'L' && $row['TJ_TERMINO'] === 'N') return 'Aberta';
     if ($row['TJ_SITUACA'] === 'L' && $row['TJ_TERMINO'] === 'S') return 'Fechada';
-    return ['C' => 'Cancelada', 'P' => 'Pendente'][$row['TJ_SITUACA']] ?? ($row['TJ_SITUACA'] . '/' . $row['TJ_TERMINO']);
+    return ['C' => 'Cancelada', 'P' => 'Pendente'][$row['TJ_SITUACA']] ?? '—';
 };
 ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">HISTÓRICO DO EQUIPAMENTO</p>
@@ -45,14 +45,14 @@ Canceladas: <?= h($s['canceled_count']) ?> · Pendentes: <?= h($s['pending_count
 <section class="pcm-dashboard-section"><h2 class="mb-4">Reincidência de corretivas</h2><div class="row g-3">
 <?php foreach ([30, 90, 365] as $days): ?><div class="col-md-4"><article class="pcm-kpi-card flex-column gap-3 p-4"><p class="pcm-kpi-label">Últimos <?= h($days) ?> dias</p><strong class="pcm-kpi-value"><?= h($s['recurrence' . $days]) ?></strong></article></div><?php endforeach; ?>
 </div><p class="text-body-secondary mt-3">Tipo COR pela data de origem (TJ_DTORIGI), incluindo hoje e os dias anteriores da janela, no fuso do PCM. Datas inválidas, ausentes e futuras não entram nas janelas.</p></section>
-<section class="pcm-dashboard-section"><h2 class="mb-4">Histórico de O.S.</h2><div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Histórico do equipamento — rolagem horizontal" tabindex="0">
+<section class="pcm-dashboard-section pcm-equipment-history"><h2 class="mb-4">Histórico de O.S.</h2><div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Histórico do equipamento — rolagem horizontal" tabindex="0">
 <table class="table pcm-orders-table align-middle"><thead><tr><?php foreach (['O.S.', 'Data de referência', 'Tipo', 'Serviço', 'Descrição da O.S.', 'Situação', 'Centro de custo', 'Área/setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($equipment['orders'] as $row): ?><tr>
 <td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
 <td><?= h($date($row['reference_date'])) ?></td><td><?= h(['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? $row['TJ_TIPO']) ?></td>
 <td><?= h($row['TJ_SERVICO']) ?><br><?= h($row['service_name'] ?? '—') ?></td>
 <td class="text-wrap" style="min-width: 20rem; white-space: pre-wrap"><?= h($row['descricao'] ?? '—') ?></td>
-<td><?= h($status($row)) ?> <small><?= h($row['TJ_SITUACA'] . '/' . $row['TJ_TERMINO']) ?></small></td>
+<td><?= h($status($row)) ?></td>
 <td><?= h($row['TJ_CCUSTO'] ?: '—') ?></td><td><?= h($area($row['TJ_CODAREA'])) ?></td></tr><?php endforeach; ?>
 <?php if (!$equipment['orders']): ?><tr><td colspan="8">Nenhuma O.S. encontrada para os filtros aplicados.</td></tr><?php endif; ?>
 </tbody></table></div><footer class="pcm-pagination"><span>Página <?= h($equipment['page']) ?></span>

@@ -52,6 +52,7 @@ return function (RouteBuilder $routes): void {
     $routes->scope('/', function (RouteBuilder $builder): void {
         $builder->connect('/login', ['controller' => 'Auth', 'action' => 'login']);
         $builder->post('/logout', ['controller' => 'Auth', 'action' => 'logout']);
+        $builder->connect('/meu-perfil', ['controller' => 'Profile', 'action' => 'index']);
         $builder->connect('/usuarios', ['controller' => 'Users', 'action' => 'index']);
         $builder->connect('/usuarios/novo', ['controller' => 'Users', 'action' => 'add']);
         $builder->connect('/usuarios/{id}/revogar-tv', ['controller' => 'Users', 'action' => 'revokeTv'], ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_method' => 'POST']);

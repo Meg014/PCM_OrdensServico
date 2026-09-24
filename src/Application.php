@@ -103,6 +103,7 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]))
+            ->add(new \App\Middleware\NormalizeLoginEmailMiddleware())
             ->add(new \App\Middleware\TvDeviceMiddleware())
             ->add(new AuthenticationMiddleware($this));
 

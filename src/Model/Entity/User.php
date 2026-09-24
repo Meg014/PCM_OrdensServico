@@ -24,6 +24,6 @@ class User extends Entity
     /** Normalizes stored email addresses. */
     protected function _setEmail(string $email): string
     {
-        return mb_strtolower(trim($email));
+        return \App\Service\UserEmailAudit::normalize($email);
     }
 }

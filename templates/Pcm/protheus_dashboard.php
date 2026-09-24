@@ -13,6 +13,16 @@ $isTv = isset($currentUser) && $currentUser->role === 'TV';
 <?php if ($presentation && !$isTv): ?>
 <?= $this->Html->link('Sair da apresentação', ['_name' => 'pcm'], ['class' => 'btn btn-sm btn-outline-secondary']) ?>
 <?php endif; ?>
+<?php if ($presentation && $isTv): ?>
+<?= $this->Form->postLink(
+    'Sair',
+    '/logout',
+    [
+        'class' => 'btn btn-sm btn-outline-secondary',
+        'confirm' => 'Deseja sair da conta da TV?'
+    ]
+) ?>
+<?php endif; ?>
 <?php if (!$presentation && !$isTv): ?><div class="d-flex gap-2">
 <?= $this->Html->link($presentation ? 'Sair da apresentação' : 'Modo Apresentação', ['_name' => $presentation ? 'pcm' : 'pcm-presentation', '?' => $payload['filters']], ['class' => 'btn btn-outline-primary']) ?>
 

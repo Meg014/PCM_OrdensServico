@@ -16,8 +16,8 @@ SQL;
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date,
     CAST(:type AS VARCHAR(100)) AS maintenance_type, CAST(:status AS VARCHAR(10)) AS status) f
 SQL;
-    public const FILTER = "(f.start_date = '' OR " . ProtheusQueries::REFERENCE_DATE . " >= CONVERT(date, NULLIF(f.start_date, ''), 23))"
-        . " AND (f.end_date = '' OR " . ProtheusQueries::REFERENCE_DATE . " <= CONVERT(date, NULLIF(f.end_date, ''), 23))"
+    public const FILTER = "(f.start_date = '' OR " . ProtheusQueries::ORIGIN_DATE . " >= CONVERT(date, NULLIF(f.start_date, ''), 23))"
+        . " AND (f.end_date = '' OR " . ProtheusQueries::ORIGIN_DATE . " <= CONVERT(date, NULLIF(f.end_date, ''), 23))"
         . " AND (f.maintenance_type = '' OR j.TJ_TIPO = f.maintenance_type)"
         . " AND (f.status = '' OR (f.status = 'open' AND " . ProtheusOperationalEligibility::OPEN . ')'
         . " OR (f.status = 'closed' AND " . ProtheusOperationalEligibility::CLOSED . '))';

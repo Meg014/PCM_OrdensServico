@@ -25,6 +25,7 @@ final class OrderProtheusServiceTest extends TestCase
         self::assertSame('MOTOR ROSCA RO-02 - SILO 01', $detail['maintenance']['equipment_name']);
         self::assertSame('PREVENTIVA ELETRICA', $detail['maintenance']['service_name']);
         self::assertSame('2026-08-18', $detail['maintenance']['actual_end_date']);
+        self::assertSame('2026-09-23', $detail['origin_date']);
         self::assertCount(2, $detail['labor']);
         self::assertSame('DAMIAO GONCALVES', $detail['labor'][0]['professional']);
         self::assertSame('008382', $detail['labor'][0]['code']);
@@ -129,6 +130,7 @@ final class OrderProtheusServiceTest extends TestCase
         return [
             'numero' => '004368', 'dados_principais' => $this->identity() + [
                 'TJ_SERVICO' => 'ELEPRE', 'TJ_TIPO' => 'COR', 'TJ_DTMRFIM' => '20260818',
+                'TJ_DTORIGI' => '20260923',
                 'TJ_USUAINI' => 'secret', 'TJ_OBSERVA' => 'binary',
             ],
             'descricao' => 'TROCA DOS ROLAMENTOS DO MOTOR',

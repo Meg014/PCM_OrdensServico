@@ -13,9 +13,9 @@ final class EquipmentHistoryService
     {
     }
 
-    public function load(array $query, bool $export = false): array
+    public function load(array $query, bool $export = false, ?int $exportPage = null): array
     {
-        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
+        if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $values = [];
         foreach (['bem', 'filial', 'date_start', 'date_end', 'type', 'status'] as $key) {
             $value = $query[$key] ?? '';
@@ -37,10 +37,10 @@ final class EquipmentHistoryService
         if ($values['date_start'] !== '' && $values['date_end'] !== '' && $values['date_start'] > $values['date_end']) {
             throw new InvalidArgumentException('Período inválido.');
         }
-        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
-        if ($page === false || $limit === false) throw new InvalidArgumentException('Paginação inválida.');
-        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
+        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1,
+            'max_range' => $export ? \App\Service\StreamingXlsxReport::BATCH_SIZE : 100]]);
+        if ($page === false || $limit === false || $page > intdiv(PHP_INT_MAX, (int)$limit)) throw new InvalidArgumentException('Paginação inválida.');
         $result = ['available' => false, 'not_found' => false, 'filters' => $values, 'page' => $page, 'limit' => $limit];
         $formatter = new PcmTimeFormatter();
         $today = new DateTimeImmutable($formatter->format(new DateTimeImmutable(), 'Y-m-d'));

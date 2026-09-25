@@ -147,7 +147,7 @@ SQL;
     public static function equipmentPortfolioPage(): string
     {
         return self::orderPage(ProtheusEquipmentQueries::SCOPE . ' AND ' . ProtheusEquipmentQueries::FILTER,
-            false, false, true, ProtheusEquipmentQueries::FILTER_JOIN);
+            false, false, true, ProtheusEquipmentQueries::FILTER_JOIN, self::ORIGIN_DATE);
     }
 
     /** Eight closed variants: exact order, branch and equipment filters. */
@@ -166,33 +166,82 @@ SQL;
 
         $join = '';
         if ($filters) {
-            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
-            $date = self::REFERENCE_DATE;
+            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:area AS VARCHAR(100)) AS area, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
+            $date = self::ORIGIN_DATE;
             $where .= " AND (f.centro = '' OR j.TJ_CCUSTO = f.centro)"
+                . " AND (f.area = '' OR j.TJ_CODAREA = f.area)"
                 . " AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))"
                 . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))";
         }
 
-        return self::orderPage($where, false, false, false, $join);
+        // The general export displays the same OS observation used by the detail page.
+        return self::orderPage($where, false, false, true, $join, self::ORIGIN_DATE, 'origin_date');
+    }
+
+    /** General, filtered, bounded page with one row per STL010 entry. */
+    public static function generalEntries(): string
+    {
+        $date = self::ORIGIN_DATE;
+        return <<<SQL
+WITH filtered AS (
+    SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
+        j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
+        CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao, {$date} AS reference_date,
+        CASE WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
+        COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
+    FROM dbo.STJ010 j
+    CROSS JOIN (SELECT CAST(:numero AS VARCHAR(100)) numero, CAST(:filial AS VARCHAR(100)) filial,
+        CAST(:bem AS VARCHAR(100)) bem, CAST(:centro AS VARCHAR(100)) centro,
+        CAST(:area AS VARCHAR(100)) area, CAST(:date_start AS VARCHAR(10)) date_start,
+        CAST(:date_end AS VARCHAR(10)) date_end) f
+    WHERE j.D_E_L_E_T_ <> '*' AND (f.numero = '' OR j.TJ_ORDEM = f.numero)
+      AND (f.filial = '' OR j.TJ_FILIAL = f.filial) AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
+      AND (f.centro = '' OR j.TJ_CCUSTO = f.centro) AND (f.area = '' OR j.TJ_CODAREA = f.area)
+      AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))
+      AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))
+), named AS (
+    SELECT j.*, CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END equipment_name,
+        CASE WHEN bl.matches > 0 THEN bl.matches ELSE bs.matches END equipment_matches,
+        CASE WHEN sl.matches > 0 THEN sl.name ELSE ss.name END service_name,
+        CASE WHEN sl.matches > 0 THEN sl.matches ELSE ss.matches END service_matches
+    FROM filtered j
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL=j.TJ_FILIAL AND b.D_E_L_E_T_<>'*') bl
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL='' AND b.D_E_L_E_T_<>'*') bs
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s WHERE s.T4_SERVICO=j.TJ_SERVICO AND s.T4_FILIAL=j.TJ_FILIAL AND s.D_E_L_E_T_<>'*') sl
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s WHERE s.T4_SERVICO=j.TJ_SERVICO AND s.T4_FILIAL='' AND s.D_E_L_E_T_<>'*') ss
+)
+SELECT n.*, l.TL_TIPOREG, l.TL_CODIGO, l.TL_DTINICI, l.TL_DTFIM, l.TL_HOINICI, l.TL_HOFIM,
+    l.TL_QUANTID, l.TL_UNIDADE, CASE WHEN l.TL_TIPOREG='M' THEN professional.name END professional_name,
+    CASE WHEN l.TL_TIPOREG='P' THEN product.name END product_name,
+    professional.matches professional_matches, product.matches product_matches
+FROM named n
+INNER JOIN dbo.STL010 l ON l.TL_ORDEM=n.TJ_ORDEM AND l.TL_FILIAL=n.TJ_FILIAL AND l.D_E_L_E_T_<>'*'
+OUTER APPLY (SELECT COUNT(*) matches, MAX(p.T1_NOME) name FROM dbo.ST1010 p WHERE l.TL_TIPOREG='M' AND p.T1_CODFUNC=l.TL_CODIGO AND p.T1_FILIAL=n.TJ_FILIAL AND p.D_E_L_E_T_<>'*') professional
+OUTER APPLY (SELECT COUNT(*) matches, MAX(p.B1_DESC) name FROM dbo.SB1010 p WHERE l.TL_TIPOREG='P' AND p.B1_COD=l.TL_CODIGO AND p.B1_FILIAL=n.TJ_FILIAL AND p.D_E_L_E_T_<>'*') product
+ORDER BY n.record_id DESC, l.R_E_C_N_O_ ASC
+OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
+OPTION (RECOMPILE)
+SQL;
     }
 
     public const REFERENCE_DATE = "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))";
+    public const ORIGIN_DATE = "TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)";
 
-    private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true, string $join = ''): string
+    private static function orderPage(string $where, bool $startUser, bool $endUser, bool $description = true, string $join = '', ?string $dateExpression = null, string $dateAlias = 'reference_date'): string
     {
         $start = $startUser ? 'j.TJ_USUAINI' : 'CAST(NULL AS VARCHAR(25))';
         $end = $endUser ? 'j.TJ_USUAFIM' : 'CAST(NULL AS VARCHAR(25))';
         $descriptionColumn = $description ? 'CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,' : '';
-        $referenceDate = self::REFERENCE_DATE;
+        $referenceDate = $dateExpression ?? self::REFERENCE_DATE;
 
         return <<<SQL
 WITH page_keys AS (
-    SELECT j.R_E_C_N_O_, {$referenceDate} AS reference_date,
+    SELECT j.R_E_C_N_O_, {$referenceDate} AS {$dateAlias},
            COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     {$join}
     WHERE {$where}
-    ORDER BY reference_date DESC, j.R_E_C_N_O_ DESC
+    ORDER BY {$dateAlias} DESC, j.R_E_C_N_O_ DESC
     OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 )
 SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM,
@@ -208,7 +257,7 @@ SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.T
        j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
        j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
        {$start} AS TJ_USUAINI, {$end} AS TJ_USUAFIM,
-       CONVERT(VARCHAR(10), p.reference_date, 23) AS reference_date
+       CONVERT(VARCHAR(10), p.{$dateAlias}, 23) AS {$dateAlias}
 FROM page_keys p
 INNER JOIN dbo.STJ010 j ON j.R_E_C_N_O_ = p.R_E_C_N_O_ AND j.D_E_L_E_T_ <> '*'
 OUTER APPLY (
@@ -235,12 +284,18 @@ OUTER APPLY (
     WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.D_E_L_E_T_ <> '*'
       AND s.T4_FILIAL = ''
 ) s_shared
-ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC
+ORDER BY p.{$dateAlias} DESC, p.R_E_C_N_O_ DESC
 SQL;
     }
 
     public const ORDER = <<<'SQL'
-SELECT TOP (2) j.*, CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS pcm_descricao
+SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.TJ_CCUSTO,
+    j.TJ_DTORIGI,
+    j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
+    j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
+    j.TJ_DTPPINI, j.TJ_HOPPINI, j.TJ_DTPPFIM, j.TJ_HOPPFIM,
+    j.TJ_DTPRINI, j.TJ_HOPRINI, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
+    CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS pcm_descricao
 FROM dbo.STJ010 j
 WHERE RTRIM(j.TJ_ORDEM) = :numero AND j.D_E_L_E_T_ <> '*'
 SQL;
@@ -317,9 +372,11 @@ SQL;
             return true;
         }
         if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()
-            || $sql === ProtheusSectorQueries::page(true) || $sql === ProtheusSectorQueries::backlog()) {
+            || $sql === ProtheusSectorQueries::page(true) || $sql === ProtheusSectorQueries::backlog()
+            || $sql === ProtheusSectorQueries::entriesPage() || $sql === ProtheusSectorQueries::entriesPage(true)) {
             return true;
         }
+        if ($sql === self::generalEntries()) return true;
         foreach ([false, true] as $number) {
             foreach ([false, true] as $branch) {
                 foreach ([false, true] as $equipment) {

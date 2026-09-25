@@ -5,14 +5,16 @@
 | Tela | Botão | Rota |
 | --- | --- | --- |
 | Visão setorial Protheus | Exportar Excel | `/pcm/setor/{code}/excel` |
+| Visão setorial Protheus | Exportar apontamentos | `/pcm/setor/{code}/apontamentos/excel` |
 | Ordens de Serviço | Exportar Excel | `/pcm/ordens/excel` |
+| Ordens de Serviço | Exportar apontamentos | `/pcm/ordens/apontamentos/excel` |
 | Histórico do equipamento | Exportar histórico para Excel | `/pcm/equipamento/excel` |
 
 Os links preservam os filtros **aplicados** à tela, inclusive seleções de gráficos, indicadores e backlog. Alterações ainda não submetidas no formulário precisam ser aplicadas antes da exportação. As telas legadas não têm rotas públicas habilitadas e não receberam exportação.
 
 ## Arquitetura e filtros
 
-`PcmController` chama os mesmos métodos `load()` usados pelas telas, com uma opção interna de exportação. Ela redefine página para 1 e limite para 5.000; não é habilitada por parâmetros de requisição nas telas normais. O repositório executa as mesmas consultas registradas, com os mesmos filtros, vínculos, ordenação e validações de ambiguidade. Somente os parâmetros de paginação mudam para `offset=0`, `fetch=5001`.
+`PcmController` chama os mesmos serviços e filtros usados pelas telas. A exportação percorre o resultado em páginas SQL de 1.000 registros e grava o XML do XLSX incrementalmente em arquivos temporários. O repositório executa as mesmas consultas registradas, com os mesmos filtros, vínculos, ordenação e validações de ambiguidade. A paginação enviada pela interface não controla nem limita a exportação.
 
 - Setor: filial, status, equipamento, serviço, nome exato do serviço, centro de custo, tipo de manutenção, busca textual, datas de início planejado, indicador, status do indicador e faixa de backlog. O setor vem do caminho da rota; `area` na query string não o substitui.
 - Ordens: número exato da OS, filial, equipamento, centro de custo e período de referência.
@@ -20,7 +22,7 @@ Os links preservam os filtros **aplicados** à tela, inclusive seleções de gr�
 
 As diferenças de significado dos períodos e de elegibilidade entre as telas permanecem. Não foram criadas regras paralelas de seleção, status, backlog ou indicadores. Os agregados setoriais continuam sendo consultados e validados, inclusive para preservar a classificação de safra/entressafra.
 
-O registro extra detecta excesso. Até 5.000 OS, todas são exportadas numa única consulta de detalhes, sem percorrer páginas nem consultar recursos de cada OS. Acima disso, HTTP 422 solicita refinar os filtros, sem entregar arquivo parcial.
+Todos os lotes são processados até `has_more=false`; não existe limite total funcional de OS. Uma falha em qualquer lote descarta os temporários e não publica um arquivo parcial.
 
 ## Conteúdo
 
@@ -28,9 +30,21 @@ O arquivo contém título, setor/área, momento de geração e total de OS. Os f
 
 Colunas comuns: número da OS, filial, código/nome do equipamento, código/nome do serviço, tipo de manutenção, área/setor e centro de custo.
 
+A descrição real da OS (`STJ010.TJ_OBSERVA`) é exportada separadamente do nome do serviço. Ela é selecionada nas consultas em lote das três visões e não provoca consultas individuais por OS.
+
 - Setor: status operacional já calculado pela consulta, data/hora de início previsto da manutenção e data/hora de início real geral. A consulta setorial não fornece datas de fim; elas não são inventadas.
 - Ordens e equipamento: situação e indicador de término nos códigos originais TOTVS, identificados como códigos nos cabeçalhos; data de referência; data de origem; datas e horas de início/fim previstos e reais, tanto gerais quanto da manutenção.
 - Equipamento: também descrição da OS.
+
+## Relatório de apontamentos
+
+O relatório setorial de apontamentos contém somente OS que possuem registros não excluídos logicamente em `STL010`. Sua unidade é o apontamento: os dados da OS se repetem quando ela possui vários registros. O cabeçalho informa total de apontamentos e quantidade de OS distintas.
+
+Colunas: número e filial da OS; código/nome do equipamento; descrição da OS; código/nome do serviço; área, centro de custo, tipo de manutenção e status; tipo e código do apontamento; código/nome do responsável; código/nome do material; datas inicial/final; horas inicial/final; quantidade e unidade. `M` é apresentado como `Mão de obra`, `P` como `Material`, e outros códigos são preservados sem inferência.
+
+Uma única consulta parametrizada e allowlisted combina o mesmo escopo/filtros setoriais com `STL010`, `ST1010` e `SB1010`. Não há consulta por OS, profissional, material ou apontamento. O filtro sazonal pode exigir uma leitura agregada adicional já usada para a classificação atual; a quantidade de consultas continua fixa. A exportação também aceita `entry_type` (`M` ou `P`) e `professional` (código exato) como filtros opcionais validados.
+
+Não existe limite total funcional de apontamentos. Cada consulta busca até 1.001 registros, escreve 1.000 e usa o registro adicional apenas para determinar a continuidade. O nome setorial segue `APONTAMENTOS_OS_{SETOR}_AAAA-MM-DD_HHMMSS.xlsx`; a exportação geral usa `APONTAMENTOS_OS_GERAL_AAAA-MM-DD_HHMMSS.xlsx`.
 
 O indicador de término não é apresentado como data. Campos ausentes ou datas/horas inválidas ficam vazios. Datas sem hora representam a data operacional recebida, sem deslocamento de fuso. Datas são células numéricas formatadas como `DD/MM/AAAA`; horas, `HH:mm`; geração, `DD/MM/AAAA HH:mm`. Códigos são sempre texto, preservando zeros à esquerda.
 
@@ -52,9 +66,13 @@ Após gerar o arquivo, registra no log existente evento `order_excel_generated`,
 
 ## Recursos e limites
 
-PhpSpreadsheet mantém as células em memória. A exportação limita a consulta a 5.001 linhas e escreve o arquivo em `tmpfile()`, transmitido como stream e removido ao liberar o recurso. Não cria cópias integrais do XLSX em strings nem usa autosize. A formatação numérica é aplicada por coluna.
+Os workbooks unitários continuam usando PhpSpreadsheet, mas as rotas de exportação usam `StreamingXlsxReport`: os dados são consultados em lotes de 1.000, o XML é escrito em disco e o ZIP final é transmitido por stream. O consumo de memória fica relacionado ao lote corrente, não ao total exportado. Não cria cópias integrais do XLSX em strings nem usa autosize.
 
-Antes de criar a planilha, uma estimativa conservadora considera células, volume textual, memória já usada e 32 MiB de reserva. Se exceder `memory_limit`, HTTP 422 pede filtros mais restritos. O limite de memória do servidor não é aumentado. Essa estimativa reduz risco, mas não garante capacidade sob concorrência; validar a carga e os tempos no ambiente de homologação é necessário. Textos acima de 32.767 caracteres por célula são recusados explicitamente, sem truncamento silencioso.
+Os lotes reutilizam o `OFFSET/FETCH` já consolidado nas consultas e uma ordenação determinística que termina em `STJ010.R_E_C_N_O_`; nos apontamentos, `STL010.R_E_C_N_O_` completa a ordenação. Essa escolha evita introduzir SQL paralelo às regras atuais. Como a fonte Protheus é consultada ao vivo e a conexão somente leitura não abre uma transação snapshot longa, alterações concorrentes de ordenação durante a exportação continuam sendo uma limitação técnica da fonte; não há como prometer um snapshot temporal sem suporte/configuração transacional no SQL Server.
+
+Textos acima de 32.767 caracteres por célula são recusados explicitamente, sem truncamento silencioso. O limite de memória do servidor não é aumentado.
+
+Permanece apenas o limite técnico do formato XLSX de 1.048.576 linhas por planilha (incluindo cabeçalhos). Se o resultado ultrapassá-lo, nenhum arquivo parcial é entregue; para esse patamar será necessária uma exportação CSV dedicada ou divisão explícita em múltiplas planilhas/arquivos.
 
 Os orçamentos e timeouts SQL existentes permanecem. Exportações maiores podem ser recusadas por timeout; não se contornam as permissões externas em tratamento pela TI.
 
@@ -76,7 +94,9 @@ Resultados finais: su?te `tests/TestCase/Service/Protheus` com **51 testes e 1.1
 
 Na primeira execu??o foram encontrados dois problemas anteriores nos testes: expectativa SQL sem o alias `j.` da consulta atual e configura??o repetida do cache `_cake_translations_`. A expectativa foi atualizada e a configura??o dos testes tornou-se condicional, sem mudan?as no SQL. A su?te conjunta passou ap?s essas corre??es. N?o foi executada a su?te que reconstr?i banco por migrations.
 
-Ensaio sint?tico local da implementa??o final: 5.000 linhas, 30 colunas do hist?rico, datas/horas preenchidas e descri??o de 1.200 caracteres por linha; **26,37 segundos**, **146 MiB de pico de mem?ria**, arquivo de aproximadamente **424 KiB**. A medi??o inclui a gera??o/grava??o, sem consulta SQL, com dados repetidos (boa compress?o). N?o representa consumo sob concorr?ncia ou textos reais distintos. A estimativa preventiva ? mais conservadora que esse ensaio.
+Ensaio sintético do escritor incremental após validação OOXML: 50.000 linhas e 25 colunas textuais com caracteres especiais em 50 lotes; **12,91 segundos**, **14 MiB de pico de memória** e XLSX de aproximadamente **4,69 MiB**. A medição inclui geração e compactação local, sem consulta SQL, concorrência ou latência de rede.
+
+O writer segue a ordem canônica da worksheet (`sheetPr`, `dimension`, `sheetViews`, `sheetFormatPr`, `cols`, `sheetData`, `autoFilter`, `mergeCells`). Textos são normalizados para UTF-8, têm somente caracteres proibidos pelo XML 1.0 removidos e são escapados dentro de `c/is/t` com `t="inlineStr"`. Testes extraem o ZIP, validam partes e relationships, verificam a estrutura da worksheet e reabrem o XLSX com PhpSpreadsheet.
 
 Cobertura adicionada: equivalência de filtros isolados/combinados entre tela e exportação, busca, backlog/indicadores, mais de uma página, limite, histórico, escopo parametrizado, tentativa de substituir setor via query string, login/perfis, indisponibilidade, zeros, geração/fuso, vazio, conteúdo XLSX reaberto, fórmulas, nome seguro, exclusão de campos técnicos, memória e textos excessivos.
 

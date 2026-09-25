@@ -51,6 +51,7 @@ final class OrderDetailPresenter
                     Availability::NotFound => 'Dados complementares não encontrados.',
                     Availability::Available => null,
                 },
+                'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? $supplement->description : null,
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
                     'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center',

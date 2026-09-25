@@ -32,6 +32,8 @@ final class EquipmentHistoryTest extends TestCase
         self::assertSame('integer', $calls[2][2]['fetch']);
         self::assertStringContainsString('j.R_E_C_N_O_ DESC', $calls[2][0]);
         self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $calls[2][0]);
+        self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)", $calls[2][0]);
+        self::assertStringNotContainsString('COALESCE(', $calls[2][0]);
         foreach ($calls as [$sql]) {
             self::assertStringNotContainsString('STL010', $sql);
             self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
@@ -114,20 +116,25 @@ final class EquipmentHistoryTest extends TestCase
         $html = $view->render('equipment', false);
         self::assertStringContainsString('18/08/2026', $html);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
-        self::assertStringNotContainsString('<script>unsafe</script>', $html);
-        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringNotContainsString('unsafe', $html);
         self::assertStringContainsString('Corretiva', $html);
         self::assertStringContainsString('PREVENTIVA ELETRICA', $html);
+        self::assertStringContainsString('Data de referência', $html);
+        self::assertStringNotContainsString('<th>Data de origem</th>', $html);
+        self::assertStringNotContainsString('Descrição da O.S.', $html);
         self::assertStringContainsString('pcm-sector-table-scroll', $html);
         self::assertStringContainsString('pcm-equipment-history', $html);
         self::assertStringContainsString('Múltiplos — consulte a tabela', $html);
-        self::assertStringContainsString('Elétrica', $html);
-        self::assertStringContainsString('Mecânica', $html);
+        self::assertStringContainsString('Período pela Data de origem da OS.', $html);
+        preg_match('/<thead>(.*?)<\/thead>/s', $html, $head);
+        self::assertSame(7, substr_count($head[1], '<th>'));
+        foreach (['O.S.', 'Data de referência', 'Tipo', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label) {
+            self::assertStringContainsString('<th>' . $label . '</th>', $head[1]);
+        }
         preg_match('/<tbody>(.*?)<\/tbody>/s', $html, $body);
         foreach (['Aberta', 'Fechada', 'Cancelada', 'Pendente'] as $label) {
             self::assertStringContainsString('<td>' . $label . '</td>', $body[1]);
         }
-        foreach (['L/N', 'L/S', 'C/N', 'P/N'] as $code) self::assertStringNotContainsString($code, $body[1]);
     }
 
     public function testExportHistoryKeepsEquipmentBranchAndAllFilters(): void
@@ -141,7 +148,7 @@ final class EquipmentHistoryTest extends TestCase
         $params = $calls[count($calls) - 1][1];
         foreach ($filters as $key => $value) self::assertSame($value, $params[$key]);
         self::assertSame(0, $params['offset']);
-        self::assertSame(5001, $params['fetch']);
+        self::assertSame(1001, $params['fetch']);
     }
 
     private function repository(array &$calls, bool $fail = false): ProtheusRepository

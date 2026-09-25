@@ -9,6 +9,7 @@ final class ProtheusSectorQueries
 WITH scoped AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
         j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
+        CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
         TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_date,
         CASE WHEN LEN(RTRIM(j.TJ_DTORIGI)) = 8 AND RTRIM(j.TJ_DTORIGI) NOT LIKE '%[^0-9]%'
             THEN TRY_CONVERT(date, j.TJ_DTORIGI, 112) END AS origin_date,
@@ -138,7 +139,7 @@ SQL;
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
         return ($backlog ? self::backlogBase() : self::BASE) . <<<SQL
 
-SELECT record_id, TJ_FILIAL, TJ_ORDEM, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
+SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
     identity_count, equipment_matches, service_matches {$ageColumns}
@@ -158,6 +159,54 @@ WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, '
     ))
 {$ageFilter}
 ORDER BY planned_date DESC, record_id DESC
+OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
+OPTION (RECOMPILE)
+SQL;
+    }
+
+    /** One bounded row per STL010 entry, with order/master data resolved in the same read. */
+    public static function entriesPage(bool $backlog = false): string
+    {
+        $source = $backlog ? 'bucketed' : 'filtered';
+        $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+        return ($backlog ? self::backlogBase() : self::BASE) . <<<SQL
+
+SELECT filtered.record_id, filtered.TJ_FILIAL, filtered.TJ_ORDEM, filtered.descricao,
+    filtered.TJ_CODBEM, filtered.equipment_name, filtered.TJ_SERVICO, filtered.service_name,
+    filtered.TJ_CODAREA, filtered.TJ_CCUSTO, filtered.TJ_TIPO, filtered.status,
+    l.TL_TIPOREG, l.TL_CODIGO, l.TL_DTINICI, l.TL_DTFIM, l.TL_HOINICI, l.TL_HOFIM,
+    l.TL_QUANTID, l.TL_UNIDADE,
+    CASE WHEN l.TL_TIPOREG = 'M' THEN professional.name END AS professional_name,
+    CASE WHEN l.TL_TIPOREG = 'P' THEN product.name END AS product_name,
+    professional.matches AS professional_matches, product.matches AS product_matches,
+    filtered.identity_count, filtered.equipment_matches, filtered.service_matches
+FROM {$source} filtered
+INNER JOIN dbo.STL010 l ON l.TL_ORDEM = filtered.TJ_ORDEM
+    AND l.TL_FILIAL = filtered.TJ_FILIAL AND l.D_E_L_E_T_ <> '*'
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(p.T1_NOME) AS name FROM dbo.ST1010 p
+    WHERE l.TL_TIPOREG = 'M' AND p.T1_CODFUNC = l.TL_CODIGO
+      AND p.T1_FILIAL = filtered.TJ_FILIAL AND p.D_E_L_E_T_ <> '*') professional
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(p.B1_DESC) AS name FROM dbo.SB1010 p
+    WHERE l.TL_TIPOREG = 'P' AND p.B1_COD = l.TL_CODIGO
+      AND p.B1_FILIAL = filtered.TJ_FILIAL AND p.D_E_L_E_T_ <> '*') product
+CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date,
+    CAST(:date_end AS VARCHAR(10)) AS end_date) d
+CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type AS VARCHAR(100)) AS type,
+    CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,
+    CAST(:card_season AS VARCHAR(20)) AS season, CAST(:entry_type AS VARCHAR(10)) AS entry_type,
+    CAST(:professional AS VARCHAR(100)) AS professional) choice
+WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
+    AND (d.end_date = '' OR planned_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
+    AND (choice.status = '' OR filtered.status = choice.status)
+    AND (choice.type = '' OR filtered.TJ_TIPO = choice.type)
+    AND (choice.service1 = '' OR filtered.TJ_SERVICO IN (choice.service1, choice.service2))
+    AND (choice.season = '' OR EXISTS (
+        SELECT 1 FROM OPENJSON(:season_services) WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
+        WHERE allowed.code = filtered.TJ_SERVICO AND allowed.name = filtered.service_name))
+    AND (choice.entry_type = '' OR l.TL_TIPOREG = choice.entry_type)
+    AND (choice.professional = '' OR (l.TL_TIPOREG = 'M' AND l.TL_CODIGO = choice.professional))
+{$ageFilter}
+ORDER BY planned_date DESC, filtered.record_id DESC, l.R_E_C_N_O_ ASC
 OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY
 OPTION (RECOMPILE)
 SQL;

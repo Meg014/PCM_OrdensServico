@@ -41,7 +41,9 @@ final class OrderPresentationTest extends TestCase
     public function testOfflineMappingKeepsMultipleEntriesWithoutGuessingFieldsOrTypes(): void
     {
         $supplement = (new OrderSupplementMapper())->map([
-            'numero' => '004893', 'dados_principais' => ['TJ_FILIAL' => '01 '],
+            'numero' => '004893', 'dados_principais' => [
+                'TJ_FILIAL' => '01 ', 'TJ_DTORIGI' => '20260923',
+            ],
             'descricao' => 'LAVAR TODOS 3 FILTRO COM SODA', 'host' => 'internal',
             'mao_de_obra' => [
                 ['apontamento' => ['TL_TIPOREG' => 'M ', 'TL_CODIGO' => '008382 ']],
@@ -65,7 +67,19 @@ final class OrderPresentationTest extends TestCase
         self::assertSame(['002075', '000110'], array_column($result['protheus']['materials'], 'code'));
         self::assertNull($result['protheus']['labor'][0]['hours']);
         self::assertNull($result['protheus']['materials'][0]['used_date']);
+        self::assertSame('2026-09-23', $result['protheus']['origin_date']);
         self::assertStringNotContainsString('internal', json_encode($result));
+    }
+
+    public function testOriginDateInvalidOrNullValuesAreUnavailable(): void
+    {
+        $mapper = new OrderSupplementMapper();
+        foreach ([null, '', '20260230', '2026-09-24 19:33:00'] as $invalid) {
+            $supplement = $mapper->map(['numero' => '1', 'dados_principais' => [
+                'TJ_FILIAL' => '01', 'TJ_DTORIGI' => $invalid,
+            ]]);
+            self::assertNull($supplement->originDate);
+        }
     }
 
     public function testNormalizedContractCanCarryValidatedNamesDatesAndDecimalQuantities(): void

@@ -14,8 +14,8 @@ final class OrderExcelReportTest extends TestCase
         $report = new OrderExcelReport();
         $orders = [];
         foreach (['=1+1', '+SUM(A1)', '-1+2', '@SUM(A1)'] as $text) {
-            $orders[] = ['TJ_ORDEM' => '000123', 'TJ_FILIAL' => '01', 'TJ_CODBEM' => '000045',
-                'TJ_SERVICO' => '001', 'equipment_name' => $text, 'planned_date' => '2026-09-25',
+            $orders[] = ['TJ_ORDEM' => '000123', 'descricao' => 'DESCRIÇÃO REAL DA OS', 'TJ_FILIAL' => '01', 'TJ_CODBEM' => '000045',
+                'TJ_SERVICO' => '001', 'service_name' => 'NOME DO SERVIÇO', 'equipment_name' => $text, 'planned_date' => '2026-09-25',
                 'TJ_HOMPINI' => '10:35', 'record_id' => 'SECRET_RECORD', 'token' => 'SECRET_TOKEN'];
         }
         $orders = array_merge($orders, array_fill(0, 479, $orders[0]));
@@ -30,14 +30,16 @@ final class OrderExcelReportTest extends TestCase
             self::assertSame('Filtros: Equipamento: +unsafe', $sheet->getCell('A5')->getValue());
             self::assertTrue($sheet->getStyle('A5')->getAlignment()->getWrapText());
             self::assertSame('A7', $sheet->getFreezePane());
-            self::assertSame('A6:N489', $sheet->getAutoFilter()->getRange());
-            foreach (['A7' => '000123', 'B7' => '01', 'C7' => '000045', 'E7' => '001',
-                'D7' => '=1+1', 'D8' => '+SUM(A1)', 'D9' => '-1+2', 'D10' => '@SUM(A1)', 'A5' => 'Filtros: Equipamento: +unsafe'] as $cell => $value) {
+            self::assertSame('A6:O489', $sheet->getAutoFilter()->getRange());
+            foreach (['A7' => '000123', 'C7' => '01', 'D7' => '000045', 'F7' => '001',
+                'E7' => '=1+1', 'E8' => '+SUM(A1)', 'E9' => '-1+2', 'E10' => '@SUM(A1)', 'A5' => 'Filtros: Equipamento: +unsafe'] as $cell => $value) {
                 self::assertSame($value, $sheet->getCell($cell)->getValue());
                 self::assertSame(DataType::TYPE_STRING, $sheet->getCell($cell)->getDataType());
             }
-            self::assertSame('25/09/2026', $sheet->getCell('K7')->getFormattedValue());
-            self::assertSame('10:35', $sheet->getCell('L7')->getFormattedValue());
+            self::assertSame('25/09/2026', $sheet->getCell('L7')->getFormattedValue());
+            self::assertSame('10:35', $sheet->getCell('M7')->getFormattedValue());
+            self::assertSame('DESCRIÇÃO REAL DA OS', $sheet->getCell('B7')->getValue());
+            self::assertSame('NOME DO SERVIÇO', $sheet->getCell('G7')->getValue());
             $contents = json_encode($sheet->toArray());
             foreach (['SECRET', 'record_id', 'token', 'R_E_C_N_O_'] as $secret) self::assertStringNotContainsString($secret, $contents);
             $loaded->disconnectWorksheets();

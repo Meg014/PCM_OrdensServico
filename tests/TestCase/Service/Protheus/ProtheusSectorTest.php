@@ -103,6 +103,8 @@ final class ProtheusSectorTest extends TestCase
         self::assertStringContainsString('card=corrective', $html);
         self::assertStringContainsString('card_status=FECHADA', $html);
         self::assertStringContainsString('pcm-sector-table-scroll', $html);
+        self::assertStringContainsString('Exportar apontamentos', $html);
+        self::assertStringContainsString('/pcm/setor/ELETRI/apontamentos/excel', $html);
         self::assertStringNotContainsString('<script>unsafe</script>', $html);
     }
 
@@ -233,7 +235,7 @@ final class ProtheusSectorTest extends TestCase
             self::assertTrue($export['available']);
             self::assertSame($screen['filters'], $export['filters']);
             self::assertSame(0, $exportCalls[2][1]['offset']);
-            self::assertSame(5001, $exportCalls[2][1]['fetch']);
+            self::assertSame(1001, $exportCalls[2][1]['fetch']);
             self::assertCount(2, $export['orders']);
             foreach ($screenCalls as $index => $call) {
                 self::assertSame($call[0], $exportCalls[$index][0]);

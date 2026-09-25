@@ -40,11 +40,17 @@ final class OrderListingTest extends TestCase
                     self::assertTrue(ProtheusQueries::allows($sql));
                     self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
                     self::assertStringNotContainsString('STL010', $sql);
-                    self::assertStringNotContainsString('TJ_OBSERVA', $sql);
+                    self::assertStringContainsString('TJ_OBSERVA', $sql);
+                    self::assertStringContainsString('AS descricao', $sql);
+                    self::assertStringNotContainsString('I_N_S_D_T_', $sql);
+                    self::assertStringNotContainsString('S_T_A_M_P_', $sql);
+                    self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)", $sql);
+                    self::assertStringNotContainsString('COALESCE(', $sql);
                     self::assertStringNotContainsString('j.*', $sql);
                     self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $sql);
-                    self::assertStringContainsString('ORDER BY p.reference_date DESC, p.R_E_C_N_O_ DESC', $sql);
-                    self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112)", $sql);
+                    self::assertStringContainsString('ORDER BY p.origin_date DESC, p.R_E_C_N_O_ DESC', $sql);
+                    self::assertStringContainsString('AS origin_date', $sql);
+                    self::assertStringNotContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112)", $sql);
                     self::assertSame(6, substr_count($sql, "D_E_L_E_T_ <> '*'"));
                 }
             }
@@ -91,7 +97,7 @@ final class OrderListingTest extends TestCase
         }
     }
 
-    public function testCostCenterAndInclusiveReferencePeriodAreBoundBeforePagination(): void
+    public function testCostCenterAndInclusiveOriginPeriodAreBoundBeforePagination(): void
     {
         $calls = [];
         $service = new OrderListingService($this->repository([], $calls));
@@ -107,7 +113,8 @@ final class OrderListingTest extends TestCase
         self::assertStringContainsString('j.TJ_CCUSTO = f.centro', $sql);
         self::assertStringContainsString(">= CONVERT(date, NULLIF(f.date_start, ''), 23)", $sql);
         self::assertStringContainsString("<= CONVERT(date, NULLIF(f.date_end, ''), 23)", $sql);
-        self::assertSame(3, substr_count($sql, "COALESCE(TRY_CONVERT(date, NULLIF(j.TJ_DTMRFIM, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTMRINI, ''), 112), TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112))"));
+        self::assertSame(3, substr_count($sql, "TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)"));
+        self::assertStringNotContainsString('COALESCE(', $sql);
         self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'f.date_end ='));
     }
 
@@ -115,21 +122,21 @@ final class OrderListingTest extends TestCase
     {
         $calls = [];
         $rows = array_fill(0, 483, ['TJ_ORDEM' => '0001', 'identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1]);
-        $filters = ['os' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'date_start' => '2026-01-01'];
+        $filters = ['os' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'area' => 'ELETRI', 'date_start' => '2026-01-01'];
         $result = (new OrderListingService($this->repository($rows, $calls)))->load($filters + ['page' => 8, 'limite' => 1], true);
         self::assertTrue($result['available']);
         self::assertCount(483, $result['orders']);
         self::assertCount(1, $calls);
         self::assertSame(0, $calls[0][1]['offset']);
-        self::assertSame(5001, $calls[0][1]['fetch']);
+        self::assertSame(1001, $calls[0][1]['fetch']);
         self::assertFalse($result['has_more']);
-        foreach (['numero' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'date_start' => '2026-01-01'] as $key => $value) {
+        foreach (['numero' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'area' => 'ELETRI', 'date_start' => '2026-01-01'] as $key => $value) {
             self::assertSame($value, $calls[0][1][$key]);
         }
         $calls = [];
-        $result = (new OrderListingService($this->repository(array_fill(0, 5001, $rows[0]), $calls)))->load([], true);
+        $result = (new OrderListingService($this->repository(array_fill(0, 1001, $rows[0]), $calls)))->load([], true);
         self::assertTrue($result['has_more']);
-        self::assertCount(5000, $result['orders']);
+        self::assertCount(1000, $result['orders']);
     }
 
     private function repository(array $rows, array &$calls, bool $fail = false): ProtheusRepository

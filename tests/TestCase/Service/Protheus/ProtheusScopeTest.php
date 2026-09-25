@@ -35,7 +35,7 @@ final class ProtheusScopeTest extends TestCase
         });
         $repo = new ProtheusRepository($connection, areaScope: 'ELETRI');
         self::assertSame([], $repo->findOrders('004368', '01')['orders']);
-        self::assertSame([], $repo->findOrders('004368', '01', limit: 5000, export: true)['orders']);
+        self::assertSame([], $repo->findOrders('004368', '01', limit: 1000, export: true)['orders']);
         self::assertNull($repo->findOrder('004368', '01'));
         self::assertNull($repo->findOrderIdentity('004368', '01'));
         self::assertSame([], $repo->findEquipmentHistory('MEL 80 115', '01')['orders']);
@@ -45,6 +45,10 @@ final class ProtheusScopeTest extends TestCase
 
     public function testScopedSqlRemainsClosedAndFiltersBeforePagination(): void
     {
+        self::assertStringContainsString('j.TJ_DTORIGI', Q::ORDER);
+        self::assertStringNotContainsString('I_N_S_D_T_', Q::ORDER);
+        self::assertStringNotContainsString('S_T_A_M_P_', Q::ORDER);
+        self::assertStringNotContainsString('j.*', Q::ORDER);
         $queries = [Q::ORDER, Q::ORDER_BRANCH, Q::ORDER_IDENTITY, Q::ENTRIES, Q::AREAS];
         foreach ([false, true] as $branch) {
             $queries[] = Q::equipmentHistory($branch);

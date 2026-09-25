@@ -13,11 +13,11 @@ final class OrderListingService
     {
     }
 
-    public function load(array $query, bool $export = false): array
+    public function load(array $query, bool $export = false, ?int $exportPage = null): array
     {
-        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
+        if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'centro', 'date_start', 'date_end'] as $key) {
+        foreach (['os', 'filial', 'bem', 'centro', 'area', 'date_start', 'date_end'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100) {
                 throw new InvalidArgumentException('Filtros inválidos.');
@@ -38,25 +38,35 @@ final class OrderListingService
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) {
             throw new InvalidArgumentException('Período inválido.');
         }
-        $page = filter_var($query['page'] ?? '1', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        $limit = filter_var($query['limite'] ?? '20', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
-        if ($page === false || $limit === false) {
+        $page = filter_var($query['page'] ?? '1', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $limit = filter_var($query['limite'] ?? '20', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1,
+            'max_range' => $export ? \App\Service\StreamingXlsxReport::BATCH_SIZE : 100]]);
+        if ($page === false || $limit === false || $page > intdiv(PHP_INT_MAX, (int)$limit)) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
-        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope);
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
                 $filters['filial'] === '' ? null : $filters['filial'],
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
-                $filters['centro'], $filters['date_start'], $filters['date_end'], $export,
+                $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
             );
 
             return $result + ['filters' => $filters, 'available' => true];
         } catch (Throwable) {
             return ['orders' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false,
                 'filters' => $filters, 'available' => false];
+        }
+    }
+
+    public function areas(): array
+    {
+        try {
+            return array_values(array_filter(array_map(static fn (array $row): string => trim((string)($row['code'] ?? '')),
+                ($this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope))->findAreas())));
+        } catch (Throwable) {
+            return [];
         }
     }
 }

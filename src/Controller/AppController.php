@@ -62,7 +62,7 @@ class AppController extends Controller
         if ($controller === 'ReportImports' || ($controller === 'Pcm' && !in_array($action, [
             'index', 'orders', 'presentation', 'presentationData', 'dashboardData',
             'sector', 'sectorData', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'equipment',
-            'exportSector', 'exportOrders', 'exportEquipment',
+            'exportSector', 'exportOrders', 'exportEquipment', 'exportSectorEntries', 'exportOrderEntries',
         ], true))) {
             throw new \Cake\Http\Exception\NotFoundException('Recurso indisponível.');
         }

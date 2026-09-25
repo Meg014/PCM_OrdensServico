@@ -65,6 +65,7 @@ final class OrderSupplementMapper
             number: $this->text($order['numero'] ?? null) ?? '',
             branch: isset($main['TJ_FILIAL']) ? rtrim((string)$main['TJ_FILIAL'], ' ') : null,
             description: $this->text($order['descricao'] ?? null),
+            originDate: $this->date($main['TJ_DTORIGI'] ?? null),
             labor: $labor,
             materials: $materials,
             maintenance: $maintenance,
@@ -98,4 +99,5 @@ final class OrderSupplementMapper
 
         return $value !== null && preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/D', $value) ? $value : null;
     }
+
 }

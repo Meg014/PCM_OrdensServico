@@ -23,9 +23,9 @@ final class ProtheusSectorService
     {
     }
 
-    public function load(string $area, array $query, bool $export = false): array
+    public function load(string $area, array $query, bool $export = false, ?int $exportPage = null): array
     {
-        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
+        if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         if (!preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
         $filters = [];
         foreach (self::FILTERS as $key) {
@@ -44,10 +44,10 @@ final class ProtheusSectorService
             }
         }
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
-        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
-        if ($page === false || $limit === false) throw new InvalidArgumentException('Paginação inválida.');
-        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
+        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1,
+            'max_range' => $export ? \App\Service\StreamingXlsxReport::BATCH_SIZE : 100]]);
+        if ($page === false || $limit === false || $page > intdiv(PHP_INT_MAX, (int)$limit)) throw new InvalidArgumentException('Paginação inválida.');
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
             'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];

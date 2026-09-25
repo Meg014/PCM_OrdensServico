@@ -20,6 +20,7 @@ final readonly class OrderSupplement
         public string $number,
         public ?string $branch,
         public ?string $description = null,
+        public ?string $originDate = null,
         public array $labor = [],
         public array $materials = [],
         public array $maintenance = [],

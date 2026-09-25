@@ -70,6 +70,7 @@
         card.append(description);
         const list = node('dl');
         const fields = [
+            ['Data de origem', date(data.origin_date)],
             ['Equipamento', codeName(m.equipment_code, m.equipment_name)],
             ['Serviço', codeName(m.service_code, m.service_name)],
             ['Área', value(m.area)], ['Centro de custo', value(m.cost_center)],

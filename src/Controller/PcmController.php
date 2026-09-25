@@ -37,33 +37,53 @@ final class PcmController extends AppController
         return $this->exportExcel('equipment');
     }
 
+    public function exportSectorEntries(string $code): Response
+    {
+        return $this->exportEntries(strtoupper(trim($code)));
+    }
+
+    public function exportOrderEntries(): Response
+    {
+        return $this->exportEntries(null);
+    }
+
+    private function exportEntries(?string $code): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        $report = new \App\Service\OrderStreamingExport();
+        $generated = $report->generatedAt();
+        try {
+            $result = $report->entries($this->request->getQueryParams(), $code, $generated);
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros ou contexto inválidos.');
+        } catch (\DomainException $error) {
+            return $this->exportError($error->getMessage(), 422);
+        } catch (\Throwable) {
+            return $this->exportError('Não foi possível gerar o arquivo Excel neste momento. Tente novamente.', 503);
+        }
+        \Cake\Log\Log::info((string)json_encode([
+            'event' => 'order_entry_excel_generated', 'user' => $this->request->getAttribute('identity')?->getIdentifier(),
+            'generated_at' => $generated->format(DATE_ATOM), 'sector' => $code, 'count' => $result['count'],
+        ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+        return $this->response->withType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->withHeader('Cache-Control', 'no-store')->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withDownload($report->filename('APONTAMENTOS_OS_' . ($code ?? 'GERAL'), $generated))
+            ->withBody(new \Laminas\Diactoros\Stream($result['stream']));
+    }
+
     private function exportExcel(string $context, ?string $code = null): Response
     {
         $this->request->allowMethod(['get']);
         $this->request->getSession()->close();
+        $report = new \App\Service\OrderStreamingExport();
+        $generated = $report->generatedAt();
         try {
-            $query = $this->request->getQueryParams();
-            $data = match ($context) {
-                'sector' => (new \App\Service\Protheus\ProtheusSectorService())->load($code, $query, true),
-                'equipment' => (new \App\Service\Protheus\EquipmentHistoryService())->load($query, true),
-                default => (new OrderListingService())->load($query, true),
-            };
+            $result = $report->orders($context, $this->request->getQueryParams(), $code, $generated);
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros ou contexto inválidos.');
-        }
-        if (!$data['available']) {
-            return $this->exportError('Não foi possível gerar o relatório: Protheus temporariamente indisponível. Tente novamente.', 503);
-        }
-        if ($data['not_found'] ?? false) throw new NotFoundException('Equipamento não encontrado no Protheus.');
-        if ($data['has_more'] || count($data['orders']) > \App\Service\OrderExcelReport::MAX_ROWS) {
-            return $this->exportError('O relatório excede o limite de 5.000 OS. Refine os filtros e tente novamente. Nenhum arquivo foi gerado.', 422);
-        }
-        $report = new \App\Service\OrderExcelReport();
-        $generated = $report->generatedAt();
-        $filename = $report->filename($context === 'equipment'
-            ? 'HISTORICO_EQUIPAMENTO_' . $data['filters']['bem'] : 'OS_' . ($code ?? 'GERAL'), $generated);
-        try {
-            $stream = $report->stream($report->workbook($data, $context, $generated));
+        } catch (\OutOfBoundsException $error) {
+            throw new NotFoundException($error->getMessage());
         } catch (\DomainException $error) {
             return $this->exportError($error->getMessage(), 422);
         } catch (\Throwable) {
@@ -72,11 +92,12 @@ final class PcmController extends AppController
         \Cake\Log\Log::info((string)json_encode([
             'event' => 'order_excel_generated', 'user' => $this->request->getAttribute('identity')?->getIdentifier(),
             'generated_at' => $generated->format(DATE_ATOM), 'context' => $context, 'sector' => $code,
-            'count' => count($data['orders']),
+            'count' => $result['count'],
         ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+        $prefix = $context === 'equipment' ? 'HISTORICO_EQUIPAMENTO' : 'OS_' . ($code ?? 'GERAL');
         return $this->response->withType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->withHeader('Cache-Control', 'no-store')->withHeader('X-Content-Type-Options', 'nosniff')
-            ->withDownload($filename)->withBody(new \Laminas\Diactoros\Stream($stream));
+            ->withDownload($report->filename($prefix, $generated))->withBody(new \Laminas\Diactoros\Stream($result['stream']));
     }
 
     private function exportError(string $message, int $status): Response
@@ -118,11 +139,13 @@ final class PcmController extends AppController
     {
         $this->request->getSession()->close();
         try {
-            $listing = (new OrderListingService())->load($this->request->getQueryParams());
+            $service = new OrderListingService();
+            $listing = $service->load($this->request->getQueryParams());
+            $areas = $listing['available'] ? $service->areas() : [];
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros ou paginação inválidos.');
         }
-        $this->set(['listing' => $listing, 'navigationAreas' => []]);
+        $this->set(['listing' => $listing, 'areas' => $areas, 'navigationAreas' => []]);
         $this->response = $this->response->withHeader('Cache-Control', 'no-store');
     }
 

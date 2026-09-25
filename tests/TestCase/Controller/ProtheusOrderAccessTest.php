@@ -94,7 +94,9 @@ final class ProtheusOrderAccessTest extends TestCase
         $routes = require ROOT . '/config/routes.php';
         $routes(Router::createRouteBuilder('/'));
         foreach (['/pcm/ordens/excel' => 'exportOrders', '/pcm/equipamento/excel' => 'exportEquipment',
-            '/pcm/setor/ELETRI/excel' => 'exportSector', '/pcm/setor/MECANI/excel' => 'exportSector'] as $url => $action) {
+            '/pcm/ordens/apontamentos/excel' => 'exportOrderEntries',
+            '/pcm/setor/ELETRI/excel' => 'exportSector', '/pcm/setor/MECANI/excel' => 'exportSector',
+            '/pcm/setor/ELETRI/apontamentos/excel' => 'exportSectorEntries'] as $url => $action) {
             $request = new ServerRequest(['url' => $url, 'environment' => ['REQUEST_METHOD' => 'GET'],
                 'params' => ['controller' => 'Pcm', 'action' => $action]]);
             self::assertSame($action, Router::parseRequest($request)['action']);
@@ -213,14 +215,20 @@ final class ProtheusOrderAccessTest extends TestCase
         $routes(Router::createRouteBuilder('/'));
         $view = new View($this->request());
         $view->setTemplatePath('Pcm');
-        $row = array_fill_keys(['reference_date', 'equipment_name', 'TJ_CODBEM', 'TJ_SERVICO',
+        $row = array_fill_keys(['equipment_name', 'TJ_CODBEM', 'TJ_SERVICO',
             'service_name', 'TJ_CODAREA', 'TJ_CCUSTO', 'TJ_TIPO', 'TJ_SITUACA', 'TJ_TERMINO'], '<script>alert(1)</script>');
-        $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01'];
+        $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23'];
         $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => ''],
             'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
         $view->set('listing', $listing);
+        $view->set('areas', ['ELETRI', 'MECANI']);
         $html = $view->render('orders', false);
+        self::assertStringContainsString('Exportar apontamentos', $html);
+        self::assertStringContainsString('/pcm/ordens/apontamentos/excel', $html);
+        self::assertStringContainsString('<option value="ELETRI">ELETRI</option>', $html);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
+        self::assertStringContainsString('23/09/2026', $html);
+        self::assertStringContainsString('Período pela Data de origem da OS.', $html);
         self::assertStringContainsString('page=2', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);

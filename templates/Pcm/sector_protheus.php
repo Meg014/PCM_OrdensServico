@@ -8,7 +8,8 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
 <p class="pcm-updated" data-sector-updated><?= h($sector['queried_at'] ? 'Dados atualizados em: ' . (new \App\Service\PcmTimeFormatter())->format(new \DateTimeImmutable($sector['queried_at']), 'd/m/Y, H:i:s') : 'Consulta indisponível') ?></p></div>
 </header>
 <?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-sector-excel', 'code' => $sector['code'], '?' => $sector['filters']], ['class' => 'btn btn-outline-success mb-3']) ?>
-<p class="text-body-secondary small">Exporta todos os resultados dos filtros aplicados, até 5.000 OS.</p>
+<?= $this->Html->link('Exportar apontamentos', ['_name' => 'pcm-sector-entries-excel', 'code' => $sector['code'], '?' => $sector['filters']], ['class' => 'btn btn-outline-primary mb-3 ms-2']) ?>
+<p class="text-body-secondary small">As exportações processam todos os resultados dos filtros aplicados em lotes, sem limite total arbitrário.</p>
 <p data-sector-notice role="status" class="text-body-secondary"><?= $sector['available'] ? '' : 'Dados do Protheus temporariamente indisponíveis.' ?></p>
 <section class="pcm-panel pcm-filter-panel"><h2>Filtros do setor</h2>
 <p>Carteira operacional: abertas elegíveis desde 01/01/2026 e fechadas, sem canceladas.</p>

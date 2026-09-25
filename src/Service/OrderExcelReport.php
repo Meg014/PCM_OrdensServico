@@ -17,7 +17,6 @@ use RuntimeException;
 /** Explicit operational allowlist; source strings are never interpreted as formulas. */
 final class OrderExcelReport
 {
-    public const MAX_ROWS = 5000;
     private const FILTER_LABELS = [
         'filial' => 'Filial', 'status' => 'Status', 'equipment' => 'Equipamento', 'bem' => 'Equipamento',
         'service' => 'Serviço', 'service_name' => 'Nome do serviço', 'cost_center' => 'Centro de custo',
@@ -40,11 +39,9 @@ final class OrderExcelReport
     public function workbook(array $data, string $context, DateTimeImmutable $generated): Spreadsheet
     {
         if (!$data['available']) throw new RuntimeException('Não foi possível gerar o relatório: Protheus temporariamente indisponível. Tente novamente.');
-        if (($data['has_more'] ?? false) || count($data['orders']) > self::MAX_ROWS) {
-            throw new RuntimeException('O relatório excede o limite de 5.000 OS. Refine os filtros e tente novamente. Nenhum arquivo foi gerado.');
-        }
         $columns = [
-            'TJ_ORDEM' => ['Número da OS', 'text'], 'TJ_FILIAL' => ['Filial', 'text'],
+            'TJ_ORDEM' => ['Número da OS', 'text'], 'descricao' => ['Descrição da OS', 'text'],
+            'TJ_FILIAL' => ['Filial', 'text'],
             'TJ_CODBEM' => ['Código do equipamento', 'text'], 'equipment_name' => ['Nome do equipamento', 'text'],
             'TJ_SERVICO' => ['Código do serviço', 'text'], 'service_name' => ['Nome do serviço', 'text'],
             'TJ_TIPO' => ['Tipo de manutenção', 'text'], 'TJ_CODAREA' => ['Área/Setor', 'text'],
@@ -63,7 +60,6 @@ final class OrderExcelReport
                     $columns['TJ_HO' . $code . $suffix] = ['Hora: ' . $part . ' ' . $label, 'time'];
                 }
             }
-            if ($context === 'equipment') $columns['descricao'] = ['Descrição da OS', 'text'];
         }
         $textBytes = 0;
         foreach ($data['orders'] as $order) {

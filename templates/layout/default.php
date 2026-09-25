@@ -14,7 +14,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark light">
     <title><?= h($title) ?> | PCM</title>
-    <?= $this->Html->meta('icon') ?>
+    <?= $this->Html->meta('icon', '/img/pcm-favicon.png', ['type' => 'image/png']) ?>
     <script>
         (() => {
             try {

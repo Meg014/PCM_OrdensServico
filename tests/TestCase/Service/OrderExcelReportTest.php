@@ -26,16 +26,18 @@ final class OrderExcelReportTest extends TestCase
             $loaded = IOFactory::load(stream_get_meta_data($stream)['uri']);
             $sheet = $loaded->getActiveSheet();
             self::assertSame('25/09/2026 10:35', $sheet->getCell('C3')->getFormattedValue());
-            self::assertSame(483, $sheet->getCell('C6')->getValue());
-            self::assertSame('A8', $sheet->getFreezePane());
-            self::assertSame('A7:N490', $sheet->getAutoFilter()->getRange());
-            foreach (['A8' => '000123', 'B8' => '01', 'C8' => '000045', 'E8' => '001',
-                'D8' => '=1+1', 'D9' => '+SUM(A1)', 'D10' => '-1+2', 'D11' => '@SUM(A1)', 'C5' => '+unsafe'] as $cell => $value) {
+            self::assertSame(483, $sheet->getCell('C4')->getValue());
+            self::assertSame('Filtros: Equipamento: +unsafe', $sheet->getCell('A5')->getValue());
+            self::assertTrue($sheet->getStyle('A5')->getAlignment()->getWrapText());
+            self::assertSame('A7', $sheet->getFreezePane());
+            self::assertSame('A6:N489', $sheet->getAutoFilter()->getRange());
+            foreach (['A7' => '000123', 'B7' => '01', 'C7' => '000045', 'E7' => '001',
+                'D7' => '=1+1', 'D8' => '+SUM(A1)', 'D9' => '-1+2', 'D10' => '@SUM(A1)', 'A5' => 'Filtros: Equipamento: +unsafe'] as $cell => $value) {
                 self::assertSame($value, $sheet->getCell($cell)->getValue());
                 self::assertSame(DataType::TYPE_STRING, $sheet->getCell($cell)->getDataType());
             }
-            self::assertSame('25/09/2026', $sheet->getCell('K8')->getFormattedValue());
-            self::assertSame('10:35', $sheet->getCell('L8')->getFormattedValue());
+            self::assertSame('25/09/2026', $sheet->getCell('K7')->getFormattedValue());
+            self::assertSame('10:35', $sheet->getCell('L7')->getFormattedValue());
             $contents = json_encode($sheet->toArray());
             foreach (['SECRET', 'record_id', 'token', 'R_E_C_N_O_'] as $secret) self::assertStringNotContainsString($secret, $contents);
             $loaded->disconnectWorksheets();
@@ -47,10 +49,28 @@ final class OrderExcelReportTest extends TestCase
     public function testEmptyResultStillHasHeadersAndZeroTotal(): void
     {
         $report = new OrderExcelReport();
-        $book = $report->workbook(['available' => true, 'orders' => [], 'filters' => []], 'orders', $report->generatedAt());
-        self::assertSame(0, $book->getActiveSheet()->getCell('C5')->getValue());
-        self::assertSame('Número da OS', $book->getActiveSheet()->getCell('A6')->getValue());
+        $book = $report->workbook(['available' => true, 'orders' => [],
+            'filters' => ['status' => 'Todos', 'card' => 'all', 'q' => '  ']], 'orders', $report->generatedAt());
+        self::assertSame(0, $book->getActiveSheet()->getCell('C4')->getValue());
+        self::assertSame('Número da OS', $book->getActiveSheet()->getCell('A5')->getValue());
         $book->disconnectWorksheets();
+    }
+
+    public function testCompactFiltersHideAbsentValuesInEveryExportContext(): void
+    {
+        $report = new OrderExcelReport();
+        foreach (['sector', 'orders', 'equipment'] as $context) {
+            $book = $report->workbook(['available' => true, 'orders' => [], 'filters' => [
+                'status' => 'Todos', 'card' => 'all', 'q' => '  ', 'equipment' => 'VAU 50 003',
+                'maintenance_type' => 'COR',
+            ]], $context, new \DateTimeImmutable('2026-09-25T16:40:00Z'));
+            $sheet = $book->getActiveSheet();
+            self::assertSame('25/09/2026 13:40', $sheet->getCell('C3')->getFormattedValue());
+            self::assertSame('Filtros: Equipamento: VAU 50 003 | Tipo de manutenção: COR', $sheet->getCell('A5')->getValue());
+            self::assertTrue($sheet->getStyle('A5')->getAlignment()->getWrapText());
+            self::assertSame('A7', $sheet->getFreezePane());
+            $book->disconnectWorksheets();
+        }
     }
 
     public function testSafeFilenameAndPresentationTimezone(): void

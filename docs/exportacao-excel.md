@@ -24,7 +24,7 @@ O registro extra detecta excesso. Até 5.000 OS, todas são exportadas numa úni
 
 ## Conteúdo
 
-O arquivo contém título, setor/área, momento de geração, todos os filtros reconhecidos e total de OS. Sem filtro, exporta o conjunto permitido pelo contexto. Sem resultados, produz uma planilha com total zero, metadados e cabeçalhos. Equipamento inexistente preserva o HTTP 404 da tela.
+O arquivo contém título, setor/área, momento de geração e total de OS. Os filtros efetivamente aplicados aparecem em uma única linha, separados por `|`; valores vazios, `all`, `Todos` e equivalentes não são exibidos. Quando não há filtro específico, a linha de filtros é omitida. Sem filtro, exporta o conjunto permitido pelo contexto. Sem resultados, produz uma planilha com total zero, metadados e cabeçalhos. Equipamento inexistente preserva o HTTP 404 da tela.
 
 Colunas comuns: número da OS, filial, código/nome do equipamento, código/nome do serviço, tipo de manutenção, área/setor e centro de custo.
 

@@ -87,19 +87,23 @@ final class OrderExcelReport
         $sheet->mergeCells('A1:' . $last . '1');
         $this->text($sheet, 'A1', $context === 'equipment' ? 'HISTÓRICO DE MANUTENÇÃO DO EQUIPAMENTO' : 'RELATÓRIO DE ORDENS DE SERVIÇO');
         $this->text($sheet, 'A2', 'Setor/Área: ' . ($data['name'] ?? 'Conforme área de cada OS'));
-        $this->text($sheet, 'A3', 'Gerado em (America/Sao_Paulo)');
+        $this->text($sheet, 'A3', 'Gerado em:');
         $sheet->setCellValue('C3', Date::PHPToExcel($generated->setTimezone(new DateTimeZone('America/Sao_Paulo'))));
         $sheet->getStyle('C3')->getNumberFormat()->setFormatCode('dd/mm/yyyy hh:mm');
+        $this->text($sheet, 'A4', 'Total de OS:');
+        $sheet->setCellValue('C4', count($data['orders']));
         $row = 5;
-        $this->text($sheet, 'A4', 'Filtros aplicados');
+        $filters = [];
         foreach ($data['filters'] as $key => $value) {
-            if (!isset(self::FILTER_LABELS[$key])) continue;
-            $this->text($sheet, 'A' . $row, self::FILTER_LABELS[$key]);
-            $sheet->mergeCells('C' . $row . ':' . $last . $row);
-            $this->text($sheet, 'C' . $row++, $value === '' ? 'Todos' : $value);
+            if (!isset(self::FILTER_LABELS[$key]) || !is_scalar($value)) continue;
+            $value = trim((string)$value);
+            if (in_array(mb_strtolower($value, 'UTF-8'), ['', 'all', 'todos', 'todas'], true)) continue;
+            $filters[] = self::FILTER_LABELS[$key] . ': ' . $value;
         }
-        $this->text($sheet, 'A' . $row, 'Total de OS');
-        $sheet->setCellValue('C' . $row++, count($data['orders']));
+        if ($filters !== []) {
+            $sheet->mergeCells('A' . $row . ':' . $last . $row);
+            $this->text($sheet, 'A' . $row++, 'Filtros: ' . implode(' | ', $filters));
+        }
         $header = $row;
         $index = 1;
         foreach ($columns as [$label, $type]) {

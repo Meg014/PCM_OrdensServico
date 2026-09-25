@@ -85,7 +85,9 @@ final class ProtheusSectorTest extends TestCase
         \Cake\Core\Configure::write('App.namespace', 'App');
         \Cake\Core\Configure::write('App.encoding', 'UTF-8');
         \Cake\Core\Configure::write('App.paths.templates', [ROOT . '/templates/']);
-        \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        if (!\Cake\Cache\Cache::getConfig('_cake_translations_')) {
+            \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        }
         \Cake\Routing\Router::reload();
         $routes = require ROOT . '/config/routes.php';
         $routes(\Cake\Routing\Router::createRouteBuilder('/'));
@@ -214,6 +216,34 @@ final class ProtheusSectorTest extends TestCase
             self::assertFalse($result['available']);
             self::assertArrayNotHasKey('backlog', $result);
         }
+    }
+
+    public function testExportUsesExactlyTheScreenFiltersAndIgnoresVisualPagination(): void
+    {
+        $combined = ['status' => 'EM ABERTO', 'equipment' => '0001', 'service' => '001',
+            'service_name' => 'SERVICO', 'cost_center' => '0002', 'maintenance_type' => 'COR',
+            'filial' => '01', 'q' => 'motor%_', 'date_start' => '2026-01-01', 'date_end' => '2026-09-25',
+            'card' => 'opportunity', 'card_status' => 'EM ABERTO', 'backlog_age' => '0_7'];
+        $cases = [[], $combined];
+        foreach ($combined as $key => $value) $cases[] = [$key => $value];
+        foreach ($cases as $filters) {
+            $screenCalls = $exportCalls = [];
+            $screen = (new ProtheusSectorService($this->repository($screenCalls)))->load('ELETRI', $filters + ['page' => 2, 'limit' => 1]);
+            $export = (new ProtheusSectorService($this->repository($exportCalls)))->load('ELETRI', $filters + ['page' => 2, 'limit' => 1, 'area' => 'MECANI'], true);
+            self::assertTrue($export['available']);
+            self::assertSame($screen['filters'], $export['filters']);
+            self::assertSame(0, $exportCalls[2][1]['offset']);
+            self::assertSame(5001, $exportCalls[2][1]['fetch']);
+            self::assertCount(2, $export['orders']);
+            foreach ($screenCalls as $index => $call) {
+                self::assertSame($call[0], $exportCalls[$index][0]);
+                self::assertSame(array_diff_key($call[1], array_flip(['offset', 'fetch'])),
+                    array_diff_key($exportCalls[$index][1], array_flip(['offset', 'fetch'])));
+                self::assertSame('ELETRI', $exportCalls[$index][1]['area']);
+            }
+        }
+        $calls = [];
+        self::assertFalse((new ProtheusSectorService($this->repository($calls, true)))->load('ELETRI', [], true)['available']);
     }
 
     private function repository(array &$calls, bool $fail = false, ?array $aggregate = null, ?array $backlog = null): ProtheusRepository

@@ -17,6 +17,8 @@ $status = static function (array $row): string {
 <h1><?= h($f['bem']) ?></h1><span class="badge text-bg-secondary">Fonte: Protheus</span>
 <?php if ($equipment['available']): ?><p class="pcm-updated">Dados atualizados em: <?= h($equipment['queried_at']) ?></p><?php endif; ?>
 </div><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?></header>
+<?= $this->Html->link('Exportar histórico para Excel', ['_name' => 'pcm-equipment-excel', '?' => $f], ['class' => 'btn btn-outline-success mb-3']) ?>
+<p class="text-body-secondary small">Exporta todos os resultados dos filtros aplicados, até 5.000 OS.</p>
 <?php if (!$equipment['available']): ?>
 <p class="alert alert-secondary" role="status">Histórico do Protheus temporariamente indisponível. Tente novamente em instantes.</p>
 <?php return; endif; $s = $equipment['summary']; ?>

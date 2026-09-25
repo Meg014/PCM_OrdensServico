@@ -8,6 +8,8 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <h1>Ordens de Serviço</h1><span class="badge text-bg-secondary">Fonte: Protheus</span>
 <p class="text-body-secondary mt-2">Consulta direta ao TOTVS. Códigos de tipo, situação e término são exibidos sem interpretação.</p></div>
 </header>
+<?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-orders-excel', '?' => $filters], ['class' => 'btn btn-outline-success mb-3']) ?>
+<p class="text-body-secondary small">Exporta todos os resultados dos filtros aplicados, até 5.000 OS.</p>
 <section class="pcm-panel p-3 mb-4">
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-3']) ?>
 <?php if (!empty($filters['filial'])): ?><?= $this->Form->hidden('filial', ['value' => $filters['filial']]) ?><?php endif; ?>

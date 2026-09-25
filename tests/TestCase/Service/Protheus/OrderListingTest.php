@@ -111,6 +111,27 @@ final class OrderListingTest extends TestCase
         self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'f.date_end ='));
     }
 
+    public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void
+    {
+        $calls = [];
+        $rows = array_fill(0, 483, ['TJ_ORDEM' => '0001', 'identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1]);
+        $filters = ['os' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'date_start' => '2026-01-01'];
+        $result = (new OrderListingService($this->repository($rows, $calls)))->load($filters + ['page' => 8, 'limite' => 1], true);
+        self::assertTrue($result['available']);
+        self::assertCount(483, $result['orders']);
+        self::assertCount(1, $calls);
+        self::assertSame(0, $calls[0][1]['offset']);
+        self::assertSame(5001, $calls[0][1]['fetch']);
+        self::assertFalse($result['has_more']);
+        foreach (['numero' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'date_start' => '2026-01-01'] as $key => $value) {
+            self::assertSame($value, $calls[0][1][$key]);
+        }
+        $calls = [];
+        $result = (new OrderListingService($this->repository(array_fill(0, 5001, $rows[0]), $calls)))->load([], true);
+        self::assertTrue($result['has_more']);
+        self::assertCount(5000, $result['orders']);
+    }
+
     private function repository(array $rows, array &$calls, bool $fail = false): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
@@ -139,6 +160,6 @@ final class OrderListingTest extends TestCase
         self::assertSame(ProtheusQueries::AREAS, $calls[0][0]);
         self::assertStringContainsString('SELECT DISTINCT', $calls[0][0]);
         self::assertStringContainsString("D_E_L_E_T_ <> '*'", $calls[0][0]);
-        self::assertStringContainsString("NULLIF(LTRIM(RTRIM(TJ_CODAREA)), '') IS NOT NULL", $calls[0][0]);
+        self::assertStringContainsString("NULLIF(LTRIM(RTRIM(j.TJ_CODAREA)), '') IS NOT NULL", $calls[0][0]);
     }
 }

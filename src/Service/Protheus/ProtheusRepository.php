@@ -52,9 +52,9 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Fixed number of reads per equipment; no OS/resource hydration. */
-    public function equipmentPortfolio(string $code, string $branch, array $filters, array $windows, int $page, int $limit): array
+    public function equipmentPortfolio(string $code, string $branch, array $filters, array $windows, int $page, int $limit, bool $export = false): array
     {
-        if ($code === '' || strlen($code) > 100 || strlen($branch) > 100 || $page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+        if ($code === '' || strlen($code) > 100 || strlen($branch) > 100 || $page < 1 || $page > 1000000 || $limit < 1 || $limit > ($export ? \App\Service\OrderExcelReport::MAX_ROWS : 100)) {
             throw new InvalidArgumentException('Equipamento ou paginação inválidos.');
         }
         $header = $this->master(ProtheusEquipmentQueries::HEADER, $code, $branch);
@@ -76,9 +76,9 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Two aggregate reads and one bounded page, never hydration of resources or snapshots. */
-    public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = []): array
+    public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = [], bool $export = false): array
     {
-        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > ($export ? \App\Service\OrderExcelReport::MAX_ROWS : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
         $this->sectorStage = 'SQL: ProtheusSectorQueries::aggregates()';
@@ -164,9 +164,9 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false): array
     {
-        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > 100) {
+        if ($page < 1 || $page > 1000000 || $limit < 1 || $limit > ($export ? \App\Service\OrderExcelReport::MAX_ROWS : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
         $params = ['offset' => ($page - 1) * $limit, 'fetch' => $limit + 1];

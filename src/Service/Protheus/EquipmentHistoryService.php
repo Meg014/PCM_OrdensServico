@@ -13,8 +13,9 @@ final class EquipmentHistoryService
     {
     }
 
-    public function load(array $query): array
+    public function load(array $query, bool $export = false): array
     {
+        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
         $values = [];
         foreach (['bem', 'filial', 'date_start', 'date_end', 'type', 'status'] as $key) {
             $value = $query[$key] ?? '';
@@ -39,6 +40,7 @@ final class EquipmentHistoryService
         $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
         if ($page === false || $limit === false) throw new InvalidArgumentException('Paginação inválida.');
+        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
         $result = ['available' => false, 'not_found' => false, 'filters' => $values, 'page' => $page, 'limit' => $limit];
         $formatter = new PcmTimeFormatter();
         $today = new DateTimeImmutable($formatter->format(new DateTimeImmutable(), 'Y-m-d'));
@@ -49,7 +51,7 @@ final class EquipmentHistoryService
         }
         try {
             $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 10))->equipmentPortfolio(
-                $values['bem'], $values['filial'], array_diff_key($values, array_flip(['bem', 'filial'])), $windows, $page, $limit,
+                $values['bem'], $values['filial'], array_diff_key($values, array_flip(['bem', 'filial'])), $windows, $page, $limit, $export,
             );
             return array_replace($result, $data, ['available' => true,
                 'not_found' => $data['header'] === null && (int)$data['summary']['all_count'] === 0,

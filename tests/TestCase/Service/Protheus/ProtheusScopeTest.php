@@ -35,11 +35,12 @@ final class ProtheusScopeTest extends TestCase
         });
         $repo = new ProtheusRepository($connection, areaScope: 'ELETRI');
         self::assertSame([], $repo->findOrders('004368', '01')['orders']);
+        self::assertSame([], $repo->findOrders('004368', '01', limit: 5000, export: true)['orders']);
         self::assertNull($repo->findOrder('004368', '01'));
         self::assertNull($repo->findOrderIdentity('004368', '01'));
         self::assertSame([], $repo->findEquipmentHistory('MEL 80 115', '01')['orders']);
         self::assertSame([], $repo->findAreas());
-        self::assertCount(5, $calls); // Rejected order never loads resources or master records.
+        self::assertCount(6, $calls); // Rejected order never loads resources or master records.
     }
 
     public function testScopedSqlRemainsClosedAndFiltersBeforePagination(): void

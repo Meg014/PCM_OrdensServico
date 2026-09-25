@@ -87,7 +87,9 @@ final class EquipmentHistoryTest extends TestCase
         \Cake\Core\Configure::write('App.namespace', 'App');
         \Cake\Core\Configure::write('App.encoding', 'UTF-8');
         \Cake\Core\Configure::write('App.paths.templates', [ROOT . '/templates/']);
-        \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        if (!\Cake\Cache\Cache::getConfig('_cake_translations_')) {
+            \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        }
         \Cake\Routing\Router::reload();
         $routes = require ROOT . '/config/routes.php';
         $routes(\Cake\Routing\Router::createRouteBuilder('/'));
@@ -126,6 +128,20 @@ final class EquipmentHistoryTest extends TestCase
             self::assertStringContainsString('<td>' . $label . '</td>', $body[1]);
         }
         foreach (['L/N', 'L/S', 'C/N', 'P/N'] as $code) self::assertStringNotContainsString($code, $body[1]);
+    }
+
+    public function testExportHistoryKeepsEquipmentBranchAndAllFilters(): void
+    {
+        $calls = [];
+        $filters = ['bem' => '000123', 'filial' => '01', 'status' => 'open', 'type' => 'COR', 'date_start' => '2026-01-01', 'date_end' => '2026-09-25'];
+        $data = (new EquipmentHistoryService($this->repository($calls)))->load($filters + ['page' => 9, 'limit' => 1], true);
+        self::assertTrue($data['available']);
+        self::assertEquals($filters, $data['filters']);
+        self::assertCount(2, $data['orders']);
+        $params = $calls[count($calls) - 1][1];
+        foreach ($filters as $key => $value) self::assertSame($value, $params[$key]);
+        self::assertSame(0, $params['offset']);
+        self::assertSame(5001, $params['fetch']);
     }
 
     private function repository(array &$calls, bool $fail = false): ProtheusRepository

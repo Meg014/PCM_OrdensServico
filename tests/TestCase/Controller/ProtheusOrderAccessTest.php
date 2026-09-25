@@ -88,6 +88,44 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('pcm-protheus-order.js', $view->fetch('script'));
     }
 
+    public function testExportRoutesRequireLoginAndRejectTvForEverySector(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        foreach (['/pcm/ordens/excel' => 'exportOrders', '/pcm/equipamento/excel' => 'exportEquipment',
+            '/pcm/setor/ELETRI/excel' => 'exportSector', '/pcm/setor/MECANI/excel' => 'exportSector'] as $url => $action) {
+            $request = new ServerRequest(['url' => $url, 'environment' => ['REQUEST_METHOD' => 'GET'],
+                'params' => ['controller' => 'Pcm', 'action' => $action]]);
+            self::assertSame($action, Router::parseRequest($request)['action']);
+            try {
+                (new PcmController($request))->Authentication->startup();
+                self::fail('Anonymous export must be blocked.');
+            } catch (UnauthenticatedException) {
+                self::assertTrue(true);
+            }
+            foreach (['TV', 'ADMIN', 'USUARIO'] as $role) {
+                $user = new Entity(['id' => 7, 'password' => 'synthetic-hash', 'role' => $role]);
+                $controller = new PcmController($request->withAttribute('identity', new Identity($user)));
+                $query = $this->createMock(SelectQuery::class);
+                $query->method('where')->willReturnSelf();
+                $query->method('first')->willReturn($user);
+                $table = $this->createMock(Table::class);
+                $table->method('find')->willReturn($query);
+                $locator = new TableLocator();
+                $locator->set('Users', $table);
+                $controller->setTableLocator($locator);
+                $controller->Authentication->startup();
+                try {
+                    $controller->beforeFilter(new Event('Controller.initialize', $controller));
+                    self::assertNotSame('TV', $role);
+                } catch (ForbiddenException) {
+                    self::assertSame('TV', $role);
+                }
+            }
+        }
+    }
+
     private function request(): ServerRequest
     {
         return new ServerRequest([

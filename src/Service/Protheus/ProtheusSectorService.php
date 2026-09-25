@@ -23,8 +23,9 @@ final class ProtheusSectorService
     {
     }
 
-    public function load(string $area, array $query): array
+    public function load(string $area, array $query, bool $export = false): array
     {
+        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
         if (!preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
         $filters = [];
         foreach (self::FILTERS as $key) {
@@ -46,6 +47,7 @@ final class ProtheusSectorService
         $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         $limit = filter_var($query['limit'] ?? 20, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
         if ($page === false || $limit === false) throw new InvalidArgumentException('Paginação inválida.');
+        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
             'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
@@ -61,7 +63,7 @@ final class ProtheusSectorService
                 'season' => in_array($filters['card'], ['safra', 'offseason'], true) ? $filters['card'] : ''];
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 10);
             $stage = 'repository';
-            $data = $repository->sector($params, $page, $limit, $filters['date_start'], $filters['date_end'], $selection);
+            $data = $repository->sector($params, $page, $limit, $filters['date_start'], $filters['date_end'], $selection, $export);
             $stage = 'validation: aggregates / cards and classifications';
             $cards = array_fill_keys(ProtheusDashboardService::CARDS, 0);
             $breakdown = array_fill_keys(array_keys(self::CATEGORIES), ['open' => 0, 'closed' => 0]);

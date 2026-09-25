@@ -13,8 +13,9 @@ final class OrderListingService
     {
     }
 
-    public function load(array $query): array
+    public function load(array $query, bool $export = false): array
     {
+        if ($export) $query = array_replace($query, ['page' => 1, 'limit' => 20, 'limite' => 20]);
         $filters = [];
         foreach (['os', 'filial', 'bem', 'centro', 'date_start', 'date_end'] as $key) {
             $value = $query[$key] ?? '';
@@ -42,13 +43,14 @@ final class OrderListingService
         if ($page === false || $limit === false) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
+        if ($export) $limit = \App\Service\OrderExcelReport::MAX_ROWS;
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope);
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
                 $filters['filial'] === '' ? null : $filters['filial'],
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
-                $filters['centro'], $filters['date_start'], $filters['date_end'],
+                $filters['centro'], $filters['date_start'], $filters['date_end'], $export,
             );
 
             return $result + ['filters' => $filters, 'available' => true];

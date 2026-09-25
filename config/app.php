@@ -1,11 +1,25 @@
 <?php
 
+use App\Database\Driver\ProtheusReadOnly;
 use Cake\Cache\Engine\FileEngine;
 use Cake\Database\Connection;
 use Cake\Database\Driver\Mysql;
+use Cake\Database\Driver\Postgres;
 use Cake\Log\Engine\FileLog;
 use Cake\Mailer\Transport\MailTransport;
 use function Cake\Core\env;
+
+$defaultDatabaseDriverName = strtolower((string)env('DB_DRIVER', 'mysql'));
+$defaultDatabaseDrivers = [
+    'mysql' => Mysql::class,
+    'pgsql' => Postgres::class,
+    'postgres' => Postgres::class,
+    'postgresql' => Postgres::class,
+];
+if (!isset($defaultDatabaseDrivers[$defaultDatabaseDriverName])) {
+    throw new RuntimeException('DB_DRIVER deve ser mysql ou postgres.');
+}
+$defaultDatabaseIsPostgres = $defaultDatabaseDrivers[$defaultDatabaseDriverName] === Postgres::class;
 
 return [
     /*
@@ -279,7 +293,7 @@ return [
         // Isolated integration: never use this datasource for ORM writes or migrations.
         'protheus' => [
             'className' => Connection::class,
-            'driver' => \App\Database\Driver\ProtheusReadOnly::class,
+            'driver' => ProtheusReadOnly::class,
             'host' => env('PROTHEUS_DB_HOST', ''),
             'port' => (int)env('PROTHEUS_DB_PORT', 1433),
             'database' => env('PROTHEUS_DB_DATABASE', ''),
@@ -304,9 +318,9 @@ return [
          */
         'default' => [
             'className' => Connection::class,
-            'driver' => Mysql::class,
+            'driver' => $defaultDatabaseDrivers[$defaultDatabaseDriverName],
             'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => (int)env('DB_PORT', 3306),
+            'port' => (int)env('DB_PORT', $defaultDatabaseIsPostgres ? 5432 : 3306),
             'database' => env('DB_DATABASE', 'pcm'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
@@ -316,7 +330,8 @@ return [
             /*
              * For MariaDB/MySQL the internal default changed from utf8 to utf8mb4, aka full utf-8 support
              */
-            'encoding' => 'utf8mb4',
+            'encoding' => env('DB_ENCODING', $defaultDatabaseIsPostgres ? 'utf8' : 'utf8mb4'),
+            'schema' => env('DB_SCHEMA', $defaultDatabaseIsPostgres ? 'public' : null),
 
             /*
              * If your MySQL server is configured with `skip-character-set-client-handshake`

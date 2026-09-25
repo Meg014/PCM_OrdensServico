@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Test\TestCase\Core;
 
 use Cake\Database\Driver\Mysql;
+use Cake\Database\Driver\Postgres;
 use Cake\TestSuite\TestCase;
 use josegonzalez\Dotenv\Loader;
 
@@ -12,6 +13,7 @@ final class DatasourceConfigurationTest extends TestCase
     public function testSharedEnvironmentOverridesDifferentProcessValues(): void
     {
         $values = [
+            'DB_DRIVER' => 'mysql',
             'DB_HOST' => 'db.example.invalid',
             'DB_PORT' => '3307',
             'DB_DATABASE' => 'pcm_external_test',
@@ -52,6 +54,49 @@ final class DatasourceConfigurationTest extends TestCase
             }
         } finally {
             unlink($file);
+            foreach ($original as $key => [$environment, $server, $process]) {
+                unset($_ENV[$key], $_SERVER[$key]);
+                if ($environment !== null) {
+                    $_ENV[$key] = $environment;
+                }
+                if ($server !== null) {
+                    $_SERVER[$key] = $server;
+                }
+                putenv($process === false ? $key : $key . '=' . $process);
+            }
+        }
+    }
+
+    public function testPostgresDatasourceUsesPortableEnvironmentConfiguration(): void
+    {
+        $values = [
+            'DB_DRIVER' => 'postgres',
+            'DB_HOST' => 'postgres.example.invalid',
+            'DB_PORT' => '5432',
+            'DB_DATABASE' => 'pcm_ordem',
+            'DB_USERNAME' => 'provided_by_ti',
+            'DB_PASSWORD' => 'test-only-secret',
+            'DB_SCHEMA' => 'public',
+            'DB_ENCODING' => 'utf8',
+        ];
+        $original = [];
+        try {
+            foreach ($values as $key => $value) {
+                $original[$key] = [$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)];
+                $_ENV[$key] = $_SERVER[$key] = $value;
+                putenv($key . '=' . $value);
+            }
+            $default = (require CONFIG . 'app.php')['Datasources']['default'];
+
+            $this->assertSame(Postgres::class, $default['driver']);
+            $this->assertSame('postgres.example.invalid', $default['host']);
+            $this->assertSame(5432, $default['port']);
+            $this->assertSame('pcm_ordem', $default['database']);
+            $this->assertSame('provided_by_ti', $default['username']);
+            $this->assertSame('test-only-secret', $default['password']);
+            $this->assertSame('public', $default['schema']);
+            $this->assertSame('utf8', $default['encoding']);
+        } finally {
             foreach ($original as $key => [$environment, $server, $process]) {
                 unset($_ENV[$key], $_SERVER[$key]);
                 if ($environment !== null) {

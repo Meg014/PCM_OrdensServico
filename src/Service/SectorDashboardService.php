@@ -133,7 +133,8 @@ final class SectorDashboardService
             'id', 'work_order_id', 'source_order_number', 'equipment_code', 'equipment_name',
             'service_code', 'service_name', 'maintenance_area_code', 'cost_center_code',
             'maintenance_type', 'source_situation', 'finished_raw', 'general_actual_start', 'maintenance_planned_start', 'treated_status',
-        ])->orderBy(['WorkOrderSnapshots.maintenance_planned_start' => 'DESC', 'WorkOrderSnapshots.id' => 'DESC']);
+        ])->orderBy($query?->expr('WorkOrderSnapshots.maintenance_planned_start IS NULL'))
+            ->orderBy(['WorkOrderSnapshots.maintenance_planned_start' => 'DESC', 'WorkOrderSnapshots.id' => 'DESC']);
     }
 
     /** Groups distinct dimensions on the database rather than loading snapshots. */

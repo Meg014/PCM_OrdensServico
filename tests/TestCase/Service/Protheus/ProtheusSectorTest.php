@@ -96,6 +96,19 @@ final class ProtheusSectorTest extends TestCase
         $view->set('sector', $sector);
         $html = $view->render('sector_protheus', false);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
+        self::assertStringContainsString('/pcm/equipamento?bem=MEL+80+115&amp;filial=01', $html);
+        self::assertStringContainsString('pcm-ranking-link', $html);
+        self::assertStringNotContainsString('· filial 01', $html);
+        self::assertStringNotContainsString('Filial / OS', $html);
+        self::assertStringNotContainsString('<label for="filial">Filial</label>', $html);
+        self::assertSame('01', $sector['backlog']['equipment'][0]['branch']);
+        self::assertSame('MEL 80 115', $sector['backlog']['equipment'][0]['key']);
+        self::assertSame('MEL 80 115 — <script>unsafe</script>', $sector['backlog']['equipment'][0]['label']);
+        self::assertSame(1, $sector['backlog']['equipment'][0]['quantity']);
+        self::assertSame('01', $sector['charts']['equipment'][0]['branch']);
+        self::assertStringNotContainsString('filial', $sector['charts']['equipment'][0]['label']);
+        self::assertLessThan(strpos($html, 'Safra / Entressafra'), strpos($html, 'Backlog / O.S. em aberto'));
+        self::assertLessThan(strpos($html, 'Resumo operacional do setor'), strpos($html, 'Safra / Entressafra'));
         self::assertStringContainsString('data-sector-chart="equipment"', $html);
         self::assertStringContainsString('Fonte: Protheus', $html);
         self::assertStringContainsString('Total operacional', $html);
@@ -261,8 +274,11 @@ final class ProtheusSectorTest extends TestCase
                 'TJ_SERVICO' => 'ELEPRE', 'service_name' => 'PREVENTIVA ELETRICA', 'TJ_TIPO' => 'COR', 'TJ_CCUSTO' => '',
                 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'status' => 'FECHADA', 'planned_date' => '2026-01-01',
                 'TJ_HOMPINI' => '', 'TJ_DTPRINI' => '', 'TJ_HOPRINI' => ''] + $base;
-            $rows = count($calls) === 1 ? [['dimension' => 'total'] + $base, ['dimension' => 'cards'] + $order] : [$order, $order];
-            if ($sql === ProtheusSectorQueries::backlog()) $rows = [['dimension' => 'total', 'quantity' => 2] + $base, ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base];
+            $rows = count($calls) === 1 ? [['dimension' => 'total'] + $base, ['dimension' => 'cards'] + $order,
+                ['dimension' => 'equipment'] + $order] : [$order, $order];
+            if ($sql === ProtheusSectorQueries::backlog()) $rows = [['dimension' => 'total', 'quantity' => 2] + $base,
+                ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base,
+                ['dimension' => 'equipment'] + $order];
             if ($sql === ProtheusSectorQueries::backlog() && $backlog !== null) {
                 $rows = array_map(static fn (array $row): array => $row + $base, $backlog);
             }

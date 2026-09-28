@@ -43,11 +43,10 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <div class="alert alert-secondary" role="status">Ordens do Protheus temporariamente indisponíveis. Tente novamente em instantes.</div>
 <?php else: ?>
 <section class="pcm-panel p-3"><div class="table-responsive"><table class="table table-hover align-middle">
-<thead><tr><th>Filial / OS</th><th>Data de origem</th><th>Equipamento</th><th>Serviço</th><th>Área / centro de custo</th><th>Tipo / situação / término (brutos)</th></tr></thead>
+<thead><tr><th>OS</th><th>Data de origem</th><th>Equipamento</th><th>Serviço</th><th>Área / centro de custo</th><th>Tipo / situação / término (brutos)</th></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td><?= h($row['TJ_FILIAL'] === '' ? '(em branco)' : $row['TJ_FILIAL']) ?> /
-<?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
+<tr><td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($display($row['TJ_CODBEM'])) ?><br><?= h($display($row['equipment_name'])) ?></td>
 <td><?= h($display($row['TJ_SERVICO'])) ?><br><?= h($display($row['service_name'])) ?></td>

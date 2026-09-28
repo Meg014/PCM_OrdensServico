@@ -23,7 +23,6 @@ $status = static function (array $row): string {
 <p class="alert alert-secondary" role="status">Histórico do Protheus temporariamente indisponível. Tente novamente em instantes.</p>
 <?php return; endif; $s = $equipment['summary']; ?>
 <section class="pcm-panel p-4 mb-4"><h2><?= h($equipment['header']['T9_NOME'] ?? 'Nome não disponível no cadastro') ?></h2>
-<p>Filial: <?= h($f['filial'] ?: 'Não informada') ?></p>
 <p>Centro de custo registrado nas O.S.: <?= h((int)$s['cost_center_count'] > 1 ? 'Múltiplos — consulte a tabela' : ($s['cost_center'] ?: 'Não informado')) ?><br>
 Área/setor registrado nas O.S.: <?= h((int)$s['area_count'] > 1 ? 'Múltiplos — consulte a tabela' : $area($s['area'])) ?></p>
 <small class="text-body-secondary">Área e centro de custo são os registros históricos das O.S., não uma atribuição cadastral atual do bem.</small></section>

@@ -17,8 +17,9 @@ $this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 
 <?= $this->Form->hidden('card', ['value' => $sector['filters']['card']]) ?>
 <?= $this->Form->hidden('card_status', ['value' => $sector['filters']['card_status']]) ?>
 <?= $this->Form->hidden('backlog_age', ['value' => $sector['filters']['backlog_age']]) ?>
+<?php if ($sector['filters']['filial'] !== ''): ?><?= $this->Form->hidden('filial', ['value' => $sector['filters']['filial']]) ?><?php endif; ?>
 <div class="row g-3">
-<?php foreach (['filial' => 'Filial', 'status' => 'Status', 'equipment' => 'Equipamento/Bem (código)', 'service' => 'Serviço (código)',
+<?php foreach (['status' => 'Status', 'equipment' => 'Equipamento/Bem (código)', 'service' => 'Serviço (código)',
     'service_name' => 'Nome do serviço (exato)', 'cost_center' => 'Centro de custo', 'maintenance_type' => 'Tipo Manut.',
     'q' => 'Pesquisar OS, bem ou serviço', 'date_start' => 'Início planejado: de', 'date_end' => 'Início planejado: até'] as $key => $label): ?>
 <div class="col-md-4"><?= $this->Form->control($key, ['label' => $label, 'value' => $sector['filters'][$key],

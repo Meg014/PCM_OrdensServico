@@ -34,7 +34,8 @@ Abertas: término N, situação diferente de C e início planejado desde 01/01/2
 Fechadas: término S, sem corte de data. Combinações conflitantes aguardam validação.</p>
 <details class="pcm-panel p-3 mb-3"><summary>Filtros da consulta Protheus</summary>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-2 mt-2']) ?>
-<?php foreach (['filial' => 'Filial', 'area' => 'Área', 'bem' => 'Equipamento', 'servico' => 'Serviço',
+<?php if ($payload['filters']['filial'] !== ''): ?><?= $this->Form->hidden('filial', ['value' => $payload['filters']['filial']]) ?><?php endif; ?>
+<?php foreach (['area' => 'Área', 'bem' => 'Equipamento', 'servico' => 'Serviço',
     'centro' => 'Centro de custo', 'tipo' => 'TJ_TIPO (bruto)', 'situacao' => 'Situação (bruta)', 'termino' => 'Término (bruto)'] as $key => $label): ?>
 <div class="col-sm-6 col-lg-3"><label class="form-label" for="dashboard-<?= h($key) ?>"><?= h($label) ?></label>
 <input class="form-control" id="dashboard-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($payload['filters'][$key]) ?>" maxlength="100"></div>

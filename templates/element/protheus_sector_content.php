@@ -8,6 +8,9 @@ $cardUrl = fn (string $category, string $status) => ['_name' => 'pcm-sector', 'c
 $backlogUrl = fn (string $age) => ['_name' => 'pcm-sector', 'code' => $sector['code'],
     '?' => array_replace($sector['filters'], ['card' => '', 'card_status' => '', 'backlog_age' => $age,
         'status' => $age === '' ? $sector['filters']['status'] : 'EM ABERTO', 'page' => 1, 'limit' => $sector['limit']]), '#' => 'orders'];
+$equipmentUrl = static fn (array $row): array => ['_name' => 'pcm-equipment', '?' => [
+    'bem' => $row['key'], 'filial' => $row['branch'],
+]];
 ?>
 <section class="pcm-dashboard-section"><h2>Backlog / O.S. em aberto</h2>
 <p class="text-body-secondary">Abertas liberadas do setor, conforme os filtros manuais. Idade desde a origem da O.S. até <?= h($sector['backlog']['as_of']) ?>, sem corte de início planejado. O período planejado filtra somente a tabela.</p>
@@ -23,11 +26,19 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <div class="col-lg-4"><article class="pcm-panel p-3"><h3 class="h5"><?= h($label) ?></h3>
 <ul class="list-group list-group-flush">
 <?php foreach ($sector['backlog'][$key] as $row): ?>
-<li class="list-group-item d-flex justify-content-between gap-2"><span><?= h($row['label']) ?><?= $row['branch'] !== '' ? h(' · filial ' . $row['branch']) : '' ?></span><strong><?= h($row['quantity']) ?></strong></li>
+<li class="list-group-item d-flex justify-content-between gap-2"><?php if ($key === 'equipment' && $row['key'] !== ''): ?>
+<?= $this->Html->link($row['label'], $equipmentUrl($row), ['class' => 'pcm-ranking-link']) ?>
+<?php else: ?><span><?= h($row['label']) ?></span><?php endif; ?><strong><?= h($row['quantity']) ?></strong></li>
 <?php endforeach; ?>
 <?php if (!$sector['backlog'][$key]): ?><li class="list-group-item text-body-secondary">Nenhuma O.S. em aberto.</li><?php endif; ?>
 </ul></article></div>
 <?php endforeach; ?></div></section>
+<section class="pcm-dashboard-section"><h2>Safra / Entressafra</h2>
+<div class="row g-3">
+<?php foreach ($labels as $key => $label): ?><div class="col-sm-6">
+<?php [$season, $state] = explode('_', $key, 2); ?>
+<a class="pcm-kpi-card text-decoration-none" href="<?= h($this->Url->build($cardUrl($season, $state === 'open' ? 'EM ABERTO' : 'FECHADA'))) ?>"><p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($sector['cards'][$key], 0, ',', '.')) ?></strong></a>
+</div><?php endforeach; ?></div></section>
 <section class="pcm-dashboard-section"><h2>Resumo operacional do setor</h2><div class="row g-3">
 <?php foreach (['total' => 'Total operacional', 'open' => 'O.S. abertas', 'closed' => 'O.S. fechadas'] as $key => $label): ?>
 <div class="col-md-4"><a class="pcm-kpi-card text-decoration-none" href="<?= h($this->Url->build($cardUrl('all', ['open' => 'EM ABERTO', 'closed' => 'FECHADA'][$key] ?? ''))) ?>">
@@ -43,12 +54,6 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
     $cardUrl($category, $state === 'open' ? 'EM ABERTO' : 'FECHADA'), ['class' => 'btn btn-outline-primary']) ?>
 <?php endforeach; ?></div></article></div>
 <?php endforeach; ?></div></section>
-<section class="pcm-dashboard-section"><h2>Safra / Entressafra</h2>
-<div class="row g-3">
-<?php foreach ($labels as $key => $label): ?><div class="<?= str_starts_with($key, 'safra_') || str_starts_with($key, 'offseason_') ? 'col-sm-6' : 'col-sm-4' ?>">
-<?php [$season, $state] = explode('_', $key, 2); ?>
-<a class="pcm-kpi-card text-decoration-none" href="<?= h($this->Url->build($cardUrl($season, $state === 'open' ? 'EM ABERTO' : 'FECHADA'))) ?>"><p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($sector['cards'][$key], 0, ',', '.')) ?></strong></a>
-</div><?php endforeach; ?></div></section>
 <section class="pcm-dashboard-section"><div class="pcm-section-title"><h2>Situação da carteira</h2></div><div class="row g-4">
 <?php foreach (['status' => 'Distribuição por status', 'maintenance' => 'Perfil de manutenção', 'equipment' => 'Top 10 equipamentos',
     'services' => 'Top 10 serviços', 'costCenters' => 'Ranking de centros de custo'] as $key => $label): ?>
@@ -73,10 +78,9 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <small class="d-block">Os filtros manuais e o período da tabela também são respeitados. Cards e gráficos mantêm o conjunto de referência.</small></p>
 <?php endif; ?>
 <div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Ordens de Serviço — rolagem horizontal" tabindex="0"><table class="table pcm-orders-table align-middle">
-<thead><tr><?php foreach (array_merge(['Filial / OS', 'Equipamento', 'Serviço', 'Centro de custo', 'Tipo', 'Situação / término', 'Início planejado', 'Início real', 'Status'], $sector['filters']['backlog_age'] !== '' ? ['Origem / idade'] : []) as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
+<thead><tr><?php foreach (array_merge(['OS', 'Equipamento', 'Serviço', 'Centro de custo', 'Tipo', 'Situação / término', 'Início planejado', 'Início real', 'Status'], $sector['filters']['backlog_age'] !== '' ? ['Origem / idade'] : []) as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($sector['orders'] as $row): ?><tr>
-<td><?= h($value($row['TJ_FILIAL'])) ?> /
-<?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
+<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
 <td><?php if (trim((string)$row['TJ_CODBEM']) !== ''): ?><?= $this->Html->link($value($row['TJ_CODBEM']) . ' — ' . $value($row['equipment_name']), ['_name' => 'pcm-equipment', '?' => ['bem' => $row['TJ_CODBEM'], 'filial' => $row['TJ_FILIAL']]]) ?><?php else: ?>—<?php endif; ?></td>
 <td><?= h($value($row['TJ_SERVICO'])) ?><br><?= h($value($row['service_name'])) ?></td>
 <td><?= h($value($row['TJ_CCUSTO'])) ?></td><td><?= h($value($row['TJ_TIPO'])) ?></td>

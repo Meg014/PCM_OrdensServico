@@ -59,7 +59,7 @@
             return;
         }
         const m = data.maintenance;
-        const title = heading('Detalhes da manutenção', `PROTHEUS · OS ${value(data.number)} · FILIAL ${value(data.branch)}`);
+        const title = heading('Detalhes da manutenção', `PROTHEUS · OS ${value(data.number)}`);
         const card = node('section', undefined, 'pcm-detail-card');
         card.append(node('h3', 'Descrição do serviço', 'h5'));
         const descriptionText = data.description == null ? '' : String(data.description)

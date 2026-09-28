@@ -121,6 +121,8 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-page-list .ellipsis { align-items: center; color: var(--pcm-muted); display: inline-flex; min-height: 2.35rem; padding: 0 .25rem; }
 .pcm-history-empty { display: flex; flex-direction: column; gap: .35rem; padding: 1.5rem; }
 .pcm-history-empty span { color: var(--pcm-muted); }
+.pcm-ranking-link { color: var(--link); cursor: pointer; font-weight: 600; text-decoration: none; }
+.pcm-ranking-link:hover, .pcm-ranking-link:focus { color: var(--text-title); text-decoration: underline; }
 .pcm-history-filter { overflow: visible; padding: 1.25rem; }
 .pcm-history-filter label { color: #586274; display: block; font-size: .79rem; font-weight: 700; margin-bottom: .4rem; }
 .pcm-history-filter select, .pcm-history-filter input { border: 1px solid #d5dde6; border-radius: .55rem; height: 2.8rem; padding: .55rem .75rem; width: 100%; }

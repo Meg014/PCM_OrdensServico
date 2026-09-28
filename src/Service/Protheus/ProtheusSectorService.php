@@ -100,7 +100,7 @@ final class ProtheusSectorService
                     'costCenters' => [$row['TJ_CCUSTO'], $row['TJ_CCUSTO']],
                 };
                 $branch = $row['TJ_FILIAL'] ?? '';
-                $charts[$dimension][] = ['key' => $key ?? '', 'label' => ($label ?: 'Não informado') . ($branch !== '' ? ' · filial ' . $branch : ''),
+                $charts[$dimension][] = ['key' => $key ?? '', 'label' => $label ?: 'Não informado',
                     'branch' => $branch, 'quantity' => $quantity];
             }
             $stage = 'validation: aggregates / totals';
@@ -120,7 +120,8 @@ final class ProtheusSectorService
                     'costCenters' => $row['TJ_CCUSTO'] ?: 'Não informado',
                     'maintenance' => ['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? ($row['TJ_TIPO'] ?: 'Não informado'),
                 };
-                $backlog[$dimension][] = ['label' => $label, 'quantity' => $quantity, 'branch' => $row['TJ_FILIAL'] ?? ''];
+                $backlog[$dimension][] = ['key' => $dimension === 'equipment' ? ($row['TJ_CODBEM'] ?? '') : '',
+                    'label' => $label, 'quantity' => $quantity, 'branch' => $row['TJ_FILIAL'] ?? ''];
             }
             if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) {
                 // Counts only: enough to diagnose the SQL result contract without exposing OS data.

@@ -1,6 +1,7 @@
 <?php
 $this->assign('title', $presentation ? 'Visão Gerencial — Protheus' : 'PCM Geral — Protheus');
-$this->Html->script($presentation ? ['pcm-protheus-dashboard'] : ['chart.umd.min', 'pcm-protheus-dashboard'], ['block' => true, 'defer' => true]);
+$this->Html->script($presentation ? ['pcm-protheus-dashboard'] : ['chart.umd.min', 'pcm-protheus-dashboard'],
+    ['block' => true, 'defer' => true, 'timestamp' => 'force']);
 $isTv = isset($currentUser) && $currentUser->role === 'TV';
 ?>
 <section class="<?= $presentation ? 'p-4' : '' ?>" data-protheus-dashboard data-presentation="<?= $presentation ? 'true' : 'false' ?>"

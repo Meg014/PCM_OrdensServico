@@ -195,6 +195,10 @@ final class ProtheusOrderAccessTest extends TestCase
         foreach (['Resumo operacional geral', 'Detalhamento por classificação', 'Backlog / O.S. em aberto',
             'Pontos de atenção', 'Ordens de Serviço'] as $heading) self::assertStringContainsString($heading, $general);
         self::assertSame(6, substr_count($general, 'data-analysis-chart='));
+        $scripts = $view->fetch('script');
+        self::assertMatchesRegularExpression('~/js/chart\.umd\.min\.js\?[0-9]+~', $scripts);
+        self::assertMatchesRegularExpression('~/js/pcm-protheus-dashboard\.js\?[0-9]+~', $scripts);
+        self::assertLessThan(strpos($scripts, 'chart.umd.min.js'), strpos($scripts, 'pcm-protheus-dashboard.js'));
         self::assertStringContainsString('data-analysis-total>37', $general);
         self::assertStringContainsString('pcm-chart-card', $general);
         self::assertStringContainsString('bem=FAB+80+080&amp;filial=01', $general);

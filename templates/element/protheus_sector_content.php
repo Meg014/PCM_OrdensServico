@@ -9,7 +9,7 @@ $backlogUrl = fn (string $age) => ['_name' => 'pcm-sector', 'code' => $sector['c
     '?' => array_replace($sector['filters'], ['card' => '', 'card_status' => '', 'backlog_age' => $age,
         'status' => $age === '' ? $sector['filters']['status'] : 'EM ABERTO', 'page' => 1, 'limit' => $sector['limit']]), '#' => 'orders'];
 $equipmentUrl = static fn (array $row): array => ['_name' => 'pcm-equipment', '?' => [
-    'bem' => $row['key'], 'filial' => $row['branch'],
+    'bem' => $row['key'], 'filial' => $row['branch'], 'setor' => $sector['code'],
 ]];
 ?>
 <section class="pcm-dashboard-section"><h2>Backlog / O.S. em aberto</h2>
@@ -22,15 +22,16 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($quantity, 0, ',', '.')) ?></strong></a></div>
 <?php endforeach; ?></div>
 <div class="row g-3 mt-2">
-<?php foreach (['equipment' => 'Top 10 equipamentos em aberto', 'costCenters' => 'Top 10 centros de custo em aberto', 'maintenance' => 'Abertas por Tipo de Manutenção'] as $key => $label): ?>
+<?php foreach (['equipment' => 'Top 10 equipamentos por O.S.', 'costCenters' => 'Top 10 centros de custo por O.S.', 'maintenance' => 'O.S. por Tipo de Manutenção'] as $key => $label): ?>
+<?php $rankingRows = $key === 'equipment' ? $sector['top_equipment'] : $sector['historical_rankings'][$key]; ?>
 <div class="col-lg-4"><article class="pcm-panel p-3"><h3 class="h5"><?= h($label) ?></h3>
 <ul class="list-group list-group-flush">
-<?php foreach ($sector['backlog'][$key] as $row): ?>
+<?php foreach ($rankingRows as $row): ?>
 <li class="list-group-item d-flex justify-content-between gap-2"><?php if ($key === 'equipment' && $row['key'] !== ''): ?>
 <?= $this->Html->link($row['label'], $equipmentUrl($row), ['class' => 'pcm-ranking-link']) ?>
 <?php else: ?><span><?= h($row['label']) ?></span><?php endif; ?><strong><?= h($row['quantity']) ?></strong></li>
 <?php endforeach; ?>
-<?php if (!$sector['backlog'][$key]): ?><li class="list-group-item text-body-secondary">Nenhuma O.S. em aberto.</li><?php endif; ?>
+<?php if (!$rankingRows): ?><li class="list-group-item text-body-secondary">Nenhuma O.S. encontrada.</li><?php endif; ?>
 </ul></article></div>
 <?php endforeach; ?></div></section>
 <section class="pcm-dashboard-section"><h2>Safra / Entressafra</h2>

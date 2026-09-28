@@ -17,7 +17,7 @@ WITH scoped AS (
         CASE WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
-    WHERE j.D_E_L_E_T_ <> '*' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))
+    WHERE j.D_E_L_E_T_ <> '*'{{AREA_SCOPE}}
       AND (
 SQL
         . ProtheusOperationalEligibility::OPERATIONAL . <<<'SQL'
@@ -54,9 +54,14 @@ SQL
 )
 SQL;
 
-    public static function aggregates(): string
+    private static function base(bool $area): string
     {
-        return self::BASE . <<<'SQL'
+        return str_replace('{{AREA_SCOPE}}', $area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '', self::BASE);
+    }
+
+    public static function aggregates(bool $area = true): string
+    {
+        return self::base($area) . <<<'SQL'
 
 , grouped AS (
     SELECT CASE WHEN GROUPING(status) = 0 AND GROUPING(TJ_SERVICO) = 0 THEN 'cards'
@@ -82,6 +87,58 @@ OPTION (RECOMPILE)
 SQL;
     }
 
+    /** Top equipment by every non-deleted OS in the selected sector and active manual filters. */
+    public static function equipmentRanking(bool $area = true): string
+    {
+        $operationalScope = '      AND (' . ProtheusOperationalEligibility::OPERATIONAL . ')';
+        $allValid = str_replace($operationalScope, '', self::base($area));
+
+        return $allValid . <<<'SQL'
+
+, grouped AS (
+    SELECT TJ_FILIAL, TJ_CODBEM, equipment_name, COUNT_BIG(*) AS quantity,
+        MAX(identity_count) AS identity_count, MAX(equipment_matches) AS equipment_matches,
+        MAX(service_matches) AS service_matches
+    FROM filtered
+    GROUP BY TJ_FILIAL, TJ_CODBEM, equipment_name
+), ranked AS (
+    SELECT grouped.*, ROW_NUMBER() OVER (
+        ORDER BY quantity DESC, TJ_FILIAL, TJ_CODBEM, equipment_name
+    ) AS position
+    FROM grouped
+)
+SELECT TJ_FILIAL, TJ_CODBEM, equipment_name, quantity,
+    identity_count, equipment_matches, service_matches
+FROM ranked
+WHERE position <= 10
+ORDER BY position
+OPTION (RECOMPILE)
+SQL;
+    }
+
+    /** Historical cost-center and maintenance rankings from the same all-valid scope as equipment. */
+    public static function historicalRankings(bool $area = true): string
+    {
+        $operationalScope = '      AND (' . ProtheusOperationalEligibility::OPERATIONAL . ')';
+        $allValid = str_replace($operationalScope, '', self::base($area));
+        return $allValid . <<<'SQL'
+
+, grouped AS (
+    SELECT CASE WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters' ELSE 'maintenance' END AS dimension,
+        TJ_CCUSTO, TJ_TIPO, COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
+        MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
+    FROM filtered GROUP BY GROUPING SETS ((TJ_CCUSTO), (TJ_TIPO))
+), ranked AS (
+    SELECT grouped.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, TJ_CCUSTO, TJ_TIPO) AS position
+    FROM grouped
+)
+SELECT dimension, TJ_CCUSTO, TJ_TIPO, quantity, identity_count, equipment_matches, service_matches
+FROM ranked WHERE dimension = 'maintenance' OR position <= 10
+ORDER BY dimension, position
+OPTION (RECOMPILE)
+SQL;
+    }
+
     private const AGE = <<<'SQL'
 
 , aged AS (
@@ -96,14 +153,14 @@ SQL;
 SQL;
 
     /** Same sector/master/manual-filter scope, exclusively L/N, with no planned-date cutoff. */
-    private static function backlogBase(): string
+    private static function backlogBase(bool $area): string
     {
-        return str_replace(ProtheusOperationalEligibility::OPERATIONAL, ProtheusOperationalEligibility::OPEN, self::BASE) . self::AGE;
+        return str_replace(ProtheusOperationalEligibility::OPERATIONAL, ProtheusOperationalEligibility::OPEN, self::base($area)) . self::AGE;
     }
 
-    public static function backlog(): string
+    public static function backlog(bool $area = true): string
     {
-        return self::backlogBase() . <<<'SQL'
+        return self::backlogBase($area) . <<<'SQL'
 
 , grouped AS (
     SELECT CASE WHEN GROUPING(age_bucket) = 0 THEN 'age' WHEN GROUPING(TJ_TIPO) = 0 THEN 'maintenance'
@@ -132,12 +189,12 @@ OPTION (RECOMPILE)
 SQL;
     }
 
-    public static function page(bool $backlog = false): string
+    public static function page(bool $backlog = false, bool $area = true): string
     {
         $source = $backlog ? 'bucketed' : 'filtered';
         $ageColumns = $backlog ? ', CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, age_days' : '';
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
-        return ($backlog ? self::backlogBase() : self::BASE) . <<<SQL
+        return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
@@ -165,11 +222,11 @@ SQL;
     }
 
     /** One bounded row per STL010 entry, with order/master data resolved in the same read. */
-    public static function entriesPage(bool $backlog = false): string
+    public static function entriesPage(bool $backlog = false, bool $area = true): string
     {
         $source = $backlog ? 'bucketed' : 'filtered';
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
-        return ($backlog ? self::backlogBase() : self::BASE) . <<<SQL
+        return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT filtered.record_id, filtered.TJ_FILIAL, filtered.TJ_ORDEM, filtered.descricao,
     filtered.TJ_CODBEM, filtered.equipment_name, filtered.TJ_SERVICO, filtered.service_name,

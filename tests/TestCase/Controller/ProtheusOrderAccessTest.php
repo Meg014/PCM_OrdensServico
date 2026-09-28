@@ -163,16 +163,45 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringNotContainsString('Concluídas', $html);
         self::assertStringNotContainsString('Fonte: Protheus', $html);
         self::assertStringNotContainsString('Filtros da consulta Protheus', $html);
+        self::assertStringNotContainsString('ANÁLISE GERAL', $html);
+        self::assertStringNotContainsString('Top 10 equipamentos por O.S.', $html);
         self::assertStringNotContainsString('Comparar legado Excel', $html);
         self::assertStringContainsString('href="/pcm" class="btn btn-sm btn-outline-secondary">Sair da apresentação</a>', $html);
         self::assertStringNotContainsString('data-pcm-current-version', $html);
         self::assertStringNotContainsString('Importe um XLSX', $html);
         $view->set('presentation', false);
+        $generalPayload = $view->get('payload');
+        $generalPayload['analysis'] = ['total' => 37, 'equipment' => [[
+            'code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37,
+        ]], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
+            'status' => ['completed' => 0, 'open' => 0, 'canceled' => 0]];
+        $generalPayload['detail'] = ['available' => true,
+            'operational' => ['total' => 10, 'open' => 3, 'closed' => 7],
+            'breakdown' => array_fill_keys(array_keys(\App\Service\Protheus\ProtheusSectorService::CATEGORIES), ['open' => 0, 'closed' => 0]),
+            'backlog' => ['total' => 3, 'ages' => array_fill_keys(array_keys(\App\Service\Protheus\ProtheusSectorService::BACKLOG_AGES), 0), 'as_of' => '28/09/2026'],
+            'missing_start' => 2, 'charts' => ['equipment' => [], 'services' => []], 'orders' => [],
+            'page' => 1, 'limit' => 20, 'has_more' => false];
+        $view->set('payload', $generalPayload);
         $general = $view->render('protheus_dashboard', false);
         self::assertStringContainsString('Fonte: Protheus', $general);
+        self::assertStringContainsString('ANÁLISE GERAL', $general);
+        self::assertStringContainsString('Top 10 equipamentos por O.S.', $general);
+        self::assertStringContainsString('Top 10 serviços por O.S.', $general);
+        self::assertStringContainsString('Top 10 centros de custo por O.S.', $general);
+        self::assertStringContainsString('O.S. por Tipo de Manutenção', $general);
+        self::assertStringContainsString('O.S. por Setor', $general);
+        self::assertStringContainsString('Situação das O.S.', $general);
+        self::assertStringContainsString('Situação e concentração das O.S.', $general);
+        foreach (['Resumo operacional geral', 'Detalhamento por classificação', 'Backlog / O.S. em aberto',
+            'Pontos de atenção', 'Ordens de Serviço'] as $heading) self::assertStringContainsString($heading, $general);
+        self::assertSame(6, substr_count($general, 'data-analysis-chart='));
+        self::assertStringContainsString('data-analysis-total>37', $general);
+        self::assertStringContainsString('pcm-chart-card', $general);
+        self::assertStringContainsString('bem=FAB+80+080&amp;filial=01', $general);
+        self::assertStringNotContainsString('setor=', $general);
         self::assertSame(4, substr_count($general, 'data-dashboard-card='));
-        foreach (['Preventivas', 'Corretivas', 'Melhorias', 'PARADAS POR OPORTUNIDADE'] as $label) {
-            self::assertStringNotContainsString($label, $general);
+        foreach (['Preventivas', 'Corretivas', 'Melhorias', 'Paradas por Oportunidade'] as $label) {
+            self::assertStringContainsString($label, $general);
         }
         $view->set('currentUser', new Entity(['nome' => 'Teste', 'role' => 'ADMIN']));
         $page = $view->render('protheus_dashboard', 'default');

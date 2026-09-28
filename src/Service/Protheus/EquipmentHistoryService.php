@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace App\Service\Protheus;
 
 use App\Service\PcmTimeFormatter;
+use Cake\Log\Log;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Throwable;
@@ -17,7 +18,7 @@ final class EquipmentHistoryService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $values = [];
-        foreach (['bem', 'filial', 'date_start', 'date_end', 'type', 'status'] as $key) {
+        foreach (['bem', 'filial', 'setor', 'date_start', 'date_end', 'type', 'status'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) {
                 throw new InvalidArgumentException('Parâmetro inválido.');
@@ -25,6 +26,7 @@ final class EquipmentHistoryService
             $values[$key] = rtrim($value);
         }
         if ($values['bem'] === '' || !array_key_exists('filial', $query)
+            || ($values['setor'] !== '' && preg_match('/^[A-Z0-9_-]{1,30}$/D', $values['setor']) !== 1)
             || !in_array($values['status'], ['', 'open', 'closed'], true)
             || !in_array($values['type'], ['', 'COR', 'PRE', 'MEL'], true)) {
             throw new InvalidArgumentException('Informe bem, filial e filtros válidos.');
@@ -51,12 +53,16 @@ final class EquipmentHistoryService
         }
         try {
             $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 10))->equipmentPortfolio(
-                $values['bem'], $values['filial'], array_diff_key($values, array_flip(['bem', 'filial'])), $windows, $page, $limit, $export,
+                $values['bem'], $values['filial'], array_diff_key($values, array_flip(['bem', 'filial', 'setor'])),
+                $windows, $page, $limit, $export, $values['setor'],
             );
             return array_replace($result, $data, ['available' => true,
                 'not_found' => $data['header'] === null && (int)$data['summary']['all_count'] === 0,
                 'queried_at' => $formatter->format(new DateTimeImmutable(), 'd/m/Y, H:i:s')]);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::error((string)json_encode(['event' => 'equipment_history_failed',
+                'exception' => $exception::class, 'message' => $exception->getMessage()],
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
             return $result;
         }
     }

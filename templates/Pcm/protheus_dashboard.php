@@ -1,6 +1,6 @@
 <?php
 $this->assign('title', $presentation ? 'Visão Gerencial — Protheus' : 'PCM Geral — Protheus');
-$this->Html->script('pcm-protheus-dashboard', ['block' => true, 'defer' => true]);
+$this->Html->script($presentation ? ['pcm-protheus-dashboard'] : ['chart.umd.min', 'pcm-protheus-dashboard'], ['block' => true, 'defer' => true]);
 $isTv = isset($currentUser) && $currentUser->role === 'TV';
 ?>
 <section class="<?= $presentation ? 'p-4' : '' ?>" data-protheus-dashboard data-presentation="<?= $presentation ? 'true' : 'false' ?>"
@@ -61,6 +61,40 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php endforeach; ?>
 <?php endif; ?>
 <?php if (!$presentation): ?>
+<?php if (($payload['detail']['available'] ?? false) === true): ?><?= $this->element('protheus_general_detail', ['payload' => $payload, 'part' => 'before']) ?><?php endif; ?>
+<?php $analysis = $payload['analysis'] ?? ['total' => 0, 'equipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
+    'status' => ['completed' => 0, 'open' => 0, 'canceled' => 0]]; ?>
+<section class="pcm-dashboard-section mt-4" data-dashboard-analysis>
+<div class="pcm-section-title"><p>ANÁLISE GERAL</p><h2>Visão histórica das O.S.</h2></div>
+<p class="text-body-secondary">Todas as O.S. válidas e não excluídas da STJ010, considerando os filtros exatos aplicados acima.</p>
+<div class="row g-3 mb-4"><div class="col-sm-6 col-lg-4"><article class="pcm-kpi-card pcm-kpi-total flex-column align-items-start text-start gap-3 p-4">
+<p class="pcm-kpi-label mb-0">Total de O.S.</p><strong class="pcm-kpi-value" data-analysis-total><?= number_format($analysis['total'], 0, ',', '.') ?></strong>
+</article></div></div>
+<div class="row g-4">
+<div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 equipamentos por O.S.</h3><p>Equipamentos com maior volume no histórico selecionado.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="equipment">
+<?php foreach ($analysis['equipment'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-equipment', '?' => ['bem' => $row['code'], 'filial' => $row['branch']]], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+</ul></article></div>
+<div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 serviços por O.S.</h3><p>Serviços mais recorrentes no histórico selecionado.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="services">
+<?php foreach ($analysis['services'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><span><?= h($row['code'] . ' — ' . $row['name']) ?></span><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+</ul></article></div>
+<div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 centros de custo por O.S.</h3><p>Quantidade histórica; não representa custo financeiro.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="costCenters">
+<?php foreach ($analysis['costCenters'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><span><?= h($row['code'] ?: 'Sem centro de custo') ?></span><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+</ul></article></div>
+<?php foreach ([['maintenance', 'O.S. por Tipo de Manutenção'], ['sectors', 'O.S. por Setor']] as [$key, $heading]): ?>
+<div class="col-xl-6"><article class="pcm-chart-card"><h3><?= h($heading) ?></h3><p>Distribuição no mesmo universo histórico.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="<?= h($key) ?>">
+<?php foreach ($analysis[$key] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><span><?= h($row['label']) ?></span><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+</ul></article></div><?php endforeach; ?>
+<div class="col-12"><article class="pcm-chart-card"><h3>Situação das O.S.</h3><p>Classificação exclusiva: cada O.S. pertence a somente uma situação.</p><div class="row g-3 mt-1">
+<?php foreach (['completed' => ['Finalizadas', 'pcm-kpi-completed'], 'open' => ['Não finalizadas', 'pcm-kpi-progress'], 'canceled' => ['Canceladas', 'pcm-kpi-cancelled']] as $key => [$label, $class]): ?><div class="col-12 col-md-4 d-flex"><div class="pcm-kpi-card <?= h($class) ?> flex-column align-items-start text-start gap-3 p-4 w-100"><p class="pcm-kpi-label mb-0"><?= h($label) ?></p><strong class="pcm-kpi-value" data-analysis-status="<?= h($key) ?>"><?= number_format($analysis['status'][$key], 0, ',', '.') ?></strong></div></div><?php endforeach; ?>
+</div></article></div>
+</div></section>
+<section class="pcm-dashboard-section" data-analysis-charts><div class="pcm-section-title"><p>VISÃO CONSOLIDADA</p><h2>Situação e concentração das O.S.</h2></div><div class="row g-4">
+<?php foreach (['status' => 'Distribuição por situação', 'maintenance' => 'Perfil de manutenção',
+    'equipment' => 'Top 10 equipamentos', 'services' => 'Top 10 serviços',
+    'costCenters' => 'Top 10 centros de custo', 'sectors' => 'Distribuição por setor'] as $key => $heading): ?>
+<div class="col-lg-6"><article class="pcm-chart-card pcm-chart-card-tall"><h3><?= h($heading) ?></h3><div class="pcm-chart-wrap"><canvas data-analysis-chart="<?= h($key) ?>"></canvas></div></article></div>
+<?php endforeach; ?></div></section>
+<?php if (($payload['detail']['available'] ?? false) === true): ?><?= $this->element('protheus_general_detail', ['payload' => $payload, 'part' => 'after']) ?><?php endif; ?>
 <details class="mt-3 text-body-secondary"><summary>Informação técnica</summary>
 O.S. não excluídas nos filtros selecionados: <span data-dashboard-count>—</span> (não é o total operacional).
 </details>

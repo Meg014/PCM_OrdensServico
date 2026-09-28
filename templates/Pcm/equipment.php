@@ -15,6 +15,7 @@ $status = static function (array $row): string {
 ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">HISTÓRICO DO EQUIPAMENTO</p>
 <h1><?= h($f['bem']) ?></h1><span class="badge text-bg-secondary">Fonte: Protheus</span>
+<?php if ($f['setor'] !== ''): ?><p class="pcm-updated">Contexto setorial: <strong><?= h($area($f['setor'])) ?></strong></p><?php endif; ?>
 <?php if ($equipment['available']): ?><p class="pcm-updated">Dados atualizados em: <?= h($equipment['queried_at']) ?></p><?php endif; ?>
 </div><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?></header>
 <?= $this->Html->link('Exportar histórico para Excel', ['_name' => 'pcm-equipment-excel', '?' => $f], ['class' => 'btn btn-outline-success mb-3']) ?>
@@ -29,6 +30,7 @@ $status = static function (array $row): string {
 <section class="pcm-panel p-4"><h2>Filtros do histórico</h2>
 <?= $this->Form->create(null, ['type' => 'get']) ?>
 <?= $this->Form->hidden('bem', ['value' => $f['bem']]) ?><?= $this->Form->hidden('filial', ['value' => $f['filial']]) ?>
+<?php if ($f['setor'] !== ''): ?><?= $this->Form->hidden('setor', ['value' => $f['setor']]) ?><?php endif; ?>
 <div class="row g-3">
 <?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $key => $label): ?>
 <div class="col-md-3"><?= $this->Form->control($key, ['type' => 'date', 'label' => $label, 'value' => $f[$key], 'class' => 'form-control']) ?></div>
@@ -36,7 +38,7 @@ $status = static function (array $row): string {
 <div class="col-md-3"><?= $this->Form->control('type', ['label' => 'Tipo de manutenção', 'empty' => 'Todos', 'options' => ['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'], 'value' => $f['type'], 'class' => 'form-select']) ?></div>
 <div class="col-md-3"><?= $this->Form->control('status', ['label' => 'Situação operacional', 'empty' => 'Todas', 'options' => ['open' => 'Aberta', 'closed' => 'Fechada'], 'value' => $f['status'], 'class' => 'form-select']) ?></div>
 </div><p class="text-body-secondary mt-3">Período pela Data de origem da OS. Os filtros afetam tabela, resumo e reincidência.</p>
-<button class="btn pcm-primary-action">Aplicar</button> <?= $this->Html->link('Limpar', ['_name' => 'pcm-equipment', '?' => array_intersect_key($f, array_flip(['bem', 'filial']))], ['class' => 'btn pcm-secondary-action']) ?>
+<button class="btn pcm-primary-action">Aplicar</button> <?= $this->Html->link('Limpar', ['_name' => 'pcm-equipment', '?' => array_intersect_key($f, array_flip(['bem', 'filial', 'setor']))], ['class' => 'btn pcm-secondary-action']) ?>
 <?= $this->Form->end() ?></section>
 <section class="pcm-dashboard-section"><h2 class="mb-4">Resumo do histórico</h2><div class="row g-3">
 <?php foreach (['total' => 'Total de O.S.', 'open_count' => 'Abertas', 'closed_count' => 'Fechadas', 'corrective' => 'Corretivas', 'preventive' => 'Preventivas', 'improvement' => 'Melhorias'] as $key => $label): ?>

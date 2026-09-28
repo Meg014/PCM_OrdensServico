@@ -26,7 +26,7 @@ final class ProtheusSectorService
     public function load(string $area, array $query, bool $export = false, ?int $exportPage = null): array
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
-        if (!preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
+        if ($area !== '' && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
         $filters = [];
         foreach (self::FILTERS as $key) {
             $value = $query[$key] ?? '';
@@ -50,9 +50,10 @@ final class ProtheusSectorService
         if ($page === false || $limit === false || $page > intdiv(PHP_INT_MAX, (int)$limit)) throw new InvalidArgumentException('Paginação inválida.');
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
-            'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
+            'top_equipment' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
         $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status', 'backlog_age']));
-        $params += ['area' => $area, 'cutoff' => str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START)];
+        if ($area !== '') $params['area'] = $area;
+        $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
         if ($params['q'] !== '') $params['q'] = '%' . strtr($params['q'], ['~' => '~~', '%' => '~%', '_' => '~_', '[' => '~[']) . '%';
         $stage = 'connection';
         $repository = null;
@@ -110,6 +111,20 @@ final class ProtheusSectorService
             $stage = 'validation: backlog / dimensions and totals';
             $backlog = ['total' => null, 'ages' => array_fill_keys(array_keys(self::BACKLOG_AGES), 0),
                 'equipment' => [], 'costCenters' => [], 'maintenance' => [], 'as_of' => $selection['as_of']];
+            $topEquipment = [];
+            foreach ($data['equipment_ranking'] as $row) {
+                $topEquipment[] = ['key' => $row['TJ_CODBEM'] ?? '',
+                    'label' => ($row['TJ_CODBEM'] ?: 'Sem código') . ' — ' . ($row['equipment_name'] ?? 'Sem nome'),
+                    'quantity' => (int)$row['quantity'], 'branch' => $row['TJ_FILIAL'] ?? ''];
+            }
+            $historical = ['costCenters' => [], 'maintenance' => []];
+            foreach ($data['historical_rankings'] as $row) {
+                $dimension = $row['dimension'];
+                $code = $dimension === 'costCenters' ? ($row['TJ_CCUSTO'] ?? '') : ($row['TJ_TIPO'] ?? '');
+                $label = $dimension === 'costCenters' ? ($code ?: 'Não informado')
+                    : (['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$code] ?? ($code ?: 'Não informado'));
+                $historical[$dimension][] = ['key' => $code, 'label' => $label, 'quantity' => (int)$row['quantity'], 'branch' => ''];
+            }
             foreach ($data['backlog'] as $row) {
                 $quantity = (int)$row['quantity'];
                 $dimension = $row['dimension'];
@@ -142,7 +157,9 @@ final class ProtheusSectorService
             unset($rows, $row);
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),
                 'orders' => $data['orders'], 'cards' => $cards, 'breakdown' => $breakdown, 'operational' => $operational,
-                'charts' => $charts, 'backlog' => $backlog, 'missing_start' => $missing, 'has_more' => $data['has_more']]);
+                'charts' => $charts, 'backlog' => $backlog, 'top_equipment' => $topEquipment,
+                'historical_rankings' => $historical,
+                'missing_start' => $missing, 'has_more' => $data['has_more']]);
         } catch (Throwable $exception) {
             if ($this->diagnostic !== null && PHP_SAPI === 'cli') {
                 ($this->diagnostic)($exception, $stage === 'repository' ? $repository->sectorDiagnosticStage() : $stage);

@@ -72,6 +72,8 @@ SQL;
 WITH base AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_CODBEM, j.TJ_SERVICO,
            j.TJ_CCUSTO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
+           CASE WHEN j.TJ_SITUACA = 'C' THEN 'canceled'
+                WHEN j.TJ_TERMINO = 'S' THEN 'completed' ELSE 'open' END AS status_group,
            COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial,
@@ -98,7 +100,7 @@ WITH base AS (
         WHEN GROUPING(TJ_SERVICO) = 0 THEN 'service'
         WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'cost_center'
         WHEN GROUPING(TJ_TIPO) = 0 THEN 'type'
-        WHEN GROUPING(TJ_SITUACA) = 0 THEN 'status_raw'
+        WHEN GROUPING(status_group) = 0 THEN 'status'
         ELSE 'total' END AS dimension,
         CASE
         WHEN GROUPING(TJ_CODAREA) = 0 THEN TJ_CODAREA
@@ -106,22 +108,46 @@ WITH base AS (
         WHEN GROUPING(TJ_SERVICO) = 0 THEN TJ_SERVICO
         WHEN GROUPING(TJ_CCUSTO) = 0 THEN TJ_CCUSTO
         WHEN GROUPING(TJ_TIPO) = 0 THEN TJ_TIPO
-        WHEN GROUPING(TJ_SITUACA) = 0 THEN TJ_SITUACA
+        WHEN GROUPING(status_group) = 0 THEN status_group
         ELSE '' END AS code,
-        CASE WHEN GROUPING(TJ_SITUACA) = 0 THEN TJ_TERMINO ELSE '' END AS ending,
+        '' AS ending,
         CASE WHEN GROUPING(TJ_FILIAL) = 0 THEN TJ_FILIAL ELSE '' END AS branch,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count
     FROM base
-    GROUP BY GROUPING SETS ((), (TJ_FILIAL, TJ_CODAREA), (TJ_FILIAL, TJ_CODBEM),
-        (TJ_FILIAL, TJ_SERVICO), (TJ_FILIAL, TJ_CCUSTO), (TJ_FILIAL, TJ_TIPO),
-        (TJ_FILIAL, TJ_SITUACA, TJ_TERMINO))
+    GROUP BY GROUPING SETS ((), (TJ_CODAREA), (TJ_FILIAL, TJ_CODBEM), (TJ_FILIAL, TJ_SERVICO),
+        (TJ_CCUSTO), (TJ_TIPO), (status_group))
 ), ranked AS (
     SELECT dimension, code, ending, branch, quantity, identity_count,
         ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, branch, code, ending) AS position
     FROM grouped
 )
-SELECT dimension, code, ending, branch, quantity, identity_count
-FROM ranked WHERE position <= 10
+SELECT r.dimension, r.code, r.ending, r.branch, r.quantity, r.identity_count,
+    CASE WHEN r.dimension = 'equipment' THEN
+        CASE WHEN local_equipment.matches > 0 THEN local_equipment.name ELSE shared_equipment.name END
+    END AS equipment_name,
+    CASE WHEN r.dimension = 'equipment' THEN
+        CASE WHEN local_equipment.matches > 0 THEN local_equipment.matches ELSE shared_equipment.matches END
+    ELSE 0 END AS equipment_matches
+    ,CASE WHEN r.dimension = 'service' THEN
+        CASE WHEN local_service.matches > 0 THEN local_service.name ELSE shared_service.name END
+    END AS service_name
+    ,CASE WHEN r.dimension = 'service' THEN
+        CASE WHEN local_service.matches > 0 THEN local_service.matches ELSE shared_service.matches END
+    ELSE 0 END AS service_matches
+FROM ranked r
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
+    WHERE r.dimension = 'equipment' AND b.T9_CODBEM = r.code AND b.T9_FILIAL = r.branch
+      AND b.D_E_L_E_T_ <> '*') local_equipment
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
+    WHERE r.dimension = 'equipment' AND b.T9_CODBEM = r.code AND b.T9_FILIAL = ''
+      AND b.D_E_L_E_T_ <> '*') shared_equipment
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE r.dimension = 'service' AND s.T4_SERVICO = r.code AND s.T4_FILIAL = r.branch
+      AND s.D_E_L_E_T_ <> '*') local_service
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE r.dimension = 'service' AND s.T4_SERVICO = r.code AND s.T4_FILIAL = ''
+      AND s.D_E_L_E_T_ <> '*') shared_service
+WHERE r.dimension NOT IN ('equipment', 'service', 'cost_center') OR r.position <= 10
 ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
@@ -144,9 +170,9 @@ SQL;
     }
 
     /** Dedicated equipment page, sharing the established history joins and ordering. */
-    public static function equipmentPortfolioPage(): string
+    public static function equipmentPortfolioPage(bool $sector = false): string
     {
-        return self::orderPage(ProtheusEquipmentQueries::SCOPE . ' AND ' . ProtheusEquipmentQueries::FILTER,
+        return self::orderPage(ProtheusEquipmentQueries::scope($sector) . ' AND ' . ProtheusEquipmentQueries::FILTER,
             false, false, true, ProtheusEquipmentQueries::FILTER_JOIN, self::ORIGIN_DATE);
     }
 
@@ -368,11 +394,16 @@ SQL;
 
     private static function allowsBase(string $sql): bool
     {
-        if (in_array($sql, [self::equipmentPortfolioPage(), ProtheusEquipmentQueries::HEADER, ProtheusEquipmentQueries::summary()], true)) {
+        if (in_array($sql, [self::equipmentPortfolioPage(), self::equipmentPortfolioPage(true),
+            ProtheusEquipmentQueries::HEADER, ProtheusEquipmentQueries::summary(), ProtheusEquipmentQueries::summary(true)], true)) {
             return true;
         }
-        if ($sql === ProtheusSectorQueries::aggregates() || $sql === ProtheusSectorQueries::page()
-            || $sql === ProtheusSectorQueries::page(true) || $sql === ProtheusSectorQueries::backlog()
+        if (in_array($sql, [ProtheusSectorQueries::aggregates(), ProtheusSectorQueries::aggregates(false),
+            ProtheusSectorQueries::page(), ProtheusSectorQueries::page(false, false),
+            ProtheusSectorQueries::page(true), ProtheusSectorQueries::page(true, false),
+            ProtheusSectorQueries::backlog(), ProtheusSectorQueries::backlog(false),
+            ProtheusSectorQueries::equipmentRanking(), ProtheusSectorQueries::equipmentRanking(false),
+            ProtheusSectorQueries::historicalRankings(), ProtheusSectorQueries::historicalRankings(false)], true)
             || $sql === ProtheusSectorQueries::entriesPage() || $sql === ProtheusSectorQueries::entriesPage(true)) {
             return true;
         }

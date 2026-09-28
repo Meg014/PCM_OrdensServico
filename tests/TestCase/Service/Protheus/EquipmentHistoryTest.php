@@ -82,6 +82,60 @@ final class EquipmentHistoryTest extends TestCase
         (new EquipmentHistoryService())->load(['bem' => 'MEL 80 115', 'filial' => '01', 'date_start' => '2026-02-30']);
     }
 
+    public function testOptionalSectorFiltersEveryEquipmentAggregateAndPageButGeneralAccessRemainsUnscoped(): void
+    {
+        foreach (['MECANI', 'ELETRI', ''] as $sector) {
+            $calls = [];
+            $result = (new EquipmentHistoryService($this->repository($calls)))->load([
+                'bem' => 'MEL 80 115', 'filial' => '01', 'setor' => $sector,
+            ]);
+            self::assertTrue($result['available']);
+            self::assertSame($sector, $result['filters']['setor']);
+            foreach ([1, 2] as $index) {
+                if ($sector === '') {
+                    self::assertArrayNotHasKey('setor', $calls[$index][1]);
+                    self::assertStringNotContainsString(':setor', $calls[$index][0]);
+                    self::assertStringNotContainsString('j.TJ_CODAREA =', $calls[$index][0]);
+                } else {
+                    self::assertSame($sector, $calls[$index][1]['setor']);
+                    self::assertSame(1, substr_count($calls[$index][0], ':setor'));
+                    self::assertStringContainsString('j.TJ_CODAREA = CAST(:setor AS VARCHAR(100))', $calls[$index][0]);
+                }
+            }
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        (new EquipmentHistoryService())->load(['bem' => 'MEL 80 115', 'filial' => '01', 'setor' => 'MECANI OR 1=1']);
+    }
+
+    public function testValidSectorWithoutOrdersIsAvailableAndEmptyRatherThanUnavailable(): void
+    {
+        $calls = [];
+        $result = (new EquipmentHistoryService($this->repository($calls, empty: true)))->load([
+            'bem' => 'MEL 80 115', 'filial' => '01', 'setor' => 'CALDEI',
+        ]);
+        self::assertTrue($result['available']);
+        self::assertSame([], $result['orders']);
+        self::assertFalse($result['has_more']);
+        self::assertSame(0, (int)$result['summary']['total']);
+    }
+
+    public function testSectorIsPreservedByPaginationAndExport(): void
+    {
+        foreach ([false, true] as $export) {
+            $calls = [];
+            $result = (new EquipmentHistoryService($this->repository($calls)))->load([
+                'bem' => 'MEL 80 115', 'filial' => '01', 'setor' => 'MECANI',
+                'page' => 2, 'limit' => 1,
+            ], $export, $export ? 3 : null);
+            self::assertTrue($result['available']);
+            self::assertSame('MECANI', $result['filters']['setor']);
+            self::assertSame('MECANI', $calls[2][1]['setor']);
+            self::assertSame($export ? 2000 : 1, $calls[2][1]['offset']);
+            self::assertSame($export ? 1001 : 2, $calls[2][1]['fetch']);
+        }
+    }
+
     public function testEquipmentRouteAndEscapedPageKeepExistingOrderDetail(): void
     {
         if (!defined('ROOT')) require dirname(__DIR__, 4) . '/config/paths.php';
@@ -143,7 +197,7 @@ final class EquipmentHistoryTest extends TestCase
         $filters = ['bem' => '000123', 'filial' => '01', 'status' => 'open', 'type' => 'COR', 'date_start' => '2026-01-01', 'date_end' => '2026-09-25'];
         $data = (new EquipmentHistoryService($this->repository($calls)))->load($filters + ['page' => 9, 'limit' => 1], true);
         self::assertTrue($data['available']);
-        self::assertEquals($filters, $data['filters']);
+        self::assertEquals($filters + ['setor' => ''], $data['filters']);
         self::assertCount(2, $data['orders']);
         $params = $calls[count($calls) - 1][1];
         foreach ($filters as $key => $value) self::assertSame($value, $params[$key]);
@@ -151,17 +205,26 @@ final class EquipmentHistoryTest extends TestCase
         self::assertSame(1001, $params['fetch']);
     }
 
-    private function repository(array &$calls, bool $fail = false): ProtheusRepository
+    private function repository(array &$calls, bool $fail = false, bool $empty = false): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail, $empty) {
             $calls[] = [$sql, $params, $types];
             self::assertTrue(ProtheusQueries::allows($sql));
+            preg_match_all('/:([a-z][a-z0-9_]*)/i', $sql, $matches);
+            $placeholders = array_values(array_unique($matches[1]));
+            sort($placeholders);
+            $parameterNames = array_keys($params);
+            sort($parameterNames);
+            self::assertSame($placeholders, $parameterNames, 'Os parâmetros devem corresponder exatamente aos placeholders SQL.');
             if ($fail) throw new \RuntimeException('SQLSTATE private host');
-            $rows = match ($sql) {
-                Q::HEADER => [['T9_CODBEM' => 'MEL 80 115', 'T9_NOME' => 'MOTOR']],
-                Q::summary() => [['identity_count' => 1, 'all_count' => 2]],
+            $rows = match (true) {
+                $sql === Q::HEADER => [['T9_CODBEM' => 'MEL 80 115', 'T9_NOME' => 'MOTOR']],
+                in_array($sql, [Q::summary(), Q::summary(true)], true) => [[
+                    'identity_count' => $empty ? null : 1, 'all_count' => $empty ? 0 : 2, 'total' => $empty ? 0 : 2,
+                ]],
+                $empty => [],
                 default => array_fill(0, 2, ['identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1, 'TJ_ORDEM' => '004368']),
             };
             $statement = $this->createMock(StatementInterface::class);

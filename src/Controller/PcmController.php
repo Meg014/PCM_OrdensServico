@@ -199,7 +199,7 @@ final class PcmController extends AppController
     /** Returns only the current presentation counters and snapshot identity. */
     public function presentationData(): Response
     {
-        return $this->dashboardData();
+        return $this->directDashboardData(false);
     }
 
     public function presentationLegacyData(): Response
@@ -214,10 +214,15 @@ final class PcmController extends AppController
 
     public function dashboardData(): Response
     {
+        return $this->directDashboardData(true);
+    }
+
+    private function directDashboardData(bool $includeAnalysis): Response
+    {
         $this->request->allowMethod(['get']);
         $this->request->getSession()->close();
         try {
-            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams());
+            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams(), $includeAnalysis);
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros inválidos.');
         }
@@ -231,7 +236,7 @@ final class PcmController extends AppController
     {
         $this->request->getSession()->close();
         try {
-            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams());
+            $payload = (new ProtheusDashboardService())->load($this->request->getQueryParams(), !$presentation);
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros inválidos.');
         }

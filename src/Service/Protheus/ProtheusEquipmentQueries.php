@@ -12,6 +12,11 @@ WHERE b.T9_CODBEM = CAST(:codigo AS VARCHAR(100)) AND b.T9_FILIAL = CAST(:filial
     AND b.D_E_L_E_T_ <> '*'
 SQL;
     public const SCOPE = "j.D_E_L_E_T_ <> '*' AND j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))";
+
+    public static function scope(bool $sector): string
+    {
+        return self::SCOPE . ($sector ? ' AND j.TJ_CODAREA = CAST(:setor AS VARCHAR(100))' : '');
+    }
     public const FILTER_JOIN = <<<'SQL'
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date,
     CAST(:type AS VARCHAR(100)) AS maintenance_type, CAST(:status AS VARCHAR(10)) AS status) f
@@ -22,9 +27,9 @@ SQL;
         . " AND (f.status = '' OR (f.status = 'open' AND " . ProtheusOperationalEligibility::OPEN . ')'
         . " OR (f.status = 'closed' AND " . ProtheusOperationalEligibility::CLOSED . '))';
 
-    public static function summary(): string
+    public static function summary(bool $sector = false): string
     {
-        $scope = self::SCOPE;
+        $scope = self::scope($sector);
         $join = self::FILTER_JOIN;
         $filter = self::FILTER;
         $open = ProtheusOperationalEligibility::OPEN;

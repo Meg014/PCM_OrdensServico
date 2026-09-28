@@ -30,7 +30,7 @@ final class ProtheusDashboardTest extends TestCase
         foreach (['preventive', 'corrective', 'improvement'] as $key) self::assertSame(0, $result['indicators'][$key]);
         foreach (['emergency', 'scheduled'] as $key) self::assertSame(1, $result['indicators'][$key]);
         self::assertCount(2, $result['screens']);
-        self::assertCount(1, $calls);
+        self::assertCount(2, $calls);
         self::assertSame("X'; DELETE--", $calls[0][1]['bem']);
         self::assertSame('20260101', $calls[0][1]['cutoff']);
         self::assertStringNotContainsString("X'; DELETE--", $calls[0][0]);
@@ -72,7 +72,7 @@ final class ProtheusDashboardTest extends TestCase
             self::assertSame(6, $counts['emergency']);
             self::assertSame(4, $counts['scheduled']);
         }
-        self::assertCount(1, $calls);
+        self::assertCount(2, $calls);
         self::assertStringContainsString('GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO', $calls[0][0]);
     }
 
@@ -131,6 +131,70 @@ final class ProtheusDashboardTest extends TestCase
         self::assertFalse($result['available']);
     }
 
+    public function testGeneralAnalysisUsesOneHistoricalAggregateAndFriendlyLabels(): void
+    {
+        $calls = [];
+        $analysisRows = [
+            ['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 25,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'equipment', 'code' => 'FAB 80 080 ', 'branch' => '01', 'quantity' => 37,
+                'identity_count' => 1, 'equipment_name' => 'EXPANDER EX-245 ', 'equipment_matches' => 1],
+            ['dimension' => 'cost_center', 'code' => 'CC100', 'branch' => '01', 'quantity' => 25,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'service', 'code' => 'COREME ', 'branch' => '01', 'quantity' => 19,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0,
+                'service_name' => 'CORRETIVA EMERGENCIAL ', 'service_matches' => 1],
+            ['dimension' => 'type', 'code' => 'COR', 'branch' => '01', 'quantity' => 25,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'area', 'code' => 'MECANI', 'branch' => '01', 'quantity' => 25,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'status', 'code' => 'completed', 'branch' => '', 'quantity' => 12,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'status', 'code' => 'open', 'branch' => '', 'quantity' => 9,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'status', 'code' => 'canceled', 'branch' => '', 'quantity' => 4,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+        ];
+        $result = (new ProtheusDashboardService($this->repository([], $calls, $analysisRows)))->load(['area' => 'MECANI']);
+        self::assertTrue($result['available']);
+        self::assertSame(25, $result['analysis']['total']);
+        self::assertSame(['code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37],
+            $result['analysis']['equipment'][0]);
+        self::assertSame('Corretiva', $result['analysis']['maintenance'][0]['label']);
+        self::assertSame(['code' => 'COREME', 'name' => 'CORRETIVA EMERGENCIAL', 'branch' => '01', 'quantity' => 19],
+            $result['analysis']['services'][0]);
+        self::assertSame('Mecânica', $result['analysis']['sectors'][0]['label']);
+        self::assertSame(['completed' => 12, 'open' => 9, 'canceled' => 4], $result['analysis']['status']);
+        self::assertCount(2, $calls);
+        self::assertSame('MECANI', $calls[1][1]['area']);
+        foreach (["j.D_E_L_E_T_ <> '*'", 'COUNT_BIG(*)', 'GROUPING SETS', 'ROW_NUMBER()', 'ST9010', 'ST4010'] as $sql) {
+            self::assertStringContainsString($sql, $calls[1][0]);
+        }
+        foreach ([\App\Service\Protheus\ProtheusOperationalEligibility::OPEN,
+            \App\Service\Protheus\ProtheusOperationalEligibility::CLOSED,
+            'TJ_DTMPINI'] as $operationalRule) self::assertStringNotContainsString($operationalRule, $calls[1][0]);
+    }
+
+    public function testPresentationDoesNotQueryOrReturnDetailedAnalysis(): void
+    {
+        $calls = [];
+        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load([], false);
+        self::assertTrue($result['available']);
+        self::assertNull($result['analysis']);
+        self::assertCount(1, $calls);
+        self::assertSame(ProtheusQueries::MANAGEMENT, $calls[0][0]);
+    }
+
+    public function testInconsistentHistoricalDistributionsAreRejected(): void
+    {
+        $calls = [];
+        $incomplete = [['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 1,
+            'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0]];
+        $result = (new ProtheusDashboardService($this->repository([], $calls, $incomplete)))->load();
+        self::assertFalse($result['available']);
+        self::assertNull($result['analysis']);
+    }
+
     private function row(string $code, string $name, int $open, int $closed): array
     {
         return ['TJ_FILIAL' => '01', 'TJ_CODAREA' => 'ELETRI', 'TJ_SERVICO' => $code, 'TJ_TIPO' => '',
@@ -150,18 +214,18 @@ final class ProtheusDashboardTest extends TestCase
         self::assertTrue($result['available']);
         self::assertSame(15, $result['indicators']['opportunity']);
         self::assertSame(15, $result['screens'][1]['opportunity']);
-        self::assertCount(1, $calls);
+        self::assertCount(2, $calls);
     }
 
-    private function repository(?array $rows, array &$calls): ProtheusRepository
+    private function repository(?array $rows, array &$calls, array $analysisRows = []): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, &$calls) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, $analysisRows, &$calls) {
             $calls[] = [$sql, $params, $types];
             if ($rows === null) throw new RuntimeException('SQLSTATE host user password');
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($rows);
+            $statement->method('fetchAll')->willReturn($sql === ProtheusQueries::DASHBOARD ? $analysisRows : $rows);
             $statement->expects(self::once())->method('closeCursor');
             return $statement;
         });

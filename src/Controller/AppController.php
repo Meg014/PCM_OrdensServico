@@ -63,6 +63,7 @@ class AppController extends Controller
             'index', 'orders', 'presentation', 'presentationData', 'dashboardData',
             'sector', 'sectorData', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'equipment',
             'exportSector', 'exportOrders', 'exportEquipment', 'exportSectorEntries', 'exportOrderEntries',
+            'opportunityStops', 'exportOpportunityStops',
         ], true))) {
             throw new \Cake\Http\Exception\NotFoundException('Recurso indisponível.');
         }

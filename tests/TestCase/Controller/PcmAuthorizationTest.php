@@ -54,7 +54,7 @@ final class PcmAuthorizationTest extends TestCase
     {
         foreach (['ADMIN', 'USUARIO'] as $role) {
             foreach (['ELETRI', null] as $assignedArea) {
-                foreach (['index', 'dashboardData', 'orders', 'equipment', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'sector', 'sectorData', 'presentation', 'presentationData'] as $action) {
+                foreach (['index', 'dashboardData', 'orders', 'equipment', 'sectorOptions', 'protheusOrder', 'protheusOrderData', 'sector', 'sectorData', 'presentation', 'presentationData', 'opportunityStops', 'exportOpportunityStops'] as $action) {
                     foreach (['MECANI', 'CALDEI'] as $target) {
                         $controller = $this->controller($role, 'Pcm', $action, $assignedArea, [$target]);
                         $controller->beforeFilter(new Event('Controller.initialize', $controller));
@@ -91,6 +91,8 @@ final class PcmAuthorizationTest extends TestCase
             ['Pcm', 'sector', '/pcm/setor/ELETRI'], ['Pcm', 'sectorData', '/pcm/setor/ELETRI/data'],
             ['Pcm', 'sectorOptions', '/pcm/setores/data'], ['Pcm', 'orders', '/pcm/ordens'],
             ['Pcm', 'equipment', '/pcm/equipamento'],
+            ['Pcm', 'opportunityStops', '/pcm/paradas-oportunidade'],
+            ['Pcm', 'exportOpportunityStops', '/pcm/paradas-oportunidade/excel'],
             ['Pcm', 'protheusOrder', '/pcm/protheus/os/004368'],
             ['Pcm', 'protheusOrderData', '/pcm/protheus/os/004368/dados'],
             ['Users', 'index', '/usuarios'], ['Users', 'add', '/usuarios/novo'],

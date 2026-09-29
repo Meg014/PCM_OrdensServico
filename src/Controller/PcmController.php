@@ -47,6 +47,42 @@ final class PcmController extends AppController
         return $this->exportEntries(null);
     }
 
+    public function opportunityStops(): void
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        try {
+            $service = new \App\Service\Protheus\OpportunityStopService();
+            $stops = $service->load($this->request->getQueryParams());
+            $workshops = $service->workshops();
+            $costCenters = $service->costCenters($stops['area']);
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtros ou paginação inválidos.');
+        }
+        if (!$stops['available']) $this->response = $this->response->withStatus(503);
+        $this->set(compact('stops', 'workshops', 'costCenters') + ['navigationAreas' => []]);
+    }
+
+    public function exportOpportunityStops(): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        $report = new \App\Service\OpportunityStopExcelReport();
+        $generated = $report->generatedAt();
+        try {
+            $result = $report->write($this->request->getQueryParams(), $generated);
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Filtro de setor inválido.');
+        } catch (\DomainException $error) {
+            return $this->exportError($error->getMessage(), 422);
+        } catch (\Throwable) {
+            return $this->exportError('Não foi possível gerar o arquivo Excel neste momento. Tente novamente.', 503);
+        }
+        return $this->response->withType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->withHeader('Cache-Control', 'no-store')->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withDownload($report->filename($generated))->withBody(new \Laminas\Diactoros\Stream($result['stream']));
+    }
+
     private function exportEntries(?string $code): Response
     {
         $this->request->allowMethod(['get']);

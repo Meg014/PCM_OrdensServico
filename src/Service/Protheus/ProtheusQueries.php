@@ -403,7 +403,9 @@ SQL;
             ProtheusSectorQueries::page(true), ProtheusSectorQueries::page(true, false),
             ProtheusSectorQueries::backlog(), ProtheusSectorQueries::backlog(false),
             ProtheusSectorQueries::equipmentRanking(), ProtheusSectorQueries::equipmentRanking(false),
-            ProtheusSectorQueries::historicalRankings(), ProtheusSectorQueries::historicalRankings(false)], true)
+            ProtheusSectorQueries::historicalRankings(), ProtheusSectorQueries::historicalRankings(false),
+            ProtheusSectorQueries::opportunityCostCenters(),
+            ProtheusSectorQueries::opportunityCostCenters(true)], true)
             || $sql === ProtheusSectorQueries::entriesPage() || $sql === ProtheusSectorQueries::entriesPage(true)) {
             return true;
         }

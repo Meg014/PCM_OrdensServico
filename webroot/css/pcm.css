@@ -123,6 +123,10 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-history-empty span { color: var(--pcm-muted); }
 .pcm-ranking-link { color: var(--link); cursor: pointer; font-weight: 600; text-decoration: none; }
 .pcm-ranking-link:hover, .pcm-ranking-link:focus { color: var(--text-title); text-decoration: underline; }
+.pcm-kpi-inline-link {
+    background: transparent; border: 0; color: var(--link); cursor: pointer; padding: 0; text-decoration: none;
+}
+.pcm-kpi-inline-link:hover, .pcm-kpi-inline-link:focus { color: var(--focus); text-decoration: underline; }
 .pcm-history-filter { overflow: visible; padding: 1.25rem; }
 .pcm-history-filter label { color: #586274; display: block; font-size: .79rem; font-weight: 700; margin-bottom: .4rem; }
 .pcm-history-filter select, .pcm-history-filter input { border: 1px solid #d5dde6; border-radius: .55rem; height: 2.8rem; padding: .55rem .75rem; width: 100%; }

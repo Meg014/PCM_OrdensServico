@@ -11,7 +11,7 @@ if ($part === 'before'):
 <section class="pcm-dashboard-section"><h2>Detalhamento por classificação</h2>
 <p class="text-body-secondary">Detalhamentos por serviço podem se sobrepor aos tipos. Não são somados ao Total operacional.</p><div class="row g-3">
 <?php foreach (\App\Service\Protheus\ProtheusSectorService::CATEGORIES as $category => $label): ?>
-<div class="col-md-6 col-xl-4"><article class="pcm-kpi-card flex-column gap-3 p-4"><h3 class="h5 mb-0"><?= h($label) ?></h3><div class="d-flex flex-wrap justify-content-center gap-3"><span>Abertas: <strong><?= number_format($detail['breakdown'][$category]['open'], 0, ',', '.') ?></strong></span><span>Fechadas: <strong><?= number_format($detail['breakdown'][$category]['closed'], 0, ',', '.') ?></strong></span></div></article></div>
+<div class="col-md-6 col-xl-4"><article class="pcm-kpi-card flex-column gap-3 p-4"><h3 class="h5 mb-0"><?= h($label) ?></h3><div class="d-flex flex-wrap justify-content-center gap-3"><?php if ($category === 'opportunity'): ?><?= $this->Html->link('Abertas: ' . number_format($detail['breakdown'][$category]['open'], 0, ',', '.'), ['_name' => 'pcm-opportunity-stops'], ['class' => 'pcm-kpi-inline-link']) ?><?php else: ?><span>Abertas: <strong><?= number_format($detail['breakdown'][$category]['open'], 0, ',', '.') ?></strong></span><?php endif; ?><span>Fechadas: <strong><?= number_format($detail['breakdown'][$category]['closed'], 0, ',', '.') ?></strong></span></div></article></div>
 <?php endforeach; ?></div></section>
 <?php else: ?>
 <section class="pcm-dashboard-section"><h2>Backlog / O.S. em aberto</h2><p class="text-body-secondary">Abertas liberadas em todas as áreas. Idade desde a origem da O.S. até <?= h($detail['backlog']['as_of']) ?>.</p><div class="row g-3">

@@ -66,6 +66,8 @@ return function (RouteBuilder $routes): void {
         $builder->get('/pcm/ordens', ['controller' => 'Pcm', 'action' => 'orders'], 'pcm-orders');
         $builder->get('/pcm/ordens/excel', ['controller' => 'Pcm', 'action' => 'exportOrders'], 'pcm-orders-excel');
         $builder->get('/pcm/ordens/apontamentos/excel', ['controller' => 'Pcm', 'action' => 'exportOrderEntries'], 'pcm-order-entries-excel');
+        $builder->get('/pcm/paradas-oportunidade', ['controller' => 'Pcm', 'action' => 'opportunityStops'], 'pcm-opportunity-stops');
+        $builder->get('/pcm/paradas-oportunidade/excel', ['controller' => 'Pcm', 'action' => 'exportOpportunityStops'], 'pcm-opportunity-stops-excel');
         $builder->get('/pcm/equipamento/excel', ['controller' => 'Pcm', 'action' => 'exportEquipment'], 'pcm-equipment-excel');
         $builder->get('/pcm/setor/{code}/excel', ['controller' => 'Pcm', 'action' => 'exportSector'], 'pcm-sector-excel')
             ->setPass(['code'])->setPatterns(['code' => '[A-Za-z0-9_-]+']);

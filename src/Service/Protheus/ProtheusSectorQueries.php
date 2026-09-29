@@ -1,10 +1,23 @@
 <?php
 declare(strict_types=1);
+
 namespace App\Service\Protheus;
 
 /** Fixed sector SQL only. No caller-supplied SQL fragments or identifiers. */
 final class ProtheusSectorQueries
 {
+    /** Distinct location codes for open opportunity stops, optionally scoped by responsible workshop. */
+    public static function opportunityCostCenters(bool $area = false): string
+    {
+        $areaFilter = $area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '';
+
+        return 'SELECT DISTINCT RTRIM(j.TJ_CCUSTO) AS code FROM dbo.STJ010 j '
+            . 'WHERE j.D_E_L_E_T_ <> \'' . '*\' AND (' . ProtheusOperationalEligibility::OPEN . ') '
+            . 'AND j.TJ_SERVICO IN (CAST(:service1 AS VARCHAR(100)), CAST(:service2 AS VARCHAR(100))) '
+            . "AND NULLIF(LTRIM(RTRIM(j.TJ_CCUSTO)), '') IS NOT NULL"
+            . $areaFilter . ' ORDER BY code';
+    }
+
     private const BASE = <<<'SQL'
 WITH scoped AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
@@ -121,6 +134,7 @@ SQL;
     {
         $operationalScope = '      AND (' . ProtheusOperationalEligibility::OPERATIONAL . ')';
         $allValid = str_replace($operationalScope, '', self::base($area));
+
         return $allValid . <<<'SQL'
 
 , grouped AS (
@@ -194,6 +208,7 @@ SQL;
         $source = $backlog ? 'bucketed' : 'filtered';
         $ageColumns = $backlog ? ', CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, age_days' : '';
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
@@ -226,6 +241,7 @@ SQL;
     {
         $source = $backlog ? 'bucketed' : 'filtered';
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT filtered.record_id, filtered.TJ_FILIAL, filtered.TJ_ORDEM, filtered.descricao,

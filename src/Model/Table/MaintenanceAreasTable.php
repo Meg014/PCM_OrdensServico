@@ -15,6 +15,7 @@ class MaintenanceAreasTable extends Table
         'CALDEI' => 'Caldeiraria',
         'USINAG' => 'Usinagem',
         'INSTRU' => 'Instrumentação',
+        'DESTIL' => 'Destilaria',
         'OPERAC' => 'Operação',
         'TERCEI' => 'Terceiros',
     ];

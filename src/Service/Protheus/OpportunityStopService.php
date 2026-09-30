@@ -46,17 +46,22 @@ final class OpportunityStopService
         return self::WORKSHOPS;
     }
 
-    /** Returns real location codes without attempting to resolve descriptions. */
+    /** Returns code => official CTT description; the code remains the filter value. */
     public function costCenters(string $area = ''): array
     {
         try {
             $rows = ($this->repository ?? new ProtheusRepository(budgetSeconds: 5))
                 ->opportunityCostCenters($area, ProtheusSectorService::SERVICES['opportunity']);
 
-            return array_values(array_filter(array_map(
-                static fn(array $row): string => trim((string)($row['code'] ?? '')),
-                $rows,
-            )));
+            $options = [];
+            foreach ($rows as $row) {
+                $code = trim((string)($row['code'] ?? ''));
+                if ($code !== '') {
+                    $options[$code] = trim((string)($row['name'] ?? '')) ?: $code;
+                }
+            }
+
+            return $options;
         } catch (Throwable) {
             return [];
         }

@@ -401,6 +401,8 @@ SQL;
         if (in_array($sql, [ProtheusSectorQueries::aggregates(), ProtheusSectorQueries::aggregates(false),
             ProtheusSectorQueries::page(), ProtheusSectorQueries::page(false, false),
             ProtheusSectorQueries::page(true), ProtheusSectorQueries::page(true, false),
+            ProtheusSectorQueries::page(false, true, true), ProtheusSectorQueries::page(false, false, true),
+            ProtheusSectorQueries::page(true, true, true), ProtheusSectorQueries::page(true, false, true),
             ProtheusSectorQueries::backlog(), ProtheusSectorQueries::backlog(false),
             ProtheusSectorQueries::equipmentRanking(), ProtheusSectorQueries::equipmentRanking(false),
             ProtheusSectorQueries::historicalRankings(), ProtheusSectorQueries::historicalRankings(false),

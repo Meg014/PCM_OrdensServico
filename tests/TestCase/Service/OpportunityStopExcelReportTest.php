@@ -38,6 +38,7 @@ final class OpportunityStopExcelReportTest extends TestCase
                     'equipment_name' => 'MÁQUINA ÁGUA',
                     'TJ_CODAREA' => 'MECANI',
                     'TJ_CCUSTO' => '3101005',
+                    'cost_center_name' => 'EXTRACAO',
                     'TJ_TIPO' => 'COR',
                     'service_name' => '=SUM(1,1)',
                 ]],
@@ -69,7 +70,7 @@ final class OpportunityStopExcelReportTest extends TestCase
             ));
             self::assertSame('Extraído em: 29/09/2026 às 14:30', $sheet->getCell('C2')->getValue());
             self::assertSame('Oficina: Mecânica | Centro de custo: 3101005', $sheet->getCell('C3')->getValue());
-            self::assertSame('3101005', $sheet->getCell('E6')->getValue());
+            self::assertSame('EXTRACAO', $sheet->getCell('E6')->getValue());
             self::assertSame('MECÂNICA', $sheet->getCell('F6')->getValue());
             self::assertCount(1, $sheet->getDrawingCollection());
             self::assertSame('A1', $sheet->getDrawingCollection()[0]->getCoordinates());

@@ -48,7 +48,10 @@ final class PcmPresentationService
     {
         $areasByCode = [];
         foreach ($areas as $area) {
-            $areasByCode[strtoupper((string)$area->source_code)] = $area;
+            $code = strtoupper(trim((string)$area->source_code));
+            if ($code !== '') {
+                $areasByCode[$code] = $area;
+            }
         }
         $ordered = [];
         foreach (MaintenanceAreasTable::FRIENDLY_NAMES as $code => $friendlyName) {

@@ -185,6 +185,40 @@ final class ProtheusDashboardTest extends TestCase
         self::assertSame(ProtheusQueries::MANAGEMENT, $calls[0][0]);
     }
 
+    public function testPresentationOmitsBlankAreasAndUsesFriendlyNames(): void
+    {
+        $calls = [];
+        $rows = [];
+        foreach (['MECANI', 'ELETRI', 'CALDEI', 'INSTRU', 'USINAG', 'DESTIL', 'OUTRA', '', '   '] as $area) {
+            $row = $this->row('ELEPRE', 'PREVENTIVA', 1, 0);
+            $row['TJ_CODAREA'] = $area;
+            $rows[] = $row;
+        }
+        $nullArea = $this->row('ELEPRE', 'PREVENTIVA', 1, 0);
+        $nullArea['TJ_CODAREA'] = null;
+        $rows[] = $nullArea;
+
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load([], false);
+
+        self::assertTrue($result['available']);
+        self::assertSame(10, $result['indicators']['safra_open']);
+        self::assertSame(
+            [
+                'general', 'area:ELETRI', 'area:MECANI', 'area:CALDEI',
+                'area:USINAG', 'area:INSTRU', 'area:DESTIL', 'area:OUTRA',
+            ],
+            array_column($result['screens'], 'key'),
+        );
+        self::assertSame(
+            [
+                'PCM - VISÃO GERAL', 'PCM - ELÉTRICA', 'PCM - MECÂNICA', 'PCM - CALDEIRARIA',
+                'PCM - USINAGEM', 'PCM - INSTRUMENTAÇÃO', 'PCM - DESTILARIA', 'PCM - OUTRA',
+            ],
+            array_column($result['screens'], 'title'),
+        );
+        self::assertNotContains('PCM - ÁREA EM BRANCO', array_column($result['screens'], 'title'));
+    }
+
     public function testInconsistentHistoricalDistributionsAreRejected(): void
     {
         $calls = [];

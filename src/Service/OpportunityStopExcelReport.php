@@ -177,7 +177,7 @@ final class OpportunityStopExcelReport
         $type = trim((string)($source['TJ_TIPO'] ?? ''));
         foreach (
             ['A' => trim((string)$source['TJ_ORDEM']), 'C' => $description, 'D' => trim($equipment, ' —'),
-            'E' => trim((string)($source['TJ_CCUSTO'] ?? '')),
+            'E' => trim((string)($source['cost_center_name'] ?? $source['TJ_CCUSTO'] ?? '')),
             'F' => OpportunityStopService::WORKSHOPS[$area] ?? $area,
             'G' => ['COR' => 'Corretiva','PRE' => 'Preventiva','MEL' => 'Melhoria'][$type] ?? $type] as $column => $value
         ) {

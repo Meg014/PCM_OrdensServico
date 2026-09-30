@@ -6,16 +6,19 @@ namespace App\Service\Protheus;
 /** Fixed sector SQL only. No caller-supplied SQL fragments or identifiers. */
 final class ProtheusSectorQueries
 {
-    /** Distinct location codes for open opportunity stops, optionally scoped by responsible workshop. */
+    /** Distinct location codes and official CTT names for open opportunity stops. */
     public static function opportunityCostCenters(bool $area = false): string
     {
         $areaFilter = $area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '';
 
-        return 'SELECT DISTINCT RTRIM(j.TJ_CCUSTO) AS code FROM dbo.STJ010 j '
+        return 'SELECT RTRIM(j.TJ_CCUSTO) AS code, '
+            . 'COALESCE(MAX(NULLIF(LTRIM(RTRIM(c.CTT_DESC01)), \'' . '\')), RTRIM(j.TJ_CCUSTO)) AS name '
+            . 'FROM dbo.STJ010 j LEFT JOIN dbo.CTT010 c ON c.CTT_FILIAL = j.TJ_FILIAL '
+            . 'AND c.CTT_CUSTO = j.TJ_CCUSTO AND c.D_E_L_E_T_ <> \'' . '*\' '
             . 'WHERE j.D_E_L_E_T_ <> \'' . '*\' AND (' . ProtheusOperationalEligibility::OPEN . ') '
             . 'AND j.TJ_SERVICO IN (CAST(:service1 AS VARCHAR(100)), CAST(:service2 AS VARCHAR(100))) '
             . "AND NULLIF(LTRIM(RTRIM(j.TJ_CCUSTO)), '') IS NOT NULL"
-            . $areaFilter . ' ORDER BY code';
+            . $areaFilter . ' GROUP BY j.TJ_CCUSTO ORDER BY name, code';
     }
 
     private const BASE = <<<'SQL'
@@ -203,19 +206,33 @@ OPTION (RECOMPILE)
 SQL;
     }
 
-    public static function page(bool $backlog = false, bool $area = true): string
+    public static function page(bool $backlog = false, bool $area = true, bool $costCenterName = false): string
     {
         $source = $backlog ? 'bucketed' : 'filtered';
         $ageColumns = $backlog ? ', CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, age_days' : '';
         $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+
+        $costCenterColumn = $costCenterName
+            ? ", COALESCE(cost_center.name, NULLIF(LTRIM(RTRIM(filtered.TJ_CCUSTO)), '')) AS cost_center_name"
+            : '';
+        $costCenterJoin = $costCenterName ? <<<'SQL'
+
+OUTER APPLY (
+    SELECT MAX(NULLIF(LTRIM(RTRIM(c.CTT_DESC01)), '')) AS name
+    FROM dbo.CTT010 c
+    WHERE c.CTT_FILIAL = filtered.TJ_FILIAL AND c.CTT_CUSTO = filtered.TJ_CCUSTO
+      AND c.D_E_L_E_T_ <> '*'
+) cost_center
+SQL : '';
 
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
-    identity_count, equipment_matches, service_matches {$ageColumns}
+    identity_count, equipment_matches, service_matches {$ageColumns}{$costCenterColumn}
 FROM {$source} filtered
+{$costCenterJoin}
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date) d
 CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type AS VARCHAR(100)) AS type,
     CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,

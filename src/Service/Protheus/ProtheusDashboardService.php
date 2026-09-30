@@ -50,16 +50,20 @@ final class ProtheusDashboardService
                     throw new RuntimeException('Serviço indisponível ou ambíguo.');
                 }
                 $area = (string)$row['TJ_CODAREA'];
-                $areaKey = 'area:' . $area;
-                $screens[$areaKey] ??= ['key' => $areaKey,
-                    'title' => 'PCM - ' . mb_strtoupper(MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? ($area ?: 'ÁREA EM BRANCO'))] + $counts;
+                $areaKey = trim($area) === '' ? null : 'area:' . $area;
+                if ($areaKey !== null) {
+                    $screens[$areaKey] ??= ['key' => $areaKey,
+                        'title' => 'PCM - ' . mb_strtoupper(
+                            MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
+                        )] + $counts;
+                }
                 // classifySnapshot changes EMERGENCIAL/PROGRAMADA to OUTROS for non-COR;
                 // neither result is ENTRESSAFRA, so the seasonal split is type-independent.
                 $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 $typeKey = ['PRE' => 'preventive', 'COR' => 'corrective', 'MEL' => 'improvement'][rtrim((string)($row['TJ_TIPO'] ?? ''), ' ')] ?? null;
                 $serviceKey = ['COREME' => 'emergency', 'CORPRO' => 'scheduled',
                     'MECOPO' => 'opportunity', 'ELECOP' => 'opportunity'][rtrim((string)$row['TJ_SERVICO'], ' ')] ?? null;
-                foreach (['general', $areaKey] as $key) {
+                foreach ($areaKey === null ? ['general'] : ['general', $areaKey] as $key) {
                     $screens[$key][$season . '_open'] += (int)$row['open_count'];
                     $screens[$key][$season . '_completed'] += (int)$row['closed_count'];
                     if ($typeKey !== null) {

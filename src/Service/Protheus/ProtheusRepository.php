@@ -142,8 +142,9 @@ final class ProtheusRepository implements ProtheusReaderInterface
             }
         }
         $this->sectorStage = $backlogAge === '' ? 'SQL: ProtheusSectorQueries::page(false)' : 'SQL: ProtheusSectorQueries::page(true)';
+        $resolveCostCenter = ($selection['services'] ?? []) === ProtheusSectorService::SERVICES['opportunity'];
         $rows = $this->read(
-            ProtheusSectorQueries::page($backlogAge !== '', $areaScoped),
+            ProtheusSectorQueries::page($backlogAge !== '', $areaScoped, $resolveCostCenter),
             $pageParams + ['date_start' => $start,
             'date_end' => $end, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
             'card_status' => $selection['status'] ?? '', 'card_type' => $selection['type'] ?? '',

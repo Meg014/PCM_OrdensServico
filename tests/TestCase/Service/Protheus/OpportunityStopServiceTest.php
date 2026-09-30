@@ -57,10 +57,29 @@ final class OpportunityStopServiceTest extends TestCase
             $sql = ProtheusSectorQueries::opportunityCostCenters($withWorkshop);
             self::assertTrue(ProtheusQueries::allows($sql));
             self::assertStringContainsString('TJ_CCUSTO', $sql);
+            self::assertStringContainsString('dbo.CTT010', $sql);
+            self::assertStringContainsString('c.CTT_FILIAL = j.TJ_FILIAL', $sql);
+            self::assertStringContainsString('c.CTT_CUSTO = j.TJ_CCUSTO', $sql);
+            self::assertStringContainsString("c.D_E_L_E_T_ <> '*'", $sql);
+            self::assertStringContainsString('ORDER BY name, code', $sql);
             self::assertStringContainsString(':service1', $sql);
             self::assertStringContainsString(':service2', $sql);
             self::assertSame($withWorkshop, str_contains($sql, ':area'));
             self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM STJ010'));
         }
+    }
+
+    public function testOpportunityPageResolvesOneCostCenterNameWithCodeFallback(): void
+    {
+        $sql = ProtheusSectorQueries::page(false, true, true);
+
+        self::assertTrue(ProtheusQueries::allows($sql));
+        self::assertStringContainsString('OUTER APPLY', $sql);
+        self::assertStringContainsString('MAX(NULLIF(LTRIM(RTRIM(c.CTT_DESC01))', $sql);
+        self::assertStringContainsString('c.CTT_FILIAL = filtered.TJ_FILIAL', $sql);
+        self::assertStringContainsString('c.CTT_CUSTO = filtered.TJ_CCUSTO', $sql);
+        self::assertStringContainsString("c.D_E_L_E_T_ <> '*'", $sql);
+        self::assertStringContainsString('AS cost_center_name', $sql);
+        self::assertStringContainsString('f.cost_center = \'\' OR n.TJ_CCUSTO = f.cost_center', $sql);
     }
 }

@@ -121,10 +121,10 @@ class UsersController extends AppController
     /** Resets a password without accepting profile changes. */
     public function password(int $id): ?Response
     {
-        $this->request->allowMethod(['get', 'post']);
+        $this->request->allowMethod(['get', 'post', 'put', 'patch']);
         $table = $this->fetchTable('Users');
         $user = $table->get($id);
-        if ($this->request->is('post')) {
+        if ($this->request->is(['post', 'put', 'patch'])) {
             if ($table->setTemporaryPassword($user, $this->request->getData('password'))) {
                 $this->Flash->success($user->role === 'TV'
                     ? 'Senha da TV redefinida. Entre novamente na TV; não haverá troca obrigatória.'

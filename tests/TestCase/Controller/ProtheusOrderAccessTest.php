@@ -173,7 +173,9 @@ final class ProtheusOrderAccessTest extends TestCase
         $generalPayload = $view->get('payload');
         $generalPayload['analysis'] = ['total' => 37, 'equipment' => [[
             'code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37,
-        ]], 'services' => [], 'costCenters' => [
+        ]], 'services' => [[
+            'code' => 'CORMEC', 'name' => 'CORRETIVA MECANICA', 'branch' => '01', 'quantity' => 962,
+        ]], 'costCenters' => [
             ['code' => '', 'mode' => 'blank', 'quantity' => 15],
         ], 'maintenance' => [], 'sectors' => [],
             'status' => ['completed' => 0, 'open' => 0]];
@@ -205,6 +207,8 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('pcm-chart-card', $general);
         self::assertStringContainsString('bem=FAB+80+080&amp;filial=01', $general);
         self::assertStringContainsString('/pcm/ordens?centro=&amp;centro_modo=blank', $general);
+        self::assertStringContainsString('/pcm/ordens?filial=01&amp;servico=CORMEC', $general);
+        self::assertStringContainsString('CORMEC — CORRETIVA MECANICA', $general);
         self::assertStringContainsString('Sem centro de custo', $general);
         self::assertStringNotContainsString('setor=', $general);
         self::assertSame(4, substr_count($general, 'data-dashboard-card='));

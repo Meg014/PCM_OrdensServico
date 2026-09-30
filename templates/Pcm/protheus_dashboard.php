@@ -3,16 +3,23 @@ $this->assign('title', $presentation ? 'Visão Gerencial — Protheus' : 'PCM Ge
 $this->Html->script($presentation ? ['pcm-protheus-dashboard'] : ['chart.umd.min', 'pcm-protheus-dashboard'],
     ['block' => true, 'defer' => true, 'timestamp' => 'force']);
 $isTv = isset($currentUser) && $currentUser->role === 'TV';
-$orderFilters = static function (array $dashboardFilters, array $costCenter): array {
-    $query = array_filter([
+$orderContextFilters = static fn (array $dashboardFilters): array => array_filter([
         'filial' => $dashboardFilters['filial'] ?? '', 'area' => $dashboardFilters['area'] ?? '',
         'bem' => $dashboardFilters['bem'] ?? '', 'servico' => $dashboardFilters['servico'] ?? '',
         'tipo' => $dashboardFilters['tipo'] ?? '', 'situacao' => $dashboardFilters['situacao'] ?? '',
         'termino' => $dashboardFilters['termino'] ?? '',
     ], static fn ($value) => $value !== '');
+$costCenterFilters = static function (array $dashboardFilters, array $costCenter) use ($orderContextFilters): array {
+    $query = $orderContextFilters($dashboardFilters);
     $query['centro'] = $costCenter['code'];
     $query['centro_modo'] = $costCenter['mode'];
     return $query;
+};
+$serviceFilters = static function (array $dashboardFilters, array $service) use ($orderContextFilters): array {
+    return array_replace($orderContextFilters($dashboardFilters), [
+        'filial' => $service['branch'],
+        'servico' => $service['code'],
+    ]);
 };
 ?>
 <section class="<?= $presentation ? 'p-4' : '' ?>" data-protheus-dashboard data-presentation="<?= $presentation ? 'true' : 'false' ?>"
@@ -88,10 +95,10 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php foreach ($analysis['equipment'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-equipment', '?' => ['bem' => $row['code'], 'filial' => $row['branch']]], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 serviços por O.S.</h3><p>Serviços mais recorrentes no histórico selecionado.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="services">
-<?php foreach ($analysis['services'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><span><?= h($row['code'] . ' — ' . $row['name']) ?></span><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+<?php foreach ($analysis['services'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-orders', '?' => $serviceFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 centros de custo por O.S.</h3><p>Quantidade histórica; não representa custo financeiro.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="costCenters">
-<?php foreach ($analysis['costCenters'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] ?: 'Sem centro de custo', ['_name' => 'pcm-orders', '?' => $orderFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+<?php foreach ($analysis['costCenters'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] ?: 'Sem centro de custo', ['_name' => 'pcm-orders', '?' => $costCenterFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <?php foreach ([['maintenance', 'O.S. por Tipo de Manutenção'], ['sectors', 'O.S. por Setor']] as [$key, $heading]): ?>
 <div class="col-xl-6"><article class="pcm-chart-card"><h3><?= h($heading) ?></h3><p>Distribuição no mesmo universo histórico.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="<?= h($key) ?>">

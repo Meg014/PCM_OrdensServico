@@ -70,7 +70,7 @@
                     link.href = `/pcm/equipamento?${new URLSearchParams({bem: item.code, filial: item.branch})}`;
                     link.textContent = `${item.code} — ${item.name}`;
                     row.appendChild(link);
-                } else if (key === 'costCenters') {
+                } else if (key === 'services' || key === 'costCenters') {
                     const link = document.createElement('a');
                     link.className = 'pcm-ranking-link';
                     const filterNames = {filial: 'filial', area: 'area', bem: 'bem', servico: 'servico',
@@ -79,15 +79,20 @@
                     for (const [source, target] of Object.entries(filterNames)) {
                         if (payload.filters?.[source]) query.set(target, payload.filters[source]);
                     }
-                    query.set('centro', item.code);
-                    query.set('centro_modo', item.mode);
+                    if (key === 'services') {
+                        query.set('filial', item.branch);
+                        query.set('servico', item.code);
+                    } else {
+                        query.set('centro', item.code);
+                        query.set('centro_modo', item.mode);
+                    }
                     link.href = `${root.dataset.ordersUrl}?${query}`;
-                    link.textContent = item.code || 'Sem centro de custo';
+                    link.textContent = key === 'services' ? `${item.code} — ${item.name}`
+                        : (item.code || 'Sem centro de custo');
                     row.appendChild(link);
                 } else {
                     const label = document.createElement('span');
-                    label.textContent = key === 'costCenters' ? (item.code || 'Sem centro de custo')
-                        : key === 'services' ? `${item.code} — ${item.name}` : item.label;
+                    label.textContent = item.label;
                     row.appendChild(label);
                 }
                 const quantity = document.createElement('strong');

@@ -143,6 +143,29 @@ final class OrderListingTest extends TestCase
         }
     }
 
+    public function testServiceDrilldownIsExactExcludesCanceledAndSurvivesPaginationAndExport(): void
+    {
+        foreach ([false, true] as $export) {
+            $calls = [];
+            $result = (new OrderListingService($this->repository([], $calls)))->load([
+                'filial' => '01', 'area' => 'MECANI', 'bem' => 'BEM01', 'servico' => 'CORMEC',
+                'tipo' => 'COR', 'situacao' => 'L', 'termino' => 'S', 'page' => '2', 'limite' => '20',
+            ], $export, $export ? 3 : null);
+            self::assertTrue($result['available']);
+            [$sql, $params] = $calls[0];
+            foreach (['filial' => '01', 'bem' => 'BEM01', 'area' => 'MECANI', 'servico' => 'CORMEC',
+                'tipo' => 'COR', 'situacao' => 'L', 'termino' => 'S'] as $key => $value) {
+                self::assertSame($value, $params[$key]);
+            }
+            self::assertStringContainsString('j.TJ_SERVICO = f.servico', $sql);
+            self::assertStringNotContainsString('LIKE', $sql);
+            self::assertStringContainsString("j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C'", $sql);
+            self::assertSame($export ? 2000 : 20, $params['offset']);
+            self::assertSame($export ? 1001 : 21, $params['fetch']);
+            self::assertSame('CORMEC', $result['filters']['servico']);
+        }
+    }
+
     public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void
     {
         $calls = [];

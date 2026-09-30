@@ -15,6 +15,8 @@ final class OrderStreamingExport
     private const FILTER_LABELS = [
         'os' => 'Número da OS', 'filial' => 'Filial', 'bem' => 'Equipamento', 'equipment' => 'Equipamento',
         'centro' => 'Centro de custo', 'cost_center' => 'Centro de custo', 'area' => 'Área/Setor',
+        'centro_modo' => 'Regra do centro de custo', 'servico' => 'Serviço', 'tipo' => 'Tipo',
+        'situacao' => 'Situação', 'termino' => 'Término',
         'status' => 'Status', 'service' => 'Serviço', 'service_name' => 'Nome do serviço',
         'maintenance_type' => 'Tipo de manutenção', 'q' => 'Busca textual', 'date_start' => 'Data inicial',
         'date_end' => 'Data final', 'card' => 'Indicador', 'card_status' => 'Status do indicador',

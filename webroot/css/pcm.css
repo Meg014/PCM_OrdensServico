@@ -223,6 +223,14 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-orders-table thead th { background: #f7f9fc; color: #586274; font-size: .69rem; letter-spacing: .03em; padding: .8rem; text-transform: uppercase; }
 .pcm-orders-table td { border-color: #edf0f4; padding: .85rem .8rem; }
 .pcm-orders-table th a { color: inherit; text-decoration: none; }
+.pcm-order-listing .pcm-order-number { white-space: nowrap; width: 1%; }
+.pcm-order-listing .pcm-order-description {
+    max-width: 28rem; min-width: 20rem; overflow-wrap: anywhere; white-space: normal;
+    width: 28rem;
+}
+.pcm-order-listing .pcm-order-text {
+    max-width: 18rem; overflow-wrap: anywhere; white-space: normal;
+}
 .pcm-status-badge { background: #52677f; font-weight: 600; }
 .pcm-detail-card dl { margin: 1rem 0 0; }
 .pcm-detail-card dl div { border-top: 1px solid #edf0f4; display: grid; gap: 1rem; grid-template-columns: minmax(130px, 38%) 1fr; padding: .65rem 0; }

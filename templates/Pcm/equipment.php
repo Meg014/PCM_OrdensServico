@@ -44,7 +44,7 @@ $status = static function (array $row): string {
 <?php foreach (['total' => 'Total de O.S.', 'open_count' => 'Abertas', 'closed_count' => 'Fechadas', 'corrective' => 'Corretivas', 'preventive' => 'Preventivas', 'improvement' => 'Melhorias'] as $key => $label): ?>
 <div class="col-md-4"><article class="pcm-kpi-card flex-column gap-3 p-4"><p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format((int)$s[$key], 0, ',', '.')) ?></strong></article></div>
 <?php endforeach; ?></div><p class="text-body-secondary mt-3">Total inclui todos os registros não excluídos. Tipos e reincidência consideram somente liberadas L/N e L/S.
-Canceladas: <?= h($s['canceled_count']) ?> · Pendentes: <?= h($s['pending_count']) ?>.</p></section>
+Pendentes: <?= h($s['pending_count']) ?>.</p></section>
 <section class="pcm-dashboard-section"><h2 class="mb-4">Reincidência de corretivas</h2><div class="row g-3">
 <?php foreach ([30, 90, 365] as $days): ?><div class="col-md-4"><article class="pcm-kpi-card flex-column gap-3 p-4"><p class="pcm-kpi-label">Últimos <?= h($days) ?> dias</p><strong class="pcm-kpi-value"><?= h($s['recurrence' . $days]) ?></strong></article></div><?php endforeach; ?>
 </div><p class="text-body-secondary mt-3">Tipo COR pela data de origem (TJ_DTORIGI), incluindo hoje e os dias anteriores da janela, no fuso do PCM. Datas inválidas, ausentes e futuras não entram nas janelas.</p></section>

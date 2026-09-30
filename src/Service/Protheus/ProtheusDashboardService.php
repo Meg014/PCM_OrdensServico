@@ -112,7 +112,7 @@ final class ProtheusDashboardService
     private function analysis(array $rows): array
     {
         $result = ['total' => 0, 'equipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
-            'status' => ['completed' => 0, 'open' => 0, 'canceled' => 0]];
+            'status' => ['completed' => 0, 'open' => 0]];
         foreach ($rows as $row) {
             $code = rtrim((string)$row['code']);
             $quantity = (int)$row['quantity'];
@@ -122,7 +122,9 @@ final class ProtheusDashboardService
                 $result['equipment'][] = ['code' => $code, 'name' => rtrim((string)$row['equipment_name']),
                     'branch' => rtrim((string)$row['branch']), 'quantity' => $quantity];
             } elseif ($row['dimension'] === 'cost_center') {
-                $result['costCenters'][] = ['code' => $code, 'quantity' => $quantity];
+                $result['costCenters'][] = ['code' => $code,
+                    'mode' => $row['code'] === null ? 'null' : ($code === '' ? 'blank' : 'exact'),
+                    'quantity' => $quantity];
             } elseif ($row['dimension'] === 'service') {
                 $result['services'][] = ['code' => $code, 'name' => rtrim((string)$row['service_name']),
                     'branch' => rtrim((string)$row['branch']), 'quantity' => $quantity];

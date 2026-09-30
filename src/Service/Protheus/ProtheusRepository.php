@@ -285,7 +285,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = ''): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -299,9 +299,15 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $params[$key] = rtrim($value, ' ');
             }
         }
-        $extraFilters = $costCenter !== '' || $dateStart !== '' || $dateEnd !== '' || $area !== '';
+        if (!in_array($costCenterMode, ['', 'exact', 'blank', 'null'], true)) {
+            throw new InvalidArgumentException('Filtro de centro de custo inválido.');
+        }
+        $extraFilters = $costCenter !== '' || $costCenterMode !== '' || $dateStart !== '' || $dateEnd !== ''
+            || $area !== '' || $service !== '' || $type !== '' || $situation !== '' || $ending !== '';
         if ($extraFilters) {
-            $params += ['centro' => $costCenter, 'area' => $area, 'date_start' => $dateStart, 'date_end' => $dateEnd];
+            $params += ['centro' => $costCenter, 'centro_modo' => $costCenterMode, 'area' => $area,
+                'servico' => $service, 'tipo' => $type, 'situacao' => $situation, 'termino' => $ending,
+                'date_start' => $dateStart, 'date_end' => $dateEnd];
         }
         $rows = $this->read(
             ProtheusQueries::orders($number !== null, $branch !== null, $equipment !== null, $extraFilters),

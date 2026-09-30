@@ -173,8 +173,10 @@ final class ProtheusOrderAccessTest extends TestCase
         $generalPayload = $view->get('payload');
         $generalPayload['analysis'] = ['total' => 37, 'equipment' => [[
             'code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37,
-        ]], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
-            'status' => ['completed' => 0, 'open' => 0, 'canceled' => 0]];
+        ]], 'services' => [], 'costCenters' => [
+            ['code' => '', 'mode' => 'blank', 'quantity' => 15],
+        ], 'maintenance' => [], 'sectors' => [],
+            'status' => ['completed' => 0, 'open' => 0]];
         $generalPayload['detail'] = ['available' => true,
             'operational' => ['total' => 10, 'open' => 3, 'closed' => 7],
             'breakdown' => array_fill_keys(array_keys(\App\Service\Protheus\ProtheusSectorService::CATEGORIES), ['open' => 0, 'closed' => 0]),
@@ -202,6 +204,8 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('data-analysis-total>37', $general);
         self::assertStringContainsString('pcm-chart-card', $general);
         self::assertStringContainsString('bem=FAB+80+080&amp;filial=01', $general);
+        self::assertStringContainsString('/pcm/ordens?centro=&amp;centro_modo=blank', $general);
+        self::assertStringContainsString('Sem centro de custo', $general);
         self::assertStringNotContainsString('setor=', $general);
         self::assertSame(4, substr_count($general, 'data-dashboard-card='));
         foreach (['Preventivas', 'Corretivas', 'Melhorias', 'Paradas por Oportunidade'] as $label) {
@@ -250,7 +254,8 @@ final class ProtheusOrderAccessTest extends TestCase
         $view->setTemplatePath('Pcm');
         $row = array_fill_keys(['equipment_name', 'TJ_CODBEM', 'TJ_SERVICO',
             'service_name', 'TJ_CODAREA', 'TJ_CCUSTO', 'TJ_TIPO', 'TJ_SITUACA', 'TJ_TERMINO'], '<script>alert(1)</script>');
-        $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23'];
+        $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23',
+            'descricao' => '<script>alert(2)</script>', 'TJ_DTMRINI' => '', 'TJ_DTMRFIM' => '20260924'];
         $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => ''],
             'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
         $view->set('listing', $listing);
@@ -261,10 +266,35 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('<option value="ELETRI">ELETRI</option>', $html);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
         self::assertStringContainsString('23/09/2026', $html);
+        self::assertStringContainsString('24/09/2026', $html);
+        self::assertStringContainsString('pcm-dashboard-section pcm-equipment-history', $html);
+        self::assertStringContainsString('pcm-sector-table-scroll', $html);
+        self::assertStringContainsString('table pcm-orders-table pcm-order-listing align-middle', $html);
+        self::assertStringContainsString('<th class="pcm-order-number">O.S.</th>', $html);
+        self::assertStringContainsString('<th class="pcm-order-description">Descrição</th>', $html);
+        self::assertStringContainsString('<td class="pcm-order-description">', $html);
+        self::assertSame(2, substr_count($html, '<td class="pcm-order-text">'));
+        self::assertStringContainsString('pcm-pagination', $html);
+        foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento',
+            'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $heading) {
+            self::assertStringContainsString('<th>' . $heading . '</th>', $html);
+        }
         self::assertStringContainsString('Período pela Data de origem da OS.', $html);
         self::assertStringContainsString('page=2', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
+        $friendly = $row;
+        $friendly['TJ_CODAREA'] = 'MECANI';
+        $friendly['TJ_CCUSTO'] = '';
+        $friendly['TJ_SITUACA'] = 'L';
+        $friendly['TJ_TERMINO'] = 'S';
+        $listing['orders'] = [$friendly];
+        $view->set('listing', $listing);
+        $friendlyHtml = $view->render('orders', false);
+        self::assertStringContainsString('Mecânica', $friendlyHtml);
+        self::assertStringContainsString('Fechada', $friendlyHtml);
+        self::assertMatchesRegularExpression('~<td>—</td>\s*<td>Mecânica</td>~', $friendlyHtml);
+        self::assertStringNotContainsString('COR / L / S', $friendlyHtml);
         $listing['available'] = false;
         $view->set('listing', $listing);
         $html = $view->render('orders', false);

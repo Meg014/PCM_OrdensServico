@@ -48,6 +48,7 @@ final class EquipmentHistoryTest extends TestCase
     public function testSummaryRulesAndRecurrenceWindowBoundariesOffline(): void
     {
         $sql = Q::summary();
+        self::assertStringContainsString(\App\Service\Protheus\ProtheusOperationalEligibility::NOT_CANCELED, $sql);
         self::assertSame(1, preg_match('/\), metrics AS \(\n(.*?)\n\), context AS/s', $sql, $match));
         // Execute the actual metric expressions with equivalent SQLite COUNT/date functions.
         $metrics = str_replace('COUNT_BIG(', 'COUNT(', $match[1]);
@@ -69,7 +70,7 @@ final class EquipmentHistoryTest extends TestCase
         $statement = $db->prepare($metrics);
         $statement->execute($params);
         $row = $statement->fetch(\PDO::FETCH_ASSOC);
-        self::assertSame(['total'=>13, 'open_count'=>6, 'closed_count'=>5, 'canceled_count'=>1, 'pending_count'=>1,
+        self::assertSame(['total'=>13, 'open_count'=>6, 'closed_count'=>5, 'pending_count'=>1,
             'corrective'=>9, 'preventive'=>1, 'improvement'=>1, 'recurrence30'=>2, 'recurrence90'=>4, 'recurrence365'=>6], $row);
         $db->exec('DELETE FROM filtered'); // Isolated in-memory fixture, never Protheus.
         $statement->execute($params);
@@ -154,14 +155,14 @@ final class EquipmentHistoryTest extends TestCase
         $calls = [];
         $data = (new EquipmentHistoryService($this->repository($calls)))->load(['bem' => 'MEL 80 115', 'filial' => '01']);
         $data['summary'] += array_fill_keys(['total','open_count','closed_count','corrective','preventive','improvement',
-            'canceled_count','pending_count','recurrence30','recurrence90','recurrence365','cost_center_count','area_count'], 0)
+            'pending_count','recurrence30','recurrence90','recurrence365','cost_center_count','area_count'], 0)
             + ['cost_center' => '', 'area' => 'ELETRI'];
         $data['orders'] = [['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'reference_date' => '2026-08-18',
             'TJ_TIPO' => 'COR', 'TJ_SERVICO' => 'ELEPRE', 'service_name' => 'PREVENTIVA ELETRICA',
             'descricao' => '<script>unsafe</script>', 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'TJ_CCUSTO' => '', 'TJ_CODAREA' => 'ELETRI']];
         $data['summary']['area_count'] = 2;
         $row = $data['orders'][0];
-        foreach ([['L', 'N'], ['C', 'N'], ['P', 'N']] as [$situation, $ending]) {
+        foreach ([['L', 'N'], ['P', 'N']] as [$situation, $ending]) {
             $data['orders'][] = array_replace($row, ['TJ_SITUACA' => $situation, 'TJ_TERMINO' => $ending, 'TJ_CODAREA' => 'MECANI']);
         }
         $view = new \Cake\View\View($request);
@@ -186,9 +187,10 @@ final class EquipmentHistoryTest extends TestCase
             self::assertStringContainsString('<th>' . $label . '</th>', $head[1]);
         }
         preg_match('/<tbody>(.*?)<\/tbody>/s', $html, $body);
-        foreach (['Aberta', 'Fechada', 'Cancelada', 'Pendente'] as $label) {
+        foreach (['Aberta', 'Fechada', 'Pendente'] as $label) {
             self::assertStringContainsString('<td>' . $label . '</td>', $body[1]);
         }
+        self::assertStringNotContainsString('<td>Cancelada</td>', $body[1]);
     }
 
     public function testExportHistoryKeepsEquipmentBranchAndAllFilters(): void

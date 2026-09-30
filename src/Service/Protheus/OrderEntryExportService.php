@@ -70,11 +70,17 @@ final class OrderEntryExportService
     public function loadGeneral(array $query, int $page = 1, int $limit = \App\Service\StreamingXlsxReport::BATCH_SIZE): array
     {
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'centro', 'area', 'date_start', 'date_end'] as $key) {
+        foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+            'situacao', 'termino', 'date_start', 'date_end'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
             $filters[$key] = trim($value);
         }
+        if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
+            || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
+            throw new InvalidArgumentException('Filtro de centro de custo inválido.');
+        }
+        if ($filters['centro'] !== '' && $filters['centro_modo'] === '') $filters['centro_modo'] = 'exact';
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] === '') continue;
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters[$key]);
@@ -82,8 +88,9 @@ final class OrderEntryExportService
         }
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
         $params = ['numero' => $filters['os'], 'filial' => $filters['filial'], 'bem' => $filters['bem'],
-            'centro' => $filters['centro'], 'area' => $filters['area'], 'date_start' => $filters['date_start'],
-            'date_end' => $filters['date_end']];
+            'centro' => $filters['centro'], 'centro_modo' => $filters['centro_modo'], 'area' => $filters['area'],
+            'servico' => $filters['servico'], 'tipo' => $filters['tipo'], 'situacao' => $filters['situacao'],
+            'termino' => $filters['termino'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']];
         try {
             $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->generalEntries($params, $page, $limit);
             return ['available' => true, 'filters' => $filters] + $data;

@@ -222,7 +222,7 @@ final class PasswordProfileTest extends TestCase
                 $event = new Event('Controller.initialize', $controller);
                 $controller->beforeFilter($event);
                 self::assertTrue($event->isStopped());
-                self::assertSame('/meu-perfil', $event->getResult()->getHeaderLine('Location'));
+                self::assertSame('/meu-perfil', parse_url($event->getResult()->getHeaderLine('Location'), PHP_URL_PATH));
             }
             $controller = $this->controller(ProfileController::class, $user, 'Profile', 'index', '/meu-perfil');
             $event = new Event('Controller.initialize', $controller);
@@ -256,7 +256,7 @@ final class PasswordProfileTest extends TestCase
             'id' => $admin->id, 'email' => 'attacker@example.com', 'nome' => 'attacker', 'role' => 'ADMIN', 'ativo' => false,
             'maintenance_area_id' => 99, 'must_change_password' => true]);
         $controller->beforeFilter(new Event('Controller.initialize', $controller));
-        self::assertSame('/pcm', $controller->index()->getHeaderLine('Location'));
+        self::assertSame('/pcm', parse_url($controller->index()->getHeaderLine('Location'), PHP_URL_PATH));
         $saved = $this->users->get($user->id);
         self::assertFalse($saved->must_change_password);
         self::assertSame('USUARIO', $saved->role);
@@ -271,7 +271,7 @@ final class PasswordProfileTest extends TestCase
         $stale = $this->controller(AppController::class, $user, 'Pcm', 'index', '/pcm');
         $event = new Event('Controller.initialize', $stale);
         $stale->beforeFilter($event);
-        self::assertSame('/login', $event->getResult()->getHeaderLine('Location'));
+        self::assertSame('/login', parse_url($event->getResult()->getHeaderLine('Location'), PHP_URL_PATH));
         self::assertNotSame($oldHash, $saved->password);
     }
 
@@ -304,7 +304,7 @@ final class PasswordProfileTest extends TestCase
         foreach ([$user,$tv] as $target) {
             $controller = $this->controller(UsersController::class, $admin, 'Users', 'password', '/usuarios/'.$target->id.'/senha', ['password' => 'Temporary-reset-2026']);
             $controller->beforeFilter(new Event('Controller.initialize', $controller));
-            self::assertSame('/usuarios', $controller->password($target->id)->getHeaderLine('Location'));
+            self::assertSame('/usuarios', parse_url($controller->password($target->id)->getHeaderLine('Location'), PHP_URL_PATH));
             $saved = $this->users->get($target->id);
             self::assertTrue(password_verify('Temporary-reset-2026', $saved->password));
             self::assertSame($target->role !== 'TV', $saved->must_change_password);
@@ -313,7 +313,7 @@ final class PasswordProfileTest extends TestCase
         $controller = $this->controller(AppController::class, $changed, 'Pcm', 'index', '/pcm');
         $event = new Event('Controller.initialize', $controller);
         $controller->beforeFilter($event);
-        self::assertSame('/meu-perfil', $event->getResult()->getHeaderLine('Location'));
+        self::assertSame('/meu-perfil', parse_url($event->getResult()->getHeaderLine('Location'), PHP_URL_PATH));
     }
 
     public function testEmailAuditNormalizationAndDuplicateRejection(): void
@@ -325,7 +325,7 @@ final class PasswordProfileTest extends TestCase
         // Complete the first access for this test administrator; the edit itself remains the real action.
         $this->users->updateAll(['must_change_password' => false], ['id' => $admin->id]);
         $controller->beforeFilter(new Event('Controller.initialize', $controller));
-        self::assertSame('/usuarios', $controller->edit($user->id)->getHeaderLine('Location'));
+        self::assertSame('/usuarios', parse_url($controller->edit($user->id)->getHeaderLine('Location'), PHP_URL_PATH));
         self::assertSame('replacement@example.com', $this->users->get($user->id)->email);
         $duplicate = $this->users->newEntity(['nome' => 'Duplicate', 'email' => ' REPLACEMENT@example.com ',
             'role' => 'ADMIN', 'ativo' => true, 'password' => 'Initial-password-2026']);

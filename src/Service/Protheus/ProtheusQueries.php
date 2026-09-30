@@ -11,7 +11,10 @@ final class ProtheusQueries
     public const AREAS = <<<'SQL'
 SELECT DISTINCT RTRIM(j.TJ_CODAREA) AS code
 FROM dbo.STJ010 j
-WHERE j.D_E_L_E_T_ <> '*' AND NULLIF(LTRIM(RTRIM(j.TJ_CODAREA)), '') IS NOT NULL
+WHERE j.D_E_L_E_T_ <> '*' AND
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+ AND NULLIF(LTRIM(RTRIM(j.TJ_CODAREA)), '') IS NOT NULL
 ORDER BY code
 SQL;
 
@@ -27,6 +30,10 @@ WITH base AS (
         CAST(:centro AS VARCHAR(100)) AS centro, CAST(:tipo AS VARCHAR(100)) AS tipo,
         CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino) f
     WHERE j.D_E_L_E_T_ <> '*'
+      AND (
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+)
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial)
       AND (f.area = '' OR j.TJ_CODAREA = f.area)
       AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
@@ -72,8 +79,7 @@ SQL;
 WITH base AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_CODBEM, j.TJ_SERVICO,
            j.TJ_CCUSTO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
-           CASE WHEN j.TJ_SITUACA = 'C' THEN 'canceled'
-                WHEN j.TJ_TERMINO = 'S' THEN 'completed' ELSE 'open' END AS status_group,
+           CASE WHEN j.TJ_TERMINO = 'S' THEN 'completed' ELSE 'open' END AS status_group,
            COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial,
@@ -85,6 +91,10 @@ WITH base AS (
                        CAST(:situacao AS VARCHAR(100)) AS situacao,
                        CAST(:termino AS VARCHAR(100)) AS termino) f
     WHERE j.D_E_L_E_T_ <> '*'
+      AND (
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+)
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial)
       AND (f.area = '' OR j.TJ_CODAREA = f.area)
       AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
@@ -192,10 +202,14 @@ SQL;
 
         $join = '';
         if ($filters) {
-            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:area AS VARCHAR(100)) AS area, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
+            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
             $date = self::ORIGIN_DATE;
-            $where .= " AND (f.centro = '' OR j.TJ_CCUSTO = f.centro)"
+            $where .= " AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro) OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))"
                 . " AND (f.area = '' OR j.TJ_CODAREA = f.area)"
+                . " AND (f.servico = '' OR j.TJ_SERVICO = f.servico)"
+                . " AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)"
+                . " AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)"
+                . " AND (f.termino = '' OR j.TJ_TERMINO = f.termino)"
                 . " AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))"
                 . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))";
         }
@@ -208,6 +222,7 @@ SQL;
     public static function generalEntries(): string
     {
         $date = self::ORIGIN_DATE;
+        $notCanceled = ProtheusOperationalEligibility::notCanceled('j');
         return <<<SQL
 WITH filtered AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
@@ -217,12 +232,18 @@ WITH filtered AS (
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:numero AS VARCHAR(100)) numero, CAST(:filial AS VARCHAR(100)) filial,
-        CAST(:bem AS VARCHAR(100)) bem, CAST(:centro AS VARCHAR(100)) centro,
-        CAST(:area AS VARCHAR(100)) area, CAST(:date_start AS VARCHAR(10)) date_start,
+        CAST(:bem AS VARCHAR(100)) bem, CAST(:centro AS VARCHAR(100)) centro, CAST(:centro_modo AS VARCHAR(10)) centro_modo,
+        CAST(:area AS VARCHAR(100)) area, CAST(:servico AS VARCHAR(100)) servico,
+        CAST(:tipo AS VARCHAR(100)) tipo, CAST(:situacao AS VARCHAR(100)) situacao,
+        CAST(:termino AS VARCHAR(100)) termino, CAST(:date_start AS VARCHAR(10)) date_start,
         CAST(:date_end AS VARCHAR(10)) date_end) f
-    WHERE j.D_E_L_E_T_ <> '*' AND (f.numero = '' OR j.TJ_ORDEM = f.numero)
+    WHERE j.D_E_L_E_T_ <> '*' AND {$notCanceled} AND (f.numero = '' OR j.TJ_ORDEM = f.numero)
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial) AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
-      AND (f.centro = '' OR j.TJ_CCUSTO = f.centro) AND (f.area = '' OR j.TJ_CODAREA = f.area)
+      AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro)
+        OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))
+      AND (f.area = '' OR j.TJ_CODAREA = f.area) AND (f.servico = '' OR j.TJ_SERVICO = f.servico)
+      AND (f.tipo = '' OR j.TJ_TIPO = f.tipo) AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
+      AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
       AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))
       AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))
 ), named AS (
@@ -259,6 +280,7 @@ SQL;
         $end = $endUser ? 'j.TJ_USUAFIM' : 'CAST(NULL AS VARCHAR(25))';
         $descriptionColumn = $description ? 'CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,' : '';
         $referenceDate = $dateExpression ?? self::REFERENCE_DATE;
+        $where = '(' . $where . ') AND ' . ProtheusOperationalEligibility::notCanceled('j');
 
         return <<<SQL
 WITH page_keys AS (
@@ -323,7 +345,10 @@ SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
     j.TJ_DTPRINI, j.TJ_HOPRINI, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
     CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS pcm_descricao
 FROM dbo.STJ010 j
-WHERE RTRIM(j.TJ_ORDEM) = :numero AND j.D_E_L_E_T_ <> '*'
+WHERE RTRIM(j.TJ_ORDEM) = :numero AND j.D_E_L_E_T_ <> '*' AND
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+
 SQL;
 
     public const ORDER_BRANCH = self::ORDER . ' AND RTRIM(j.TJ_FILIAL) = :filial';
@@ -332,7 +357,10 @@ SQL;
 SELECT TOP (2) j.TJ_ORDEM, j.TJ_FILIAL, j.TJ_CODBEM
 FROM dbo.STJ010 j
 WHERE j.TJ_ORDEM = CAST(:numero AS VARCHAR(100))
-    AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'
+    AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*' AND
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+
 SQL;
 
     public const EQUIPMENT = <<<'SQL'
@@ -351,7 +379,10 @@ SQL;
 SELECT l.*
 FROM dbo.STL010 l
 INNER JOIN dbo.STJ010 j ON RTRIM(j.TJ_ORDEM) = RTRIM(l.TL_ORDEM)
-    AND RTRIM(j.TJ_FILIAL) = RTRIM(l.TL_FILIAL) AND j.D_E_L_E_T_ <> '*'
+    AND RTRIM(j.TJ_FILIAL) = RTRIM(l.TL_FILIAL) AND j.D_E_L_E_T_ <> '*' AND
+SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+
 WHERE RTRIM(j.TJ_ORDEM) = :numero AND RTRIM(j.TJ_FILIAL) = :filial
     AND l.D_E_L_E_T_ <> '*'
 SQL;

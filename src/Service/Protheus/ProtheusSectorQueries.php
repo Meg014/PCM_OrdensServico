@@ -36,6 +36,10 @@ WITH scoped AS (
     WHERE j.D_E_L_E_T_ <> '*'{{AREA_SCOPE}}
       AND (
 SQL
+        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
+)
+      AND (
+SQL
         . ProtheusOperationalEligibility::OPERATIONAL . <<<'SQL'
 )
 ), named AS (

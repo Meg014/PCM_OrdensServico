@@ -11,7 +11,8 @@ FROM dbo.ST9010 b
 WHERE b.T9_CODBEM = CAST(:codigo AS VARCHAR(100)) AND b.T9_FILIAL = CAST(:filial AS VARCHAR(100))
     AND b.D_E_L_E_T_ <> '*'
 SQL;
-    public const SCOPE = "j.D_E_L_E_T_ <> '*' AND j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))";
+    public const SCOPE = "j.D_E_L_E_T_ <> '*' AND " . ProtheusOperationalEligibility::NOT_CANCELED
+        . " AND j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))";
 
     public static function scope(bool $sector): string
     {
@@ -48,7 +49,6 @@ WITH scoped AS (
     SELECT COUNT_BIG(*) AS total,
         COUNT_BIG(CASE WHEN {$open} THEN 1 END) AS open_count,
         COUNT_BIG(CASE WHEN {$closed} THEN 1 END) AS closed_count,
-        COUNT_BIG(CASE WHEN TJ_SITUACA = 'C' THEN 1 END) AS canceled_count,
         COUNT_BIG(CASE WHEN TJ_SITUACA = 'P' THEN 1 END) AS pending_count,
         COUNT_BIG(CASE WHEN (({$open}) OR ({$closed})) AND TJ_TIPO = 'COR' THEN 1 END) AS corrective,
         COUNT_BIG(CASE WHEN (({$open}) OR ({$closed})) AND TJ_TIPO = 'PRE' THEN 1 END) AS preventive,

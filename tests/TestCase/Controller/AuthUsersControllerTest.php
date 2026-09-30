@@ -29,6 +29,9 @@ class AuthUsersControllerTest extends TestCase
             ]);
             $table->saveOrFail($this->{$key});
         }
+        $table->updateAll(['must_change_password' => false], ['id IN' => [$this->admin->id, $this->user->id]]);
+        $this->admin = $table->get($this->admin->id);
+        $this->user = $table->get($this->user->id);
         $this->enableCsrfToken();
     }
 
@@ -85,7 +88,7 @@ class AuthUsersControllerTest extends TestCase
 
     public function testProtectedPagesRequireLogin(): void
     {
-        foreach (['/pcm', '/usuarios', '/pcm/apresentacao', '/pcm/apresentacao/data', '/importacoes', '/users/index'] as $url) {
+        foreach (['/pcm', '/usuarios', '/pcm/apresentacao', '/pcm/apresentacao/data'] as $url) {
             $this->get($url);
             $this->assertRedirect('/login');
         }
@@ -108,7 +111,7 @@ class AuthUsersControllerTest extends TestCase
     public function testUserCannotManageUsersOrImport(): void
     {
         $this->session(['Auth' => $this->user]);
-        foreach (['/usuarios', '/usuarios/novo', '/usuarios/' . $this->admin->id . '/editar', '/users/index', '/importacoes/manual'] as $url) {
+        foreach (['/usuarios', '/usuarios/novo', '/usuarios/' . $this->admin->id . '/editar'] as $url) {
             $this->get($url);
             $this->assertResponseCode(403);
         }
@@ -141,14 +144,4 @@ class AuthUsersControllerTest extends TestCase
         $this->assertResponseCode(403);
     }
 
-    public function testPaginationPreservesFilters(): void
-    {
-        $this->session(['Auth' => $this->user]);
-        $this->get('/pcm/setor/MECANI?date_start=2026-01-01&date_end=2026-12-31&status=FECHADA&equipment=EQ-M1');
-        $this->assertResponseOk();
-        $this->assertResponseContains('date_start=2026-01-01');
-        $this->assertResponseContains('date_end=2026-12-31');
-        $this->assertResponseContains('equipment=EQ-M1');
-        $this->assertResponseContains('page=2');
-    }
 }

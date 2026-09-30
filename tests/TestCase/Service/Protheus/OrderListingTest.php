@@ -105,17 +105,42 @@ final class OrderListingTest extends TestCase
         self::assertTrue($result['available']);
         [$sql, $params] = $calls[0];
         self::assertSame('00100', $params['centro']);
+        self::assertSame('exact', $params['centro_modo']);
         self::assertSame('2026-08-18', $params['date_start']);
         self::assertSame('2026-08-18', $params['date_end']);
         self::assertSame(20, $params['offset']);
         self::assertTrue(ProtheusQueries::allows($sql));
         self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
-        self::assertStringContainsString('j.TJ_CCUSTO = f.centro', $sql);
+        self::assertStringContainsString("f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro", $sql);
         self::assertStringContainsString(">= CONVERT(date, NULLIF(f.date_start, ''), 23)", $sql);
         self::assertStringContainsString("<= CONVERT(date, NULLIF(f.date_end, ''), 23)", $sql);
         self::assertSame(3, substr_count($sql, "TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)"));
         self::assertStringNotContainsString('COALESCE(', $sql);
         self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'f.date_end ='));
+    }
+
+    public function testCostCenterDrilldownPreservesDashboardFiltersAndBlankRule(): void
+    {
+        foreach (['blank' => "j.TJ_CCUSTO = ''", 'null' => 'j.TJ_CCUSTO IS NULL'] as $mode => $condition) {
+            $calls = [];
+            $result = (new OrderListingService($this->repository([], $calls)))->load([
+                'centro_modo' => $mode, 'filial' => '01', 'bem' => 'BEM01', 'area' => 'ELETRI',
+                'servico' => 'COREME', 'tipo' => 'COR', 'situacao' => 'L', 'termino' => 'N',
+            ]);
+            self::assertTrue($result['available']);
+            [$sql, $params] = $calls[0];
+            self::assertSame($mode, $params['centro_modo']);
+            self::assertSame('', $params['centro']);
+            foreach (['filial' => '01', 'bem' => 'BEM01', 'area' => 'ELETRI', 'servico' => 'COREME',
+                'tipo' => 'COR', 'situacao' => 'L', 'termino' => 'N'] as $key => $value) {
+                self::assertSame($value, $params[$key]);
+            }
+            self::assertStringContainsString($condition, $sql);
+            self::assertStringContainsString('j.TJ_SERVICO = f.servico', $sql);
+            self::assertStringContainsString('j.TJ_TIPO = f.tipo', $sql);
+            self::assertStringContainsString('j.TJ_SITUACA = f.situacao', $sql);
+            self::assertStringContainsString('j.TJ_TERMINO = f.termino', $sql);
+        }
     }
 
     public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void

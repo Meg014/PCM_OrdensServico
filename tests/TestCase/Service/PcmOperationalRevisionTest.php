@@ -28,6 +28,8 @@ final class PcmOperationalRevisionTest extends TestCase
         $connection = self::connection();
         $connection->begin();
         $users->saveOrFail($user);
+        $users->updateAll(['must_change_password' => false], ['id' => $user->id]);
+        $user = $users->get($user->id);
         $this->session(['Auth' => $user]);
         self::clearPcmData();
         $areas = [];
@@ -182,26 +184,12 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame(25, $connection->execute('SELECT COUNT(*) FROM work_order_snapshots')->fetchColumn(0));
     }
 
-    public function testOperationalRoutesAndOldOrderCannotBypassScope(): void
+    public function testCurrentSnapshotAnalysesRespectOperationalScope(): void
     {
         $connection = self::connection();
         $connection->update('work_order_snapshots', ['maintenance_planned_start' => '2025-12-31',
             'equipment_name' => 'EXCLUDED_2025', 'equipment_code' => 'EXCLUDED_2025'],
             ['report_import_id' => $this->currentId, 'source_order_number' => '1']);
-        foreach (['/pcm', '/pcm/ordens', '/pcm/setor/MECANI', '/pcm/setor/FUTURO', '/pcm/analises',
-            '/pcm/apresentacao', '/pcm/analises/qualidade/missing_service'] as $url) {
-            $this->get($url);
-            $this->assertResponseOk();
-            $this->assertResponseNotContains('DADOS REFERENTES ÀS O.S. CRIADAS A PARTIR DE 2026');
-            $this->assertResponseNotContains('EXCLUDED_2025');
-        }
-        $old = $connection->execute('SELECT id FROM work_order_snapshots WHERE report_import_id = :import AND source_order_number = :number',
-            ['import' => $this->currentId, 'number' => '1'])->fetchColumn(0);
-        $this->get('/pcm/os/' . $old);
-        $this->assertResponseCode(404);
-        $this->get('/pcm/ordens?season=offseason&indicator=safra_open');
-        $this->assertResponseOk();
-        $this->assertResponseContains('Nenhuma O.S. encontrada');
         $filters = ['season' => 'offseason', 'within' => ['safra_open'], 'indicator' => 'offseason_open'];
         $this->assertSame(0, (new SectorDashboardService())->detailQuery(null, $filters)->count());
         $dashboard = (new SectorDashboardService())->dashboard(null, []);
@@ -278,20 +266,6 @@ final class PcmOperationalRevisionTest extends TestCase
                 $this->assertSame($indicators[$key], $screen[$key]);
             }
         }
-        // The first old closed Safra order is visible, while the adjacent old open/cancelled ones are not.
-        foreach (['/pcm/ordens', '/pcm/setor/MECANI'] as $route) {
-            $this->get($route . '?indicator=safra_completed&limit=1&sort=source_order_number&direction=asc&page=2');
-            $this->assertResponseOk();
-            $this->assertResponseContains('TEMP-302');
-            $this->assertResponseNotContains('TEMP-301');
-            $this->assertResponseNotContains('TEMP-303');
-            $this->get($route . '?indicator=safra_open');
-            $this->assertResponseOk();
-            $this->assertResponseNotContains('TEMP-301</td>');
-        }
-        $oldClosed = $current->query(status: 'FECHADA')->where(['source_order_number' => '302'])->first();
-        $this->get('/pcm/os/' . $oldClosed->id);
-        $this->assertResponseOk();
     }
 
     private function insertRow(

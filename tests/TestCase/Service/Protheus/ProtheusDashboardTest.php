@@ -135,36 +135,36 @@ final class ProtheusDashboardTest extends TestCase
     {
         $calls = [];
         $analysisRows = [
-            ['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 25,
+            ['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 21,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'equipment', 'code' => 'FAB 80 080 ', 'branch' => '01', 'quantity' => 37,
                 'identity_count' => 1, 'equipment_name' => 'EXPANDER EX-245 ', 'equipment_matches' => 1],
-            ['dimension' => 'cost_center', 'code' => 'CC100', 'branch' => '01', 'quantity' => 25,
+            ['dimension' => 'cost_center', 'code' => 'CC100', 'branch' => '01', 'quantity' => 21,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'service', 'code' => 'COREME ', 'branch' => '01', 'quantity' => 19,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0,
                 'service_name' => 'CORRETIVA EMERGENCIAL ', 'service_matches' => 1],
-            ['dimension' => 'type', 'code' => 'COR', 'branch' => '01', 'quantity' => 25,
+            ['dimension' => 'type', 'code' => 'COR', 'branch' => '01', 'quantity' => 21,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
-            ['dimension' => 'area', 'code' => 'MECANI', 'branch' => '01', 'quantity' => 25,
+            ['dimension' => 'area', 'code' => 'MECANI', 'branch' => '01', 'quantity' => 21,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'status', 'code' => 'completed', 'branch' => '', 'quantity' => 12,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'status', 'code' => 'open', 'branch' => '', 'quantity' => 9,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
-            ['dimension' => 'status', 'code' => 'canceled', 'branch' => '', 'quantity' => 4,
-                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
         ];
         $result = (new ProtheusDashboardService($this->repository([], $calls, $analysisRows)))->load(['area' => 'MECANI']);
         self::assertTrue($result['available']);
-        self::assertSame(25, $result['analysis']['total']);
+        self::assertSame(21, $result['analysis']['total']);
         self::assertSame(['code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37],
             $result['analysis']['equipment'][0]);
+        self::assertSame(['code' => 'CC100', 'mode' => 'exact', 'quantity' => 21],
+            $result['analysis']['costCenters'][0]);
         self::assertSame('Corretiva', $result['analysis']['maintenance'][0]['label']);
         self::assertSame(['code' => 'COREME', 'name' => 'CORRETIVA EMERGENCIAL', 'branch' => '01', 'quantity' => 19],
             $result['analysis']['services'][0]);
         self::assertSame('Mecânica', $result['analysis']['sectors'][0]['label']);
-        self::assertSame(['completed' => 12, 'open' => 9, 'canceled' => 4], $result['analysis']['status']);
+        self::assertSame(['completed' => 12, 'open' => 9], $result['analysis']['status']);
         self::assertCount(2, $calls);
         self::assertSame('MECANI', $calls[1][1]['area']);
         foreach (["j.D_E_L_E_T_ <> '*'", 'COUNT_BIG(*)', 'GROUPING SETS', 'ROW_NUMBER()', 'ST9010', 'ST4010'] as $sql) {
@@ -183,6 +183,31 @@ final class ProtheusDashboardTest extends TestCase
         self::assertNull($result['analysis']);
         self::assertCount(1, $calls);
         self::assertSame(ProtheusQueries::MANAGEMENT, $calls[0][0]);
+    }
+
+    public function testBlankAndNullCostCentersKeepTheRankingsOwnGroupingRule(): void
+    {
+        $calls = [];
+        $base = static fn ($code, int $quantity): array => ['dimension' => 'cost_center', 'code' => $code,
+            'branch' => '', 'quantity' => $quantity, 'identity_count' => 1,
+            'equipment_name' => null, 'equipment_matches' => 0];
+        $analysis = [
+            ['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 3,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            $base('', 2), $base(null, 1),
+            ['dimension' => 'type', 'code' => 'COR', 'branch' => '', 'quantity' => 3,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'area', 'code' => 'ELETRI', 'branch' => '', 'quantity' => 3,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+            ['dimension' => 'status', 'code' => 'open', 'branch' => '', 'quantity' => 3,
+                'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
+        ];
+        $result = (new ProtheusDashboardService($this->repository([], $calls, $analysis)))->load();
+        self::assertTrue($result['available']);
+        self::assertSame([
+            ['code' => '', 'mode' => 'blank', 'quantity' => 2],
+            ['code' => '', 'mode' => 'null', 'quantity' => 1],
+        ], $result['analysis']['costCenters']);
     }
 
     public function testPresentationOmitsBlankAreasAndUsesFriendlyNames(): void

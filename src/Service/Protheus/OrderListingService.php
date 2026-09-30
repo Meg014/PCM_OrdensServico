@@ -17,12 +17,20 @@ final class OrderListingService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'centro', 'area', 'date_start', 'date_end'] as $key) {
+        foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+            'situacao', 'termino', 'date_start', 'date_end'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100) {
                 throw new InvalidArgumentException('Filtros inválidos.');
             }
             $filters[$key] = trim($value);
+        }
+        if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
+            || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
+            throw new InvalidArgumentException('Filtro de centro de custo inválido.');
+        }
+        if ($filters['centro'] !== '' && $filters['centro_modo'] === '') {
+            $filters['centro_modo'] = 'exact';
         }
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] !== '') {
@@ -51,6 +59,7 @@ final class OrderListingService
                 $filters['filial'] === '' ? null : $filters['filial'],
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
+                $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
             );
 
             return $result + ['filters' => $filters, 'available' => true];

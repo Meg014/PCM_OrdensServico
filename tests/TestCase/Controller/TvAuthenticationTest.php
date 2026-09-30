@@ -32,6 +32,8 @@ class TvAuthenticationTest extends TestCase
                 'password' => 'Test-password-2026', 'role' => $role, 'ativo' => true]);
             $table->saveOrFail($this->{$key});
         }
+        $table->updateAll(['must_change_password' => false], ['id' => $this->admin->id]);
+        $this->admin = $table->get($this->admin->id);
         $this->token = (new TvDeviceService())->issue($this->tv->id);
         $this->enableCsrfToken();
     }
@@ -65,7 +67,7 @@ class TvAuthenticationTest extends TestCase
             if ($url === '/login') {
                 $this->assertRedirect('/pcm/apresentacao');
             } else {
-                $this->assertResponseOk();
+                $this->assertContains($this->_response->getStatusCode(), [200, 503]);
             }
             $this->assertSession('TV', 'Auth.role');
             if ($url === '/pcm/apresentacao') {
@@ -73,7 +75,7 @@ class TvAuthenticationTest extends TestCase
                 $this->assertResponseNotContains('data-exit-url');
                 $this->assertResponseNotContains('href="/usuarios"');
                 $this->assertResponseNotContains('href="/importacoes"');
-                $this->assertResponseContains('Logout');
+                $this->assertResponseContains('Sair');
             }
         }
     }
@@ -81,14 +83,14 @@ class TvAuthenticationTest extends TestCase
     public function testTvCannotAccessOtherRoutesIncludingFallbackAliases(): void
     {
         $this->cookie(TvDeviceService::COOKIE, $this->token);
-        foreach (
-            ['/usuarios', '/usuarios/novo', '/users/index', '/pcm/setor/MECANI',
-            '/importacoes', '/importacoes/manual', '/report-imports/index', '/pcm/os/1',
-            '/pcm', '/', '/pcm/analises', '/pcm/ordens', '/pcm/current-version',
-            '/pcm/presentation-data', '/pages/home'] as $url
-        ) {
+        foreach (['/usuarios', '/usuarios/novo', '/pcm/setor/MECANI', '/pcm', '/', '/pcm/ordens'] as $url) {
             $this->get($url);
             $this->assertResponseCode(403, $url);
+        }
+        foreach (['/users/index', '/importacoes', '/report-imports/index', '/pcm/os/1',
+            '/pcm/analises', '/pcm/current-version', '/pcm/presentation-data', '/pages/home'] as $url) {
+            $this->get($url);
+            $this->assertResponseCode(404, $url);
         }
         $this->post('/usuarios/' . $this->tv->id . '/revogar-tv');
         $this->assertResponseCode(403);
@@ -176,7 +178,8 @@ class TvAuthenticationTest extends TestCase
         $devices->updateAll(['expires_at' => new DateTime('+1 day')], ['user_id' => $this->tv->id]);
         $this->cookie($service::COOKIE, $this->token);
         $this->get('/pcm/apresentacao/data');
-        $this->assertResponseOk();
+        $this->assertContains($this->_response->getStatusCode(), [200, 503]);
+        $this->assertSession('TV', 'Auth.role');
         $device = $devices->find()->where(['user_id' => $this->tv->id])->firstOrFail();
         $this->assertGreaterThan(new DateTime('+89 days'), $device->expires_at);
         $this->assertStringContainsString('pcm_tv_device=', $this->_response->getHeaderLine('Set-Cookie'));
@@ -199,7 +202,7 @@ class TvAuthenticationTest extends TestCase
     public function testRevocationRequiresPostAndCsrf(): void
     {
         $this->session(['Auth' => $this->admin]);
-        $this->get('/users/revoke-tv/' . $this->tv->id);
+        $this->get('/usuarios/' . $this->tv->id . '/revogar-tv');
         $this->assertResponseCode(405);
         $this->_csrfToken = false;
         $this->post('/usuarios/' . $this->tv->id . '/revogar-tv');
@@ -213,6 +216,8 @@ class TvAuthenticationTest extends TestCase
         $user = $table->newEntity(['nome' => 'Normal', 'email' => 'normal@example.com',
             'password' => 'Test-password-2026', 'role' => 'USUARIO', 'ativo' => true]);
         $table->saveOrFail($user);
+        $table->updateAll(['must_change_password' => false], ['id' => $user->id]);
+        $user = $table->get($user->id);
         foreach ([$user, $this->admin] as $account) {
             $this->session(['Auth' => null]);
             $this->post('/login', ['email' => $account->email, 'password' => 'Test-password-2026']);

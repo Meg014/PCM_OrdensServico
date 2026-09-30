@@ -18,6 +18,8 @@ trait AuthenticatedUserTrait
             'password' => 'Test-password-2026', 'role' => 'ADMIN', 'ativo' => true,
         ]);
         $users->saveOrFail($user);
+        $users->updateAll(['must_change_password' => false], ['id' => $user->id]);
+        $user = $users->get($user->id);
         $this->authenticatedUserId = (int)$user->id;
         $this->session(['Auth' => $user]);
     }

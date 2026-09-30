@@ -22,6 +22,11 @@ final class ProtheusOperationalEligibilityTest extends TestCase
         $row = $db->query($sql)->fetch(PDO::FETCH_ASSOC);
         self::assertSame(312, (int)$row['opened']);
         self::assertSame(4254, (int)$row['closed']);
+
+        $kept = $db->query('WITH samples(TJ_SITUACA, TJ_TERMINO) AS (VALUES '
+            . "('L','N'), ('L','S'), ('P','N'), ('C','N'), ('C','S'), (NULL,'N')) "
+            . 'SELECT COUNT(*) FROM samples WHERE ' . Rule::NOT_CANCELED)->fetchColumn();
+        self::assertSame(4, (int)$kept, 'Only situation C is canceled, independently of TJ_TERMINO.');
     }
 
     public function testAllOperationalQueriesUseSharedRuleAndKeepPlannedCutoff(): void
@@ -30,11 +35,29 @@ final class ProtheusOperationalEligibilityTest extends TestCase
             self::assertStringContainsString(Rule::ELIGIBLE_OPEN, $sql);
             self::assertStringContainsString(Rule::CLOSED, $sql);
             self::assertSame(1, substr_count($sql, ':cutoff'));
-            self::assertStringNotContainsString("TJ_SITUACA <> 'C'", $sql);
+            self::assertStringContainsString(Rule::NOT_CANCELED, $sql);
             self::assertStringNotContainsString("TJ_SITUACA IN ('L', 'P')", $sql);
             self::assertTrue(ProtheusQueries::allows($sql));
         }
         self::assertStringContainsString("TRY_CONVERT(date, NULLIF(TJ_DTMPINI, ''), 112) >= CONVERT(date, :cutoff, 112)", Rule::ELIGIBLE_OPEN);
         self::assertStringNotContainsString('cutoff', Rule::CLOSED);
+    }
+
+    public function testEveryNonOperationalOrderReadUsesTheCentralCancellationPredicate(): void
+    {
+        $queries = [ProtheusQueries::AREAS, ProtheusQueries::DASHBOARD, ProtheusQueries::MANAGEMENT,
+            ProtheusQueries::orders(false, false, false), ProtheusQueries::orders(true, true, true, true),
+            ProtheusQueries::generalEntries(), ProtheusQueries::equipmentHistory(false),
+            ProtheusQueries::equipmentPortfolioPage(), ProtheusQueries::ORDER,
+            ProtheusQueries::ORDER_IDENTITY, ProtheusQueries::ENTRIES,
+            \App\Service\Protheus\ProtheusEquipmentQueries::summary(),
+            ProtheusSectorQueries::equipmentRanking(), ProtheusSectorQueries::historicalRankings()];
+        foreach ($queries as $sql) {
+            self::assertTrue(
+                str_contains($sql, Rule::NOT_CANCELED) || str_contains($sql, Rule::notCanceled('j')),
+                "Missing central canceled-order exclusion in SQL:\n{$sql}",
+            );
+            self::assertTrue(ProtheusQueries::allows($sql));
+        }
     }
 }

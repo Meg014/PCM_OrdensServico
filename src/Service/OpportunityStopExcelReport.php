@@ -51,7 +51,7 @@ final class OpportunityStopExcelReport
         }
         $book = new Spreadsheet();
         $sheet = $book->getActiveSheet()->setTitle('Paradas por Oportunidade');
-        $this->heading($sheet, $first['area_name'], $first['filters']['cost_center'], $generated);
+        $this->heading($sheet, $first['area_name'], $first['unit_name'] ?? 'TODAS', $first['filters']['cost_center'], $generated);
         $row = self::HEADER_ROW;
         $count = 0;
         $page = 1;
@@ -104,6 +104,7 @@ final class OpportunityStopExcelReport
     private function heading(
         Worksheet $sheet,
         string $workshop,
+        string $unit,
         string $costCenter,
         DateTimeImmutable $generated,
     ): void {
@@ -114,7 +115,7 @@ final class OpportunityStopExcelReport
         $this->text($sheet, 'C1', 'PARADAS POR OPORTUNIDADE');
         $extracted = $generated->setTimezone(new DateTimeZone('America/Sao_Paulo'))->format('d/m/Y \à\s H:i');
         $this->text($sheet, 'C2', 'Extraído em: ' . $extracted);
-        $this->text($sheet, 'C3', 'Oficina: ' . $workshop . ' | Centro de custo: '
+        $this->text($sheet, 'C3', 'Oficina: ' . $workshop . ' | UNIDADE: ' . $unit . ' | Centro de custo: '
             . ($costCenter === '' ? 'Todos' : $costCenter));
         $this->priorityLegend($sheet);
         foreach ($headers as $index => $header) {
@@ -171,13 +172,13 @@ final class OpportunityStopExcelReport
     /** Writes one Protheus order using explicit text cells for injection safety. */
     private function orderRow(Worksheet $sheet, int $row, array $source): void
     {
-        $description = trim((string)($source['service_name'] ?? ''));
+        $description = trim((string)($source['descricao'] ?? ''));
         $equipment = trim((string)($source['TJ_CODBEM'] ?? '')) . ' — ' . trim((string)($source['equipment_name'] ?? ''));
         $area = trim((string)($source['TJ_CODAREA'] ?? ''));
         $type = trim((string)($source['TJ_TIPO'] ?? ''));
         foreach (
             ['A' => trim((string)$source['TJ_ORDEM']), 'C' => $description, 'D' => trim($equipment, ' —'),
-            'E' => trim((string)($source['cost_center_name'] ?? $source['TJ_CCUSTO'] ?? '')),
+            'E' => OpportunityStopService::costCenterLabel($source),
             'F' => OpportunityStopService::WORKSHOPS[$area] ?? $area,
             'G' => ['COR' => 'Corretiva','PRE' => 'Preventiva','MEL' => 'Melhoria'][$type] ?? $type] as $column => $value
         ) {

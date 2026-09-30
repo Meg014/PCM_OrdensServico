@@ -58,12 +58,18 @@ SQL
     CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial, CAST(:status AS VARCHAR(20)) AS status,
         CAST(:equipment AS VARCHAR(100)) AS equipment, CAST(:service AS VARCHAR(100)) AS service,
         CAST(:service_name AS VARCHAR(255)) AS service_name, CAST(:cost_center AS VARCHAR(100)) AS cost_center,
-        CAST(:maintenance_type AS VARCHAR(100)) AS maintenance_type, CAST(:q AS VARCHAR(450)) AS q) f
+        CAST(:maintenance_type AS VARCHAR(100)) AS maintenance_type, CAST(:q AS VARCHAR(450)) AS q,
+        CAST(:opportunity_unit AS VARCHAR(20)) AS opportunity_unit) f
     WHERE (f.filial = '' OR n.TJ_FILIAL = f.filial) AND (f.status = '' OR n.status = f.status)
         AND (f.equipment = '' OR n.TJ_CODBEM = f.equipment) AND (f.service = '' OR n.TJ_SERVICO = f.service)
         AND (f.service_name = '' OR n.service_name = f.service_name)
         AND (f.cost_center = '' OR n.TJ_CCUSTO = f.cost_center)
         AND (f.maintenance_type = '' OR n.TJ_TIPO = f.maintenance_type)
+        AND (f.opportunity_unit = ''
+            OR (f.opportunity_unit = 'factory' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) LIKE '31%')
+            OR (f.opportunity_unit = 'mill' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) LIKE '41%')
+            OR (f.opportunity_unit = 'other' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) NOT LIKE '31%'
+                AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) NOT LIKE '41%'))
         AND (f.q = '' OR n.TJ_ORDEM LIKE f.q ESCAPE '~' OR n.TJ_CODBEM LIKE f.q ESCAPE '~'
             OR n.equipment_name LIKE f.q ESCAPE '~' OR n.TJ_SERVICO LIKE f.q ESCAPE '~'
             OR n.service_name LIKE f.q ESCAPE '~')

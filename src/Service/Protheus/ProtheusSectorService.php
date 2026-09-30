@@ -18,7 +18,7 @@ final class ProtheusSectorService
     public const SERVICES = ['emergency' => ['COREME'], 'scheduled' => ['CORPRO'], 'opportunity' => ['MECOPO', 'ELECOP']];
     public const BACKLOG_AGES = ['0_7' => '0–7 dias', '8_15' => '8–15 dias', '16_30' => '16–30 dias',
         '31_60' => '31–60 dias', 'over_60' => '+60 dias', 'unknown' => 'Sem data válida', 'future' => 'Data futura'];
-    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age'];
+    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'opportunity_unit'];
     public function __construct(private ?ProtheusRepository $repository = null, private readonly ?\Closure $diagnostic = null)
     {
     }
@@ -35,6 +35,7 @@ final class ProtheusSectorService
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
         if (!in_array($filters['backlog_age'], ['', 'all', ...array_keys(self::BACKLOG_AGES)], true)) throw new InvalidArgumentException('Faixa de backlog inválida.');
+        if (!in_array($filters['opportunity_unit'], ['', 'factory', 'mill', 'other'], true)) throw new InvalidArgumentException('Unidade inválida.');
         if (!in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(self::CATEGORIES)], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
         foreach (['date_start', 'date_end'] as $key) {

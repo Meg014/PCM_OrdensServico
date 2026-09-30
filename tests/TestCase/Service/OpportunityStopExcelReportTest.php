@@ -29,6 +29,7 @@ final class OpportunityStopExcelReportTest extends TestCase
             return [
                 'available' => true,
                 'area_name' => 'Mecânica',
+                'unit_name' => 'FÁBRICA',
                 'filters' => ['cost_center' => '3101005'],
                 'has_more' => false,
                 'orders' => [[
@@ -40,7 +41,7 @@ final class OpportunityStopExcelReportTest extends TestCase
                     'TJ_CCUSTO' => '3101005',
                     'cost_center_name' => 'EXTRACAO',
                     'TJ_TIPO' => 'COR',
-                    'service_name' => '=SUM(1,1)',
+                    'service_name' => 'MANUT. CORRETIVA PARADA POR OPORTUNIDADE',
                 ]],
             ];
         };
@@ -69,8 +70,8 @@ final class OpportunityStopExcelReportTest extends TestCase
                 $conditions,
             ));
             self::assertSame('Extraído em: 29/09/2026 às 14:30', $sheet->getCell('C2')->getValue());
-            self::assertSame('Oficina: Mecânica | Centro de custo: 3101005', $sheet->getCell('C3')->getValue());
-            self::assertSame('EXTRACAO', $sheet->getCell('E6')->getValue());
+            self::assertSame('Oficina: Mecânica | UNIDADE: FÁBRICA | Centro de custo: 3101005', $sheet->getCell('C3')->getValue());
+            self::assertSame('3101005 — EXTRACAO', $sheet->getCell('E6')->getValue());
             self::assertSame('MECÂNICA', $sheet->getCell('F6')->getValue());
             self::assertCount(1, $sheet->getDrawingCollection());
             self::assertSame('A1', $sheet->getDrawingCollection()[0]->getCoordinates());
@@ -90,6 +91,7 @@ final class OpportunityStopExcelReportTest extends TestCase
         $fetch = static fn(int $page): array => [
             'available' => true,
             'area_name' => 'Todos',
+            'unit_name' => 'TODAS',
             'filters' => ['cost_center' => ''],
             'has_more' => $page === 1,
             'orders' => [[

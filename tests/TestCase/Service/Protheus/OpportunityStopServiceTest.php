@@ -24,7 +24,7 @@ final class OpportunityStopServiceTest extends TestCase
             ];
         };
         $result = (new OpportunityStopService(loader: $loader))->load(
-            ['area' => 'MECANI', 'cost_center' => '3101005', 'card' => 'preventive', 'status' => 'FECHADA'],
+            ['area' => 'MECANI', 'unit' => 'factory', 'cost_center' => '3101005', 'card' => 'preventive', 'status' => 'FECHADA'],
             true,
             2,
         );
@@ -34,21 +34,44 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertSame('EM ABERTO', $received['filters']['card_status']);
         self::assertSame('EM ABERTO', $received['filters']['status']);
         self::assertSame('3101005', $received['filters']['cost_center']);
+        self::assertSame('factory', $received['filters']['opportunity_unit']);
         self::assertTrue($received['export']);
         self::assertSame(2, $received['page']);
         self::assertSame(14, $result['total']);
         self::assertSame('MECANI', $result['orders'][0]['TJ_CODAREA']);
         self::assertSame('MECÂNICA', $result['area_name']);
+        self::assertSame('FÁBRICA', $result['unit_name']);
         self::assertSame(
             ['MECANI' => 'MECÂNICA', 'ELETRI' => 'ELÉTRICA'],
             (new OpportunityStopService())->workshops(),
         );
     }
 
+    public function testClassifiesAndFormatsCostCentersWithoutMixingWorkshop(): void
+    {
+        $service = new OpportunityStopService();
+        $centers = ['3101005' => '3101005 — EXTRAÇÃO', '4101005' => '4101005 — CALDEIRAS', '9901' => '9901 — APOIO'];
+
+        self::assertSame('factory', OpportunityStopService::unitForCostCenter('3101005'));
+        self::assertSame('mill', OpportunityStopService::unitForCostCenter('4101005'));
+        self::assertSame('other', OpportunityStopService::unitForCostCenter('9901'));
+        self::assertSame(['factory' => 'FÁBRICA', 'mill' => 'USINA', 'other' => 'OUTROS'], $service->units($centers));
+        self::assertSame(['3101005' => '3101005 — EXTRAÇÃO'], $service->costCentersForUnit($centers, 'factory'));
+        self::assertSame('3101005 — EXTRAÇÃO', OpportunityStopService::costCenterLabel([
+            'TJ_CCUSTO' => '3101005', 'cost_center_name' => 'EXTRAÇÃO',
+        ]));
+    }
+
     public function testRejectsUnsafeAreaBeforeLoading(): void
     {
         $this->expectException(InvalidArgumentException::class);
         (new OpportunityStopService(loader: static fn(): array => []))->load(['area' => "MECANI' OR 1=1"]);
+    }
+
+    public function testRejectsUnknownUnitBeforeLoading(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new OpportunityStopService(loader: static fn(): array => []))->load(['unit' => 'workshop-name']);
     }
 
     public function testCostCenterOptionsSqlIsFixedBoundAndAllowlisted(): void
@@ -81,5 +104,10 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertStringContainsString("c.D_E_L_E_T_ <> '*'", $sql);
         self::assertStringContainsString('AS cost_center_name', $sql);
         self::assertStringContainsString('f.cost_center = \'\' OR n.TJ_CCUSTO = f.cost_center', $sql);
+        self::assertStringContainsString("f.opportunity_unit = 'factory'", $sql);
+        self::assertStringContainsString("LIKE '31%'", $sql);
+        self::assertStringContainsString("f.opportunity_unit = 'mill'", $sql);
+        self::assertStringContainsString("LIKE '41%'", $sql);
+        self::assertStringContainsString("f.opportunity_unit = 'other'", $sql);
     }
 }

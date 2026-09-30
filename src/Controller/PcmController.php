@@ -55,12 +55,14 @@ final class PcmController extends AppController
             $service = new \App\Service\Protheus\OpportunityStopService();
             $stops = $service->load($this->request->getQueryParams());
             $workshops = $service->workshops();
-            $costCenters = $service->costCenters($stops['area']);
+            $allCostCenters = $service->costCenters($stops['area']);
+            $units = $service->units($allCostCenters);
+            $costCenters = $service->costCentersForUnit($allCostCenters, $stops['unit']);
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros ou paginação inválidos.');
         }
         if (!$stops['available']) $this->response = $this->response->withStatus(503);
-        $this->set(compact('stops', 'workshops', 'costCenters') + ['navigationAreas' => []]);
+        $this->set(compact('stops', 'workshops', 'units', 'costCenters') + ['navigationAreas' => []]);
     }
 
     public function exportOpportunityStops(): Response

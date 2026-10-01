@@ -19,6 +19,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     private ?array $historyUserColumns = null;
 
+    private ?string $historicalOffseasonServices = null;
+
     private ?float $deadline;
 
     private string $sectorStage = 'connection';
@@ -253,6 +255,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
             }
             $params[$key] = trim($value);
         }
+        if (!$management) {
+            $unit = $filters['unidade'] ?? '';
+            if (!is_string($unit) || !in_array($unit, ['', 'factory', 'mill'], true)) {
+                throw new InvalidArgumentException('Unidade invÃ¡lida.');
+            }
+            $params['unidade'] = $unit;
+            $params['offseason_services'] = $this->historicalOffseasonServices();
+        }
         if ($management) {
             $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
         }
@@ -285,7 +295,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = ''): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -302,15 +312,30 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if (!in_array($costCenterMode, ['', 'exact', 'blank', 'null'], true)) {
             throw new InvalidArgumentException('Filtro de centro de custo inválido.');
         }
+        if (!in_array($historical, ['', '1'], true) || !in_array($unit, ['', 'factory', 'mill'], true)
+            || ($unit !== '' && $historical !== '1')) {
+            throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
+        }
         $extraFilters = $costCenter !== '' || $costCenterMode !== '' || $dateStart !== '' || $dateEnd !== ''
-            || $area !== '' || $service !== '' || $type !== '' || $situation !== '' || $ending !== '';
+            || $area !== '' || $service !== '' || $type !== '' || $situation !== '' || $ending !== ''
+            || $historical !== '';
         if ($extraFilters) {
             $params += ['centro' => $costCenter, 'centro_modo' => $costCenterMode, 'area' => $area,
                 'servico' => $service, 'tipo' => $type, 'situacao' => $situation, 'termino' => $ending,
                 'date_start' => $dateStart, 'date_end' => $dateEnd];
+            if ($historical === '1') {
+                $params['unidade'] = $unit;
+                $params['offseason_services'] = $this->historicalOffseasonServices();
+            }
         }
         $rows = $this->read(
-            ProtheusQueries::orders($number !== null, $branch !== null, $equipment !== null, $extraFilters),
+            ProtheusQueries::orders(
+                $number !== null,
+                $branch !== null,
+                $equipment !== null,
+                $extraFilters,
+                $historical === '1',
+            ),
             $params,
             ['offset' => 'integer', 'fetch' => 'integer'],
         );
@@ -333,6 +358,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
         ) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
+        $filters['offseason_services'] = ($filters['historico'] ?? '') === '1'
+            ? $this->historicalOffseasonServices() : '[]';
         $rows = $this->read(ProtheusQueries::generalEntries(), $filters + [
             'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
         ], ['offset' => 'integer', 'fetch' => 'integer']);
@@ -348,6 +375,31 @@ final class ProtheusRepository implements ProtheusReaderInterface
         unset($row);
 
         return ['entries' => array_slice($rows, 0, $limit), 'has_more' => count($rows) > $limit];
+    }
+
+    /** Classifies resolved service definitions once and passes exact branch/code pairs to historical SQL. */
+    private function historicalOffseasonServices(): string
+    {
+        if ($this->historicalOffseasonServices !== null) {
+            return $this->historicalOffseasonServices;
+        }
+        $rows = $this->read(ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS);
+        if (count($rows) > 2000) {
+            throw new RuntimeException('DefiniÃ§Ãµes de serviÃ§o incompletas.');
+        }
+        $classifier = new PcmServiceClassifier();
+        $services = [];
+        foreach ($rows as $row) {
+            if ((int)($row['service_matches'] ?? 0) !== 1 || ($row['service_name'] ?? null) === null) {
+                throw new RuntimeException('Cadastro de serviÃ§o indisponÃ­vel ou ambÃ­guo.');
+            }
+            if ($classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA') {
+                $services[] = ['branch' => rtrim((string)$row['TJ_FILIAL']),
+                    'code' => rtrim((string)$row['TJ_SERVICO'])];
+            }
+        }
+
+        return $this->historicalOffseasonServices = json_encode($services, JSON_THROW_ON_ERROR);
     }
 
     public function findOrderIdentity(string $numero, string $filial): ?array

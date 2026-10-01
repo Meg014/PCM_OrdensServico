@@ -205,9 +205,13 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertLessThan(strpos($scripts, 'chart.umd.min.js'), strpos($scripts, 'pcm-protheus-dashboard.js'));
         self::assertStringContainsString('data-analysis-total>37', $general);
         self::assertStringContainsString('pcm-chart-card', $general);
-        self::assertStringContainsString('bem=FAB+80+080&amp;filial=01', $general);
-        self::assertStringContainsString('/pcm/ordens?centro=&amp;centro_modo=blank', $general);
-        self::assertStringContainsString('/pcm/ordens?filial=01&amp;servico=CORMEC', $general);
+        self::assertStringContainsString('ANÁLISE GERAL · SAFRA', $general);
+        self::assertStringContainsString('exclusivamente O.S. da Safra', $general);
+        self::assertStringContainsString('pcm-filter-panel pcm-history-scope-filter', $general);
+        self::assertStringContainsString('class="form-select"', $general);
+        self::assertStringContainsString('/pcm/ordens?historico=1&amp;filial=01&amp;bem=FAB+80+080', $general);
+        self::assertStringContainsString('/pcm/ordens?historico=1&amp;centro=&amp;centro_modo=blank', $general);
+        self::assertStringContainsString('/pcm/ordens?historico=1&amp;filial=01&amp;servico=CORMEC', $general);
         self::assertStringContainsString('CORMEC — CORRETIVA MECANICA', $general);
         self::assertStringContainsString('Sem centro de custo', $general);
         self::assertStringNotContainsString('setor=', $general);
@@ -260,7 +264,8 @@ final class ProtheusOrderAccessTest extends TestCase
             'service_name', 'TJ_CODAREA', 'TJ_CCUSTO', 'TJ_TIPO', 'TJ_SITUACA', 'TJ_TERMINO'], '<script>alert(1)</script>');
         $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23',
             'descricao' => '<script>alert(2)</script>', 'TJ_DTMRINI' => '', 'TJ_DTMRFIM' => '20260924'];
-        $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => ''],
+        $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => '',
+            'historico' => '1', 'unidade' => 'factory'],
             'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
         $view->set('listing', $listing);
         $view->set('areas', ['ELETRI', 'MECANI']);
@@ -285,6 +290,8 @@ final class ProtheusOrderAccessTest extends TestCase
         }
         self::assertStringContainsString('Período pela Data de origem da OS.', $html);
         self::assertStringContainsString('page=2', $html);
+        self::assertStringContainsString('historico=1', $html);
+        self::assertStringContainsString('unidade=factory', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
         $friendly = $row;

@@ -51,7 +51,8 @@ final class OrderEntryExportServiceTest extends TestCase
         $service = new OrderEntryExportService($this->repository($calls, $rows));
         foreach ([1, 2] as $page) {
             $result = $service->loadGeneral(['os' => '005472', 'bem' => '000045', 'centro' => '0001',
-                'area' => '', 'date_start' => '2026-01-01', 'date_end' => '2026-12-31'], $page);
+                'area' => '', 'date_start' => '2026-01-01', 'date_end' => '2026-12-31',
+                'historico' => '1', 'unidade' => 'mill'], $page);
             self::assertTrue($result['available']);
         }
         self::assertCount(2, $calls);
@@ -59,7 +60,13 @@ final class OrderEntryExportServiceTest extends TestCase
             self::assertSame('005472', $call[1]['numero']);
             self::assertSame('000045', $call[1]['bem']);
             self::assertSame('', $call[1]['area']);
+            self::assertSame('1', $call[1]['historico']);
+            self::assertSame('mill', $call[1]['unidade']);
+            self::assertSame('[]', $call[1]['offseason_services']);
+            self::assertStringContainsString('OPENJSON(f.offseason_services)', $call[0]);
             self::assertStringContainsString('dbo.STL010', $call[0]);
+            self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $call[0]);
+            self::assertStringContainsString("LIKE '41%'", $call[0]);
             self::assertTrue(ProtheusQueries::allows($call[0]));
         }
         self::assertSame(0, $calls[0][1]['offset']);
@@ -71,6 +78,12 @@ final class OrderEntryExportServiceTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $rows, $fail) {
+            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+                $statement = $this->createMock(StatementInterface::class);
+                $statement->method('fetchAll')->willReturn([]);
+                $statement->expects(self::once())->method('closeCursor');
+                return $statement;
+            }
             $calls[] = [$sql, $params, $types];
             if ($fail) throw new \RuntimeException('SQLSTATE secret');
             $statement = $this->createMock(StatementInterface::class);

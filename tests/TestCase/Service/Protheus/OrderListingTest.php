@@ -150,6 +150,7 @@ final class OrderListingTest extends TestCase
             $result = (new OrderListingService($this->repository([], $calls)))->load([
                 'filial' => '01', 'area' => 'MECANI', 'bem' => 'BEM01', 'servico' => 'CORMEC',
                 'tipo' => 'COR', 'situacao' => 'L', 'termino' => 'S', 'page' => '2', 'limite' => '20',
+                'historico' => '1', 'unidade' => 'factory',
             ], $export, $export ? 3 : null);
             self::assertTrue($result['available']);
             [$sql, $params] = $calls[0];
@@ -158,12 +159,24 @@ final class OrderListingTest extends TestCase
                 self::assertSame($value, $params[$key]);
             }
             self::assertStringContainsString('j.TJ_SERVICO = f.servico', $sql);
-            self::assertStringNotContainsString('LIKE', $sql);
+            self::assertSame('factory', $params['unidade']);
+            self::assertSame('[]', $params['offseason_services']);
+            self::assertStringContainsString('OPENJSON(f.offseason_services)', $sql);
+            self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $sql);
+            self::assertStringContainsString("LIKE '31%'", $sql);
+            self::assertStringContainsString("LIKE '41%'", $sql);
             self::assertStringContainsString("j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C'", $sql);
             self::assertSame($export ? 2000 : 20, $params['offset']);
             self::assertSame($export ? 1001 : 21, $params['fetch']);
             self::assertSame('CORMEC', $result['filters']['servico']);
+            self::assertSame('1', $result['filters']['historico']);
         }
+    }
+
+    public function testHistoricalUnitCannotBeUsedOutsideHistoricalDrilldown(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new OrderListingService())->load(['unidade' => 'mill']);
     }
 
     public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void
@@ -192,6 +205,12 @@ final class OrderListingTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, &$calls, $fail) {
+            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+                $statement = $this->createMock(StatementInterface::class);
+                $statement->method('fetchAll')->willReturn([]);
+                $statement->expects(self::once())->method('closeCursor');
+                return $statement;
+            }
             $calls[] = [$sql, $params, $types];
             self::assertTrue(ProtheusQueries::allows($sql));
             if ($fail) {

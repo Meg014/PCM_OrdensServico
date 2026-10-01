@@ -175,6 +175,39 @@ final class ProtheusDashboardTest extends TestCase
             'TJ_DTMPINI'] as $operationalRule) self::assertStringNotContainsString($operationalRule, $calls[1][0]);
     }
 
+    public function testHistoricalAnalysisUsesOnlySelectedUnitAndExcludesFactoryEquipment(): void
+    {
+        $calls = [];
+        $definitions = [
+            ['TJ_FILIAL' => '01 ', 'TJ_SERVICO' => '2425ME ', 'service_name' => 'ENTRESSAFRA 24-25 MECANICA ', 'service_matches' => 1],
+            ['TJ_FILIAL' => '01 ', 'TJ_SERVICO' => 'ESMECA ', 'service_name' => 'ENTRESSAFRA ', 'service_matches' => 1],
+            ['TJ_FILIAL' => '01 ', 'TJ_SERVICO' => 'CORMEC ', 'service_name' => 'CORRETIVA MECANICA ', 'service_matches' => 1],
+        ];
+        $result = (new ProtheusDashboardService($this->repository([], $calls, [], $definitions)))
+            ->load(['unidade' => 'factory']);
+
+        self::assertTrue($result['available']);
+        self::assertSame('', $calls[0][1]['centro']);
+        self::assertArrayNotHasKey('unidade', $calls[0][1]);
+        self::assertSame('factory', $calls[1][1]['unidade']);
+        self::assertSame([['branch' => '01', 'code' => '2425ME'], ['branch' => '01', 'code' => 'ESMECA']],
+            json_decode($calls[1][1]['offseason_services'], true));
+        self::assertStringContainsString('OPENJSON(f.offseason_services)', $calls[1][0]);
+        self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $calls[1][0]);
+        self::assertStringContainsString("f.unidade = 'factory'", $calls[1][0]);
+        self::assertStringContainsString("LIKE '31%'", $calls[1][0]);
+        self::assertStringContainsString("f.unidade = 'mill'", $calls[1][0]);
+        self::assertStringContainsString("LIKE '41%'", $calls[1][0]);
+        self::assertStringContainsString("TJ_SITUACA IS NULL OR TJ_SITUACA <> 'C'", $calls[1][0]);
+        self::assertStringNotContainsString('FAB 80 020', $calls[0][0]);
+    }
+
+    public function testHistoricalUnitRejectsUnsupportedValues(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new ProtheusDashboardService())->load(['unidade' => 'other']);
+    }
+
     public function testPresentationDoesNotQueryOrReturnDetailedAnalysis(): void
     {
         $calls = [];
@@ -276,11 +309,17 @@ final class ProtheusDashboardTest extends TestCase
         self::assertCount(2, $calls);
     }
 
-    private function repository(?array $rows, array &$calls, array $analysisRows = []): ProtheusRepository
+    private function repository(?array $rows, array &$calls, array $analysisRows = [], array $definitions = []): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
-        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, $analysisRows, &$calls) {
+        $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, $analysisRows, $definitions, &$calls) {
+            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+                $statement = $this->createMock(StatementInterface::class);
+                $statement->method('fetchAll')->willReturn($definitions);
+                $statement->expects(self::once())->method('closeCursor');
+                return $statement;
+            }
             $calls[] = [$sql, $params, $types];
             if ($rows === null) throw new RuntimeException('SQLSTATE host user password');
             $statement = $this->createMock(StatementInterface::class);

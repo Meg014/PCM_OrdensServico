@@ -14,7 +14,7 @@ final class ProtheusDashboardService
 {
     public const CARDS = ['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed',
         'preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'];
-    public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'];
+    public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino', 'unidade'];
 
     public function __construct(private ?ProtheusRepository $repository = null)
     {
@@ -29,6 +29,9 @@ final class ProtheusDashboardService
                 throw new InvalidArgumentException('Filtros inválidos.');
             }
             $filters[$key] = trim($value);
+        }
+        if (!in_array($filters['unidade'], ['', 'factory', 'mill'], true)) {
+            throw new InvalidArgumentException('Unidade invÃ¡lida.');
         }
         $payload = ['available' => false, 'source' => 'Protheus', 'queried_at' => null,
             'filters' => $filters, 'record_count' => null, 'groups' => [],

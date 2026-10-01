@@ -173,6 +173,9 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 }
 .pcm-filter-actions { display: flex; gap: .65rem; }
 .pcm-filter-actions .btn { align-items: center; display: inline-flex; height: 2.8rem; justify-content: center; min-width: 7rem; padding: .55rem 1rem; }
+.pcm-history-scope-filter { max-width: 38rem; }
+.pcm-history-scope-filter .pcm-panel-heading { padding-bottom: .8rem; }
+.pcm-history-scope-filter .pcm-panel-heading h3 { font-size: .9rem; margin: 0; }
 .pcm-secondary-action { background: #f8fafc; border: 1px solid #d5dde6; color: #49637e; font-weight: 600; }
 .pcm-secondary-action:hover, .pcm-secondary-action:focus { background: #eef3f7; border-color: #aebdcb; color: #244f7b; }
 .pcm-dashboard-section { margin-top: 3rem; scroll-margin-top: 1rem; }

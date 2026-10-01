@@ -8,6 +8,26 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    public const HISTORICAL_SERVICE_DEFINITIONS = <<<'SQL'
+WITH grouped AS (
+    SELECT j.TJ_FILIAL, j.TJ_SERVICO
+    FROM dbo.STJ010 j
+    WHERE j.D_E_L_E_T_ <> '*' AND (j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C')
+      AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
+      AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%' OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
+    GROUP BY j.TJ_FILIAL, j.TJ_SERVICO
+)
+SELECT g.TJ_FILIAL, g.TJ_SERVICO,
+    CASE WHEN local_service.matches > 0 THEN local_service.name ELSE shared_service.name END AS service_name,
+    CASE WHEN local_service.matches > 0 THEN local_service.matches ELSE shared_service.matches END AS service_matches
+FROM grouped g
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = g.TJ_SERVICO AND s.T4_FILIAL = g.TJ_FILIAL AND s.D_E_L_E_T_ <> '*') local_service
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
+    WHERE s.T4_SERVICO = g.TJ_SERVICO AND s.T4_FILIAL = '' AND s.D_E_L_E_T_ <> '*') shared_service
+ORDER BY g.TJ_FILIAL, g.TJ_SERVICO
+SQL;
+
     public const AREAS = <<<'SQL'
 SELECT DISTINCT RTRIM(j.TJ_CODAREA) AS code
 FROM dbo.STJ010 j
@@ -89,7 +109,9 @@ WITH base AS (
                        CAST(:centro AS VARCHAR(100)) AS centro,
                        CAST(:tipo AS VARCHAR(100)) AS tipo,
                        CAST(:situacao AS VARCHAR(100)) AS situacao,
-                       CAST(:termino AS VARCHAR(100)) AS termino) f
+                       CAST(:termino AS VARCHAR(100)) AS termino,
+                       CAST(:unidade AS VARCHAR(20)) AS unidade,
+                       CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services) f
     WHERE j.D_E_L_E_T_ <> '*'
       AND (
 SQL
@@ -103,6 +125,16 @@ SQL
       AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)
       AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
+      AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
+      AND NOT EXISTS (
+        SELECT 1 FROM OPENJSON(f.offseason_services)
+        WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason
+        WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO
+      )
+      AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')
+        OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
+        OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'
+          OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))
 ), grouped AS (
     SELECT CASE
         WHEN GROUPING(TJ_CODAREA) = 0 THEN 'area'
@@ -187,7 +219,7 @@ SQL;
     }
 
     /** Eight closed variants: exact order, branch and equipment filters. */
-    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false): string
+    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false, bool $historical = false): string
     {
         $where = "j.D_E_L_E_T_ <> '*'";
         if ($number) {
@@ -202,7 +234,8 @@ SQL;
 
         $join = '';
         if ($filters) {
-            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end) f";
+            $unitField = $historical ? ', CAST(:unidade AS VARCHAR(20)) AS unidade, CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services' : '';
+            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end{$unitField}) f";
             $date = self::ORIGIN_DATE;
             $where .= " AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro) OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))"
                 . " AND (f.area = '' OR j.TJ_CODAREA = f.area)"
@@ -212,6 +245,14 @@ SQL;
                 . " AND (f.termino = '' OR j.TJ_TERMINO = f.termino)"
                 . " AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))"
                 . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))";
+            if ($historical) {
+                $where .= " AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'"
+                    . " AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services) WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)"
+                    . " AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')"
+                    . " OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')"
+                    . " OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'"
+                    . " OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))";
+            }
         }
 
         // The general export displays the same OS observation used by the detail page.
@@ -236,7 +277,8 @@ WITH filtered AS (
         CAST(:area AS VARCHAR(100)) area, CAST(:servico AS VARCHAR(100)) servico,
         CAST(:tipo AS VARCHAR(100)) tipo, CAST(:situacao AS VARCHAR(100)) situacao,
         CAST(:termino AS VARCHAR(100)) termino, CAST(:date_start AS VARCHAR(10)) date_start,
-        CAST(:date_end AS VARCHAR(10)) date_end) f
+        CAST(:date_end AS VARCHAR(10)) date_end, CAST(:historico AS VARCHAR(1)) historico,
+        CAST(:unidade AS VARCHAR(20)) unidade, CAST(:offseason_services AS NVARCHAR(MAX)) offseason_services) f
     WHERE j.D_E_L_E_T_ <> '*' AND {$notCanceled} AND (f.numero = '' OR j.TJ_ORDEM = f.numero)
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial) AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
       AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro)
@@ -246,6 +288,14 @@ WITH filtered AS (
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
       AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))
       AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))
+      AND (f.historico = '' OR (RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
+        AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services)
+          WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason
+          WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)
+        AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')
+          OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
+          OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'
+            OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))))
 ), named AS (
     SELECT j.*, CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END equipment_name,
         CASE WHEN bl.matches > 0 THEN bl.matches ELSE bs.matches END equipment_matches,
@@ -446,8 +496,11 @@ SQL;
         foreach ([false, true] as $number) {
             foreach ([false, true] as $branch) {
                 foreach ([false, true] as $equipment) {
-                    if ($sql === self::orders($number, $branch, $equipment) || $sql === self::orders($number, $branch, $equipment, true)) {
-                        return true;
+                    foreach ([false, true] as $historical) {
+                        if ($sql === self::orders($number, $branch, $equipment)
+                            || $sql === self::orders($number, $branch, $equipment, true, $historical)) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -462,7 +515,7 @@ SQL;
             }
         }
         return in_array($sql, [
-            self::DASHBOARD, self::MANAGEMENT, self::AREAS,
+            self::DASHBOARD, self::MANAGEMENT, self::AREAS, self::HISTORICAL_SERVICE_DEFINITIONS,
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
             self::HISTORY_USER_COLUMNS,

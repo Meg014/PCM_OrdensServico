@@ -18,7 +18,7 @@ final class OrderListingService
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
         foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
-            'situacao', 'termino', 'date_start', 'date_end'] as $key) {
+            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'unidade'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100) {
                 throw new InvalidArgumentException('Filtros inválidos.');
@@ -31,6 +31,11 @@ final class OrderListingService
         }
         if ($filters['centro'] !== '' && $filters['centro_modo'] === '') {
             $filters['centro_modo'] = 'exact';
+        }
+        if (!in_array($filters['historico'], ['', '1'], true)
+            || !in_array($filters['unidade'], ['', 'factory', 'mill'], true)
+            || ($filters['unidade'] !== '' && $filters['historico'] !== '1')) {
+            throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
         }
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] !== '') {
@@ -60,6 +65,7 @@ final class OrderListingService
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
                 $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
+                $filters['historico'], $filters['unidade'],
             );
 
             return $result + ['filters' => $filters, 'available' => true];

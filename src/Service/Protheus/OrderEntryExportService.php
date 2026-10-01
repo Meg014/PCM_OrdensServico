@@ -71,7 +71,7 @@ final class OrderEntryExportService
     {
         $filters = [];
         foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
-            'situacao', 'termino', 'date_start', 'date_end'] as $key) {
+            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'unidade'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
             $filters[$key] = trim($value);
@@ -81,6 +81,11 @@ final class OrderEntryExportService
             throw new InvalidArgumentException('Filtro de centro de custo inválido.');
         }
         if ($filters['centro'] !== '' && $filters['centro_modo'] === '') $filters['centro_modo'] = 'exact';
+        if (!in_array($filters['historico'], ['', '1'], true)
+            || !in_array($filters['unidade'], ['', 'factory', 'mill'], true)
+            || ($filters['unidade'] !== '' && $filters['historico'] !== '1')) {
+            throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
+        }
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] === '') continue;
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters[$key]);
@@ -90,7 +95,8 @@ final class OrderEntryExportService
         $params = ['numero' => $filters['os'], 'filial' => $filters['filial'], 'bem' => $filters['bem'],
             'centro' => $filters['centro'], 'centro_modo' => $filters['centro_modo'], 'area' => $filters['area'],
             'servico' => $filters['servico'], 'tipo' => $filters['tipo'], 'situacao' => $filters['situacao'],
-            'termino' => $filters['termino'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']];
+            'termino' => $filters['termino'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end'],
+            'historico' => $filters['historico'], 'unidade' => $filters['unidade']];
         try {
             $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->generalEntries($params, $page, $limit);
             return ['available' => true, 'filters' => $filters] + $data;

@@ -64,22 +64,20 @@
                 if (!Number.isSafeInteger(item.quantity) || item.quantity < 0) throw new Error('Invalid analysis count');
                 const row = document.createElement('li');
                 row.className = 'list-group-item d-flex justify-content-between align-items-start gap-3 px-0';
-                if (key === 'equipment') {
-                    const link = document.createElement('a');
-                    link.className = 'pcm-ranking-link';
-                    link.href = `/pcm/equipamento?${new URLSearchParams({bem: item.code, filial: item.branch})}`;
-                    link.textContent = `${item.code} — ${item.name}`;
-                    row.appendChild(link);
-                } else if (key === 'services' || key === 'costCenters') {
+                if (key === 'equipment' || key === 'services' || key === 'costCenters') {
                     const link = document.createElement('a');
                     link.className = 'pcm-ranking-link';
                     const filterNames = {filial: 'filial', area: 'area', bem: 'bem', servico: 'servico',
-                        tipo: 'tipo', situacao: 'situacao', termino: 'termino'};
+                        tipo: 'tipo', situacao: 'situacao', termino: 'termino', unidade: 'unidade'};
                     const query = new URLSearchParams();
                     for (const [source, target] of Object.entries(filterNames)) {
                         if (payload.filters?.[source]) query.set(target, payload.filters[source]);
                     }
-                    if (key === 'services') {
+                    query.set('historico', '1');
+                    if (key === 'equipment') {
+                        query.set('filial', item.branch);
+                        query.set('bem', item.code);
+                    } else if (key === 'services') {
                         query.set('filial', item.branch);
                         query.set('servico', item.code);
                     } else {
@@ -87,7 +85,7 @@
                         query.set('centro_modo', item.mode);
                     }
                     link.href = `${root.dataset.ordersUrl}?${query}`;
-                    link.textContent = key === 'services' ? `${item.code} — ${item.name}`
+                    link.textContent = ['equipment', 'services'].includes(key) ? `${item.code} — ${item.name}`
                         : (item.code || 'Sem centro de custo');
                     row.appendChild(link);
                 } else {

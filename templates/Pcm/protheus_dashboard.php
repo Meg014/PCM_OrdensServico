@@ -7,7 +7,8 @@ $orderContextFilters = static fn (array $dashboardFilters): array => array_filte
         'filial' => $dashboardFilters['filial'] ?? '', 'area' => $dashboardFilters['area'] ?? '',
         'bem' => $dashboardFilters['bem'] ?? '', 'servico' => $dashboardFilters['servico'] ?? '',
         'tipo' => $dashboardFilters['tipo'] ?? '', 'situacao' => $dashboardFilters['situacao'] ?? '',
-        'termino' => $dashboardFilters['termino'] ?? '',
+        'termino' => $dashboardFilters['termino'] ?? '', 'unidade' => $dashboardFilters['unidade'] ?? '',
+        'historico' => '1',
     ], static fn ($value) => $value !== '');
 $costCenterFilters = static function (array $dashboardFilters, array $costCenter) use ($orderContextFilters): array {
     $query = $orderContextFilters($dashboardFilters);
@@ -19,6 +20,12 @@ $serviceFilters = static function (array $dashboardFilters, array $service) use 
     return array_replace($orderContextFilters($dashboardFilters), [
         'filial' => $service['branch'],
         'servico' => $service['code'],
+    ]);
+};
+$equipmentFilters = static function (array $dashboardFilters, array $equipment) use ($orderContextFilters): array {
+    return array_replace($orderContextFilters($dashboardFilters), [
+        'filial' => $equipment['branch'],
+        'bem' => $equipment['code'],
     ]);
 };
 ?>
@@ -85,14 +92,25 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php $analysis = $payload['analysis'] ?? ['total' => 0, 'equipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
     'status' => ['completed' => 0, 'open' => 0]]; ?>
 <section class="pcm-dashboard-section mt-4" data-dashboard-analysis>
-<div class="pcm-section-title"><p>ANÁLISE GERAL</p><h2>Visão histórica das O.S.</h2></div>
-<p class="text-body-secondary">Todas as O.S. válidas e não excluídas da STJ010, considerando os filtros exatos aplicados acima.</p>
+<div class="pcm-section-title"><p>ANÁLISE GERAL · SAFRA</p><h2>Visão histórica das O.S.</h2></div>
+<p class="text-body-secondary">A partir desta seção, os indicadores consideram exclusivamente O.S. da Safra nas unidades Fábrica e Usina. O.S. de Entressafra não fazem parte desta análise.</p>
+<div class="pcm-panel pcm-filter-panel pcm-history-scope-filter mb-4">
+<div class="pcm-panel-heading"><h3>Filtros da análise</h3></div>
+<?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?><div class="row g-3 align-items-end">
+<?php foreach (['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'] as $key): ?>
+<?php if (($payload['filters'][$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $payload['filters'][$key]]) ?><?php endif; ?>
+<?php endforeach; ?>
+<div class="col-12 col-sm-7 col-md-5 col-lg-4"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
+    'options' => ['factory' => 'Fábrica', 'mill' => 'Usina'], 'value' => $payload['filters']['unidade'] ?? '',
+    'class' => 'form-select']) ?></div>
+<div class="col-12 col-sm-auto"><div class="pcm-filter-actions"><button type="submit" class="btn pcm-primary-action">Aplicar</button></div></div>
+</div><?= $this->Form->end() ?></div>
 <div class="row g-3 mb-4"><div class="col-sm-6 col-lg-4"><article class="pcm-kpi-card pcm-kpi-total flex-column align-items-start text-start gap-3 p-4">
 <p class="pcm-kpi-label mb-0">Total de O.S.</p><strong class="pcm-kpi-value" data-analysis-total><?= number_format($analysis['total'], 0, ',', '.') ?></strong>
 </article></div></div>
 <div class="row g-4">
 <div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 equipamentos por O.S.</h3><p>Equipamentos com maior volume no histórico selecionado.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="equipment">
-<?php foreach ($analysis['equipment'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-equipment', '?' => ['bem' => $row['code'], 'filial' => $row['branch']]], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+<?php foreach ($analysis['equipment'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-orders', '?' => $equipmentFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 serviços por O.S.</h3><p>Serviços mais recorrentes no histórico selecionado.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="services">
 <?php foreach ($analysis['services'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-orders', '?' => $serviceFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>

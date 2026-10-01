@@ -43,7 +43,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
 <input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
-<?php foreach (['servico', 'tipo', 'situacao', 'termino'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
+<?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'unidade'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
 <div class="col-md-4"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($area) ?></option><?php endforeach; ?>

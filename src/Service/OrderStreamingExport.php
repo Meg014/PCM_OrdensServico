@@ -16,6 +16,7 @@ final class OrderStreamingExport
         'os' => 'Número da OS', 'filial' => 'Filial', 'bem' => 'Equipamento', 'equipment' => 'Equipamento',
         'centro' => 'Centro de custo', 'cost_center' => 'Centro de custo', 'area' => 'Área/Setor',
         'centro_modo' => 'Regra do centro de custo', 'servico' => 'Serviço', 'tipo' => 'Tipo',
+        'historico' => 'Origem do escopo', 'unidade' => 'Unidade',
         'situacao' => 'Situação', 'termino' => 'Término',
         'status' => 'Status', 'service' => 'Serviço', 'service_name' => 'Nome do serviço',
         'maintenance_type' => 'Tipo de manutenção', 'q' => 'Busca textual', 'date_start' => 'Data inicial',

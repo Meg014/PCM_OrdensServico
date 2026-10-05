@@ -17,7 +17,7 @@ final class OrderListingService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+        foreach (['os', 'filial', 'bem', 'nome_bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
             'situacao', 'termino', 'date_start', 'date_end', 'historico', 'unidade'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100) {
@@ -65,7 +65,7 @@ final class OrderListingService
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
                 $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
-                $filters['historico'], $filters['unidade'],
+                $filters['historico'], $filters['unidade'], self::equipmentNamePattern($filters['nome_bem']),
             );
 
             return $result + ['filters' => $filters, 'available' => true];
@@ -73,6 +73,16 @@ final class OrderListingService
             return ['orders' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false,
                 'filters' => $filters, 'available' => false];
         }
+    }
+
+    /** Literal case-insensitive substring pattern for SQL Server LIKE. */
+    public static function equipmentNamePattern(string $name): string
+    {
+        if ($name === '') {
+            return '';
+        }
+
+        return '%' . str_replace(['~', '%', '_'], ['~~', '~%', '~_'], mb_strtoupper($name)) . '%';
     }
 
     public function areas(): array

@@ -226,7 +226,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
             if (
                 (int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1
                 || (int)$row['service_matches'] > 1 || (int)$row['professional_matches'] > 1
-                || (int)$row['product_matches'] > 1
+                || (int)$row['product_matches'] > 1 || (int)$row['cost_center_matches'] > 1
             ) {
                 throw new RuntimeException('Identidade ou cadastro ambíguo.');
             }
@@ -236,6 +236,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $row['service_matches'],
                 $row['professional_matches'],
                 $row['product_matches'],
+                $row['cost_center_matches'],
                 $row['record_id'],
             );
         }
@@ -295,7 +296,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = '', string $equipmentName = ''): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -316,13 +317,16 @@ final class ProtheusRepository implements ProtheusReaderInterface
             || ($unit !== '' && $historical !== '1')) {
             throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
         }
+        if (strlen($equipmentName) > 202) {
+            throw new InvalidArgumentException('Nome do equipamento invÃ¡lido.');
+        }
         $extraFilters = $costCenter !== '' || $costCenterMode !== '' || $dateStart !== '' || $dateEnd !== ''
             || $area !== '' || $service !== '' || $type !== '' || $situation !== '' || $ending !== ''
-            || $historical !== '';
+            || $historical !== '' || $equipmentName !== '';
         if ($extraFilters) {
             $params += ['centro' => $costCenter, 'centro_modo' => $costCenterMode, 'area' => $area,
                 'servico' => $service, 'tipo' => $type, 'situacao' => $situation, 'termino' => $ending,
-                'date_start' => $dateStart, 'date_end' => $dateEnd];
+                'date_start' => $dateStart, 'date_end' => $dateEnd, 'nome_bem' => $equipmentName];
             if ($historical === '1') {
                 $params['unidade'] = $unit;
                 $params['offseason_services'] = $this->historicalOffseasonServices();
@@ -367,10 +371,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
             if (
                 (int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1
                 || (int)$row['professional_matches'] > 1 || (int)$row['product_matches'] > 1
+                || (int)$row['cost_center_matches'] > 1
             ) {
                 throw new RuntimeException('Identidade ou cadastro ambíguo.');
             }
-            unset($row['identity_count'], $row['equipment_matches'], $row['service_matches'], $row['professional_matches'], $row['product_matches']);
+            unset($row['identity_count'], $row['equipment_matches'], $row['service_matches'], $row['professional_matches'], $row['product_matches'], $row['cost_center_matches']);
         }
         unset($row);
 

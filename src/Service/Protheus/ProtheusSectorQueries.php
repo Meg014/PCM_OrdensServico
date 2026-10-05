@@ -273,16 +273,21 @@ SQL;
 
 SELECT filtered.record_id, filtered.TJ_FILIAL, filtered.TJ_ORDEM, filtered.descricao,
     filtered.TJ_CODBEM, filtered.equipment_name, filtered.TJ_SERVICO, filtered.service_name,
-    filtered.TJ_CODAREA, filtered.TJ_CCUSTO, filtered.TJ_TIPO, filtered.status,
+    filtered.TJ_CODAREA, filtered.TJ_CCUSTO, cost_center.name AS cost_center_name,
+    filtered.TJ_TIPO, filtered.status,
     l.TL_TIPOREG, l.TL_CODIGO, l.TL_DTINICI, l.TL_DTFIM, l.TL_HOINICI, l.TL_HOFIM,
     l.TL_QUANTID, l.TL_UNIDADE,
     CASE WHEN l.TL_TIPOREG = 'M' THEN professional.name END AS professional_name,
     CASE WHEN l.TL_TIPOREG = 'P' THEN product.name END AS product_name,
+    cost_center.matches AS cost_center_matches,
     professional.matches AS professional_matches, product.matches AS product_matches,
     filtered.identity_count, filtered.equipment_matches, filtered.service_matches
 FROM {$source} filtered
 INNER JOIN dbo.STL010 l ON l.TL_ORDEM = filtered.TJ_ORDEM
     AND l.TL_FILIAL = filtered.TJ_FILIAL AND l.D_E_L_E_T_ <> '*'
+OUTER APPLY (SELECT COUNT(*) AS matches, MAX(c.CTT_DESC01) AS name FROM dbo.CTT010 c
+    WHERE c.CTT_CUSTO = filtered.TJ_CCUSTO AND c.CTT_FILIAL = filtered.TJ_FILIAL
+      AND c.D_E_L_E_T_ <> '*') cost_center
 OUTER APPLY (SELECT COUNT(*) AS matches, MAX(p.T1_NOME) AS name FROM dbo.ST1010 p
     WHERE l.TL_TIPOREG = 'M' AND p.T1_CODFUNC = l.TL_CODIGO
       AND p.T1_FILIAL = filtered.TJ_FILIAL AND p.D_E_L_E_T_ <> '*') professional

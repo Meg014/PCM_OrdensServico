@@ -179,6 +179,47 @@ final class OrderListingTest extends TestCase
         (new OrderListingService())->load(['unidade' => 'mill']);
     }
 
+    public function testEquipmentNameIsCaseInsensitiveLiteralSubstringBeforePagination(): void
+    {
+        foreach ([
+            'BOMBA CENTRIFUGA' => '%BOMBA CENTRIFUGA%',
+            'bOmBa' => '%BOMBA%',
+            'BOMBA%_~01' => '%BOMBA~%~_~~01%',
+        ] as $input => $expected) {
+            $calls = [];
+            $result = (new OrderListingService($this->repository([], $calls)))->load([
+                'nome_bem' => $input, 'bem' => 'BOM 01', 'os' => '000123', 'centro' => '3101001',
+                'area' => 'MECANI', 'date_start' => '2026-01-01', 'date_end' => '2026-12-31',
+                'page' => '2',
+            ]);
+            self::assertTrue($result['available']);
+            [$sql, $params] = $calls[0];
+            self::assertSame($expected, $params['nome_bem']);
+            self::assertSame('BOM 01', $params['bem']);
+            self::assertSame('000123', $params['numero']);
+            self::assertSame('3101001', $params['centro']);
+            self::assertSame('MECANI', $params['area']);
+            self::assertSame(20, $params['offset']);
+            self::assertStringContainsString('UPPER(name_local.T9_NOME) LIKE f.nome_bem', $sql);
+            self::assertStringContainsString('UPPER(name_shared.T9_NOME) LIKE f.nome_bem', $sql);
+            self::assertStringContainsString("ESCAPE '~'", $sql);
+            self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'UPPER(name_local.T9_NOME)'));
+        }
+    }
+
+    public function testEquipmentNameSurvivesOrderExportBatches(): void
+    {
+        $calls = [];
+        $result = (new OrderListingService($this->repository([], $calls)))->load([
+            'nome_bem' => 'bomba', 'page' => '9',
+        ], true, 3);
+
+        self::assertTrue($result['available']);
+        self::assertSame('%BOMBA%', $calls[0][1]['nome_bem']);
+        self::assertSame(2000, $calls[0][1]['offset']);
+        self::assertSame('bomba', $result['filters']['nome_bem']);
+    }
+
     public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void
     {
         $calls = [];

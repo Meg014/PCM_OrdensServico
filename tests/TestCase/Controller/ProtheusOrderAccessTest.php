@@ -265,7 +265,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23',
             'descricao' => '<script>alert(2)</script>', 'TJ_DTMRINI' => '', 'TJ_DTMRFIM' => '20260924'];
         $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => '',
-            'historico' => '1', 'unidade' => 'factory'],
+            'historico' => '1', 'unidade' => 'factory', 'nome_bem' => 'BOMBA'],
             'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
         $view->set('listing', $listing);
         $view->set('areas', ['ELETRI', 'MECANI']);
@@ -292,6 +292,9 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('page=2', $html);
         self::assertStringContainsString('historico=1', $html);
         self::assertStringContainsString('unidade=factory', $html);
+        self::assertStringContainsString('nome_bem=BOMBA', $html);
+        self::assertStringContainsString('Nome do equipamento', $html);
+        self::assertStringContainsString('value="BOMBA"', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
         $friendly = $row;

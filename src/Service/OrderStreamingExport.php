@@ -14,6 +14,7 @@ final class OrderStreamingExport
 {
     private const FILTER_LABELS = [
         'os' => 'Número da OS', 'filial' => 'Filial', 'bem' => 'Equipamento', 'equipment' => 'Equipamento',
+        'nome_bem' => 'Nome do equipamento',
         'centro' => 'Centro de custo', 'cost_center' => 'Centro de custo', 'area' => 'Área/Setor',
         'centro_modo' => 'Regra do centro de custo', 'servico' => 'Serviço', 'tipo' => 'Tipo',
         'historico' => 'Origem do escopo', 'unidade' => 'Unidade',
@@ -158,6 +159,7 @@ final class OrderStreamingExport
             'equipment_name' => ['Nome do equipamento', 'text'], 'descricao' => ['Descrição da OS', 'text', 30],
             'TJ_SERVICO' => ['Código do serviço', 'text'], 'service_name' => ['Nome do serviço', 'text'],
             'TJ_CODAREA' => ['Área/Setor', 'text'], 'TJ_CCUSTO' => ['Centro de custo', 'text'],
+            'cost_center_name' => ['Nome do centro de custo', 'text', 32],
             'TJ_TIPO' => ['Tipo de manutenção', 'text'], 'status' => ['Status da OS', 'text'],
             'entry_type' => ['Tipo do apontamento', 'text', 24, $type], 'TL_CODIGO' => ['Código do apontamento', 'text'],
             'professional_code' => ['Código do responsável/profissional', 'text', 24, static fn ($r) => rtrim((string)$r['TL_TIPOREG']) === 'M' ? $r['TL_CODIGO'] : ''],

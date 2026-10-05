@@ -43,19 +43,22 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
 <input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
+<div class="w-100 d-none d-md-block"></div>
+<div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-nome-bem">Nome do equipamento</label>
+<input class="form-control" id="filter-nome-bem" name="nome_bem" maxlength="100" value="<?= h($filters['nome_bem'] ?? '') ?>" placeholder="Ex.: BOMBA"></div>
 <?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'unidade'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
-<div class="col-md-4"><label class="form-label" for="filter-area">Área/Setor</label>
+<div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($area) ?></option><?php endforeach; ?>
 </select></div>
 <?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $key => $label): ?>
-<div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
+<div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
 <input type="date" class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($filters[$key] ?? '') ?>" aria-describedby="origin-date-help"></div>
 <?php endforeach; ?>
 <div class="col-12 text-body-secondary" id="origin-date-help">Período pela Data de origem da OS.</div>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
-<span class="text-body-secondary ms-2">Pesquisa por códigos exatos.</span></div>
+<span class="text-body-secondary ms-2">Códigos exatos; nome do equipamento por trecho.</span></div>
 <?= $this->Form->end() ?></section>
 <?php if (!$listing['available']): ?>
 <div class="alert alert-secondary" role="status">Ordens do Protheus temporariamente indisponíveis. Tente novamente em instantes.</div>

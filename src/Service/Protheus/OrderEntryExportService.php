@@ -70,7 +70,7 @@ final class OrderEntryExportService
     public function loadGeneral(array $query, int $page = 1, int $limit = \App\Service\StreamingXlsxReport::BATCH_SIZE): array
     {
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+        foreach (['os', 'filial', 'bem', 'nome_bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
             'situacao', 'termino', 'date_start', 'date_end', 'historico', 'unidade'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
@@ -93,6 +93,7 @@ final class OrderEntryExportService
         }
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
         $params = ['numero' => $filters['os'], 'filial' => $filters['filial'], 'bem' => $filters['bem'],
+            'nome_bem' => OrderListingService::equipmentNamePattern($filters['nome_bem']),
             'centro' => $filters['centro'], 'centro_modo' => $filters['centro_modo'], 'area' => $filters['area'],
             'servico' => $filters['servico'], 'tipo' => $filters['tipo'], 'situacao' => $filters['situacao'],
             'termino' => $filters['termino'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end'],

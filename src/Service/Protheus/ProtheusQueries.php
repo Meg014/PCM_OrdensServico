@@ -235,10 +235,11 @@ SQL;
         $join = '';
         if ($filters) {
             $unitField = $historical ? ', CAST(:unidade AS VARCHAR(20)) AS unidade, CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services' : '';
-            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end{$unitField}) f";
+            $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end, CAST(:nome_bem AS VARCHAR(202)) AS nome_bem{$unitField}) f";
             $date = self::ORIGIN_DATE;
             $where .= " AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro) OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))"
                 . " AND (f.area = '' OR j.TJ_CODAREA = f.area)"
+                . " AND (f.nome_bem = '' OR EXISTS (SELECT 1 FROM dbo.ST9010 name_local WHERE name_local.T9_CODBEM = j.TJ_CODBEM AND name_local.T9_FILIAL = j.TJ_FILIAL AND name_local.D_E_L_E_T_ <> '*' AND UPPER(name_local.T9_NOME) LIKE f.nome_bem ESCAPE '~') OR (NOT EXISTS (SELECT 1 FROM dbo.ST9010 any_local WHERE any_local.T9_CODBEM = j.TJ_CODBEM AND any_local.T9_FILIAL = j.TJ_FILIAL AND any_local.D_E_L_E_T_ <> '*') AND EXISTS (SELECT 1 FROM dbo.ST9010 name_shared WHERE name_shared.T9_CODBEM = j.TJ_CODBEM AND name_shared.T9_FILIAL = '' AND name_shared.D_E_L_E_T_ <> '*' AND UPPER(name_shared.T9_NOME) LIKE f.nome_bem ESCAPE '~')))"
                 . " AND (f.servico = '' OR j.TJ_SERVICO = f.servico)"
                 . " AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)"
                 . " AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)"
@@ -275,6 +276,7 @@ WITH filtered AS (
     CROSS JOIN (SELECT CAST(:numero AS VARCHAR(100)) numero, CAST(:filial AS VARCHAR(100)) filial,
         CAST(:bem AS VARCHAR(100)) bem, CAST(:centro AS VARCHAR(100)) centro, CAST(:centro_modo AS VARCHAR(10)) centro_modo,
         CAST(:area AS VARCHAR(100)) area, CAST(:servico AS VARCHAR(100)) servico,
+        CAST(:nome_bem AS VARCHAR(202)) nome_bem,
         CAST(:tipo AS VARCHAR(100)) tipo, CAST(:situacao AS VARCHAR(100)) situacao,
         CAST(:termino AS VARCHAR(100)) termino, CAST(:date_start AS VARCHAR(10)) date_start,
         CAST(:date_end AS VARCHAR(10)) date_end, CAST(:historico AS VARCHAR(1)) historico,
@@ -283,6 +285,15 @@ WITH filtered AS (
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial) AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
       AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro)
         OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))
+      AND (f.nome_bem = ''
+        OR EXISTS (SELECT 1 FROM dbo.ST9010 name_local WHERE name_local.T9_CODBEM = j.TJ_CODBEM
+          AND name_local.T9_FILIAL = j.TJ_FILIAL AND name_local.D_E_L_E_T_ <> '*'
+          AND UPPER(name_local.T9_NOME) LIKE f.nome_bem ESCAPE '~')
+        OR (NOT EXISTS (SELECT 1 FROM dbo.ST9010 any_local WHERE any_local.T9_CODBEM = j.TJ_CODBEM
+          AND any_local.T9_FILIAL = j.TJ_FILIAL AND any_local.D_E_L_E_T_ <> '*')
+          AND EXISTS (SELECT 1 FROM dbo.ST9010 name_shared WHERE name_shared.T9_CODBEM = j.TJ_CODBEM
+            AND name_shared.T9_FILIAL = '' AND name_shared.D_E_L_E_T_ <> '*'
+            AND UPPER(name_shared.T9_NOME) LIKE f.nome_bem ESCAPE '~')))
       AND (f.area = '' OR j.TJ_CODAREA = f.area) AND (f.servico = '' OR j.TJ_SERVICO = f.servico)
       AND (f.tipo = '' OR j.TJ_TIPO = f.tipo) AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
@@ -310,9 +321,12 @@ WITH filtered AS (
 SELECT n.*, l.TL_TIPOREG, l.TL_CODIGO, l.TL_DTINICI, l.TL_DTFIM, l.TL_HOINICI, l.TL_HOFIM,
     l.TL_QUANTID, l.TL_UNIDADE, CASE WHEN l.TL_TIPOREG='M' THEN professional.name END professional_name,
     CASE WHEN l.TL_TIPOREG='P' THEN product.name END product_name,
+    cost_center.name cost_center_name, cost_center.matches cost_center_matches,
     professional.matches professional_matches, product.matches product_matches
 FROM named n
 INNER JOIN dbo.STL010 l ON l.TL_ORDEM=n.TJ_ORDEM AND l.TL_FILIAL=n.TJ_FILIAL AND l.D_E_L_E_T_<>'*'
+OUTER APPLY (SELECT COUNT(*) matches, MAX(c.CTT_DESC01) name FROM dbo.CTT010 c
+    WHERE c.CTT_CUSTO=n.TJ_CCUSTO AND c.CTT_FILIAL=n.TJ_FILIAL AND c.D_E_L_E_T_<>'*') cost_center
 OUTER APPLY (SELECT COUNT(*) matches, MAX(p.T1_NOME) name FROM dbo.ST1010 p WHERE l.TL_TIPOREG='M' AND p.T1_CODFUNC=l.TL_CODIGO AND p.T1_FILIAL=n.TJ_FILIAL AND p.D_E_L_E_T_<>'*') professional
 OUTER APPLY (SELECT COUNT(*) matches, MAX(p.B1_DESC) name FROM dbo.SB1010 p WHERE l.TL_TIPOREG='P' AND p.B1_COD=l.TL_CODIGO AND p.B1_FILIAL=n.TJ_FILIAL AND p.D_E_L_E_T_<>'*') product
 ORDER BY n.record_id DESC, l.R_E_C_N_O_ ASC

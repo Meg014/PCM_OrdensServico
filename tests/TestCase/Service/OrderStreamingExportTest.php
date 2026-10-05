@@ -47,6 +47,18 @@ final class OrderStreamingExportTest extends TestCase
         self::assertArrayHasKey('TJ_DTORIGI', $method->invoke($export, 'equipment'));
     }
 
+    public function testEntrySchemaPlacesCostCenterNameAfterCodeWithReadableWidth(): void
+    {
+        $method = new ReflectionMethod(OrderStreamingExport::class, 'entryColumns');
+        $columns = $method->invoke(new OrderStreamingExport());
+        $keys = array_keys($columns);
+        $code = array_search('TJ_CCUSTO', $keys, true);
+
+        self::assertIsInt($code);
+        self::assertSame('cost_center_name', $keys[$code + 1]);
+        self::assertSame(['Nome do centro de custo', 'text', 32], $columns['cost_center_name']);
+    }
+
     public function testGeneralWorkbookUsesOnlyValidatedOriginDate(): void
     {
         $method = new ReflectionMethod(OrderStreamingExport::class, 'orderColumns');

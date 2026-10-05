@@ -14,6 +14,7 @@ final class OrderEntryExcelReportTest extends TestCase
         $base = ['TJ_FILIAL' => '01', 'TJ_ORDEM' => '005472', 'TJ_CODBEM' => '000045',
             'equipment_name' => 'EQUIPAMENTO X', 'descricao' => 'DESCRIÇÃO X', 'TJ_SERVICO' => '001',
             'service_name' => 'SERVIÇO DIFERENTE', 'TJ_CODAREA' => 'ELETRI', 'TJ_CCUSTO' => '0007',
+            'cost_center_name' => 'PREPARAÇÃO INDUSTRIAL',
             'TJ_TIPO' => 'COR', 'status' => 'EM ABERTO', 'TL_DTINICI' => '20260925',
             'TL_DTFIM' => '20260925', 'TL_HOINICI' => '09:30', 'TL_HOFIM' => '10:30',
             'TL_QUANTID' => '1.00', 'TL_UNIDADE' => 'H'];
@@ -33,21 +34,24 @@ final class OrderEntryExcelReportTest extends TestCase
         self::assertSame(2, $sheet->getCell('C5')->getValue());
         self::assertSame('Filtros: Equipamento: 000045', $sheet->getCell('A6')->getValue());
         self::assertSame('A8', $sheet->getFreezePane());
-        self::assertSame('A7:W11', $sheet->getAutoFilter()->getRange());
+        self::assertSame('A7:X11', $sheet->getAutoFilter()->getRange());
         self::assertSame(['005472', '005472', '005472', '005473'], array_map(
             static fn (int $row): string => (string)$sheet->getCell('A' . $row)->getValue(), range(8, 11)));
         self::assertSame('DESCRIÇÃO X', $sheet->getCell('E8')->getValue());
         self::assertSame('SERVIÇO DIFERENTE', $sheet->getCell('G8')->getValue());
-        self::assertSame('Mão de obra', $sheet->getCell('L8')->getValue());
-        self::assertSame('Material', $sheet->getCell('L10')->getValue());
-        self::assertSame('008382', $sheet->getCell('N8')->getValue());
-        self::assertSame('002075', $sheet->getCell('P10')->getValue());
-        foreach (['O8' => '=PERIGOSO', 'Q10' => '+MATERIAL'] as $cell => $value) {
+        self::assertSame('Nome do centro de custo', $sheet->getCell('J7')->getValue());
+        self::assertSame('PREPARAÇÃO INDUSTRIAL', $sheet->getCell('J8')->getValue());
+        self::assertSame(32.0, $sheet->getColumnDimension('J')->getWidth());
+        self::assertSame('Mão de obra', $sheet->getCell('M8')->getValue());
+        self::assertSame('Material', $sheet->getCell('M10')->getValue());
+        self::assertSame('008382', $sheet->getCell('O8')->getValue());
+        self::assertSame('002075', $sheet->getCell('Q10')->getValue());
+        foreach (['P8' => '=PERIGOSO', 'R10' => '+MATERIAL'] as $cell => $value) {
             self::assertSame($value, $sheet->getCell($cell)->getValue());
             self::assertSame(DataType::TYPE_STRING, $sheet->getCell($cell)->getDataType());
         }
-        self::assertSame('25/09/2026', $sheet->getCell('R8')->getFormattedValue());
-        self::assertSame('09:30', $sheet->getCell('T8')->getFormattedValue());
+        self::assertSame('25/09/2026', $sheet->getCell('S8')->getFormattedValue());
+        self::assertSame('09:30', $sheet->getCell('U8')->getFormattedValue());
         $book->disconnectWorksheets();
     }
 

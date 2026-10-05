@@ -44,7 +44,8 @@ final class OrderEntryExcelReport
             'TJ_CODBEM' => ['Código do equipamento', 'text'], 'equipment_name' => ['Nome do equipamento', 'text'],
             'descricao' => ['Descrição da OS', 'text'], 'TJ_SERVICO' => ['Código do serviço', 'text'],
             'service_name' => ['Nome do serviço', 'text'], 'TJ_CODAREA' => ['Área/Setor', 'text'],
-            'TJ_CCUSTO' => ['Centro de custo', 'text'], 'TJ_TIPO' => ['Tipo de manutenção', 'text'],
+            'TJ_CCUSTO' => ['Centro de custo', 'text'],
+            'cost_center_name' => ['Nome do centro de custo', 'text'], 'TJ_TIPO' => ['Tipo de manutenção', 'text'],
             'status' => ['Status da OS', 'text'], 'entry_type' => ['Tipo do apontamento', 'text'],
             'TL_CODIGO' => ['Código do apontamento', 'text'], 'professional_code' => ['Código do responsável/profissional', 'text'],
             'professional_name' => ['Nome do responsável/profissional', 'text'],
@@ -100,7 +101,7 @@ final class OrderEntryExcelReport
         foreach ($columns as [$label, $type]) {
             $letter = Coordinate::stringFromColumnIndex($index++);
             $this->text($sheet, $letter . $header, $label);
-            $sheet->getColumnDimension($letter)->setWidth($type === 'text' ? 24 : 18);
+            $sheet->getColumnDimension($letter)->setWidth($label === 'Nome do centro de custo' ? 32 : ($type === 'text' ? 24 : 18));
         }
         foreach ($data['entries'] as $entry) {
             ++$row;

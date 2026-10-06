@@ -79,6 +79,18 @@ final class OrderProtheusServiceTest extends TestCase
         self::assertSame(2, $result['history']['page']);
     }
 
+    public function testEmbeddedEquipmentHistoryPreservesUnit(): void
+    {
+        $reader = $this->createMock(ProtheusReaderInterface::class);
+        $reader->method('findOrder')->willReturn($this->order());
+        $reader->expects(self::once())->method('findEquipmentHistory')
+            ->with('MEL 80 115', '01', 1, 10, 'mill')->willReturn($this->history());
+
+        $result = (new OrderProtheusService($reader))->load(self::SNAPSHOT, 'all', 1, null, 'mill');
+
+        self::assertSame('available', $result['history']['state']);
+    }
+
     public function testHistoricDetailMustBelongToSameEquipmentAndBranch(): void
     {
         foreach (['valid', 'equipment', 'branch'] as $scenario) {

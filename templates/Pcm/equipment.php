@@ -32,6 +32,8 @@ $status = static function (array $row): string {
 <?= $this->Form->hidden('bem', ['value' => $f['bem']]) ?><?= $this->Form->hidden('filial', ['value' => $f['filial']]) ?>
 <?php if ($f['setor'] !== ''): ?><?= $this->Form->hidden('setor', ['value' => $f['setor']]) ?><?php endif; ?>
 <div class="row g-3">
+<div class="col-md-3"><?= $this->Form->control('unit', ['label' => 'Unidade', 'empty' => 'Todas',
+    'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $f['unit'], 'class' => 'form-select']) ?></div>
 <?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $key => $label): ?>
 <div class="col-md-3"><?= $this->Form->control($key, ['type' => 'date', 'label' => $label, 'value' => $f[$key], 'class' => 'form-control']) ?></div>
 <?php endforeach; ?>
@@ -51,7 +53,7 @@ Pendentes: <?= h($s['pending_count']) ?>.</p></section>
 <section class="pcm-dashboard-section pcm-equipment-history"><h2 class="mb-4">Histórico de O.S.</h2><div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Histórico do equipamento — rolagem horizontal" tabindex="0">
 <table class="table pcm-orders-table align-middle"><thead><tr><?php foreach (['O.S.', 'Data de referência', 'Tipo', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($equipment['orders'] as $row): ?><tr>
-<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
+<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $f['unit']]]) ?></td>
 <td><?= h($date($row['reference_date'])) ?></td><td><?= h(['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? $row['TJ_TIPO']) ?></td>
 <td><?= h($row['TJ_SERVICO']) ?><br><?= h($row['service_name'] ?? '—') ?></td>
 <td><?= h($status($row)) ?></td>

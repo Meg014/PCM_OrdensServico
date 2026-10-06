@@ -349,7 +349,7 @@ final class PcmController extends AppController
         return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
             ->withStatus($sector['available'] ? 200 : 503)
             ->withStringBody((string)json_encode(['available' => $sector['available'], 'html' => $html,
-                'charts' => $sector['charts'], 'queried_at' => $sector['queried_at'],
+                'queried_at' => $sector['queried_at'],
                 'queried_at_display' => (new PcmTimeFormatter())->format(
                     $sector['queried_at'] ? new \DateTimeImmutable($sector['queried_at']) : null, 'd/m/Y, H:i:s',
                 )], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE));
@@ -471,7 +471,14 @@ final class PcmController extends AppController
             throw new BadRequestException('Informe número da OS e filial válidos.');
         }
 
-        return ['source_order_number' => $number, 'branch_code' => rtrim($branch, ' ')];
+        $unit = $this->request->getQuery('unit', '');
+        try {
+            $unit = \App\Service\Protheus\ProtheusUnit::validate($unit);
+        } catch (InvalidArgumentException) {
+            throw new BadRequestException('Unidade inválida.');
+        }
+
+        return ['source_order_number' => $number, 'branch_code' => rtrim($branch, ' '), 'unit' => $unit];
     }
 
     private function protheusPayload(array $identity): Response
@@ -487,7 +494,7 @@ final class PcmController extends AppController
         }
         // Do not hold the user's session lock while waiting for the complementary server.
         $this->request->getSession()->close();
-        $payload = (new OrderProtheusService())->load($identity, $part, $page, $selected);
+        $payload = (new OrderProtheusService())->load($identity, $part, $page, $selected, (string)($identity['unit'] ?? ''));
 
         return $this->response->withType('application/json')->withHeader('Cache-Control', 'no-store')
             ->withStringBody((string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));

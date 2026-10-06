@@ -30,18 +30,20 @@ WITH scoped AS (
         CASE WHEN LEN(RTRIM(j.TJ_DTORIGI)) = 8 AND RTRIM(j.TJ_DTORIGI) NOT LIKE '%[^0-9]%'
             THEN TRY_CONVERT(date, j.TJ_DTORIGI, 112) END AS origin_date,
         j.TJ_HOMPINI, j.TJ_DTPRINI, j.TJ_HOPRINI,
+        j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
         CASE WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*'{{AREA_SCOPE}}
+      AND
+SQL
+        . ProtheusAnalyticalScope::STJ_PREDICATE . <<<'SQL'
+
       AND (
 SQL
         . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
 )
-      AND (
-SQL
-        . ProtheusOperationalEligibility::OPERATIONAL . <<<'SQL'
-)
+      AND ({{ELIGIBILITY_SCOPE}})
 ), named AS (
     SELECT j.*,
         CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END AS equipment_name,
@@ -63,26 +65,36 @@ SQL
         CAST(:equipment AS VARCHAR(100)) AS equipment, CAST(:service AS VARCHAR(100)) AS service,
         CAST(:service_name AS VARCHAR(255)) AS service_name, CAST(:cost_center AS VARCHAR(100)) AS cost_center,
         CAST(:maintenance_type AS VARCHAR(100)) AS maintenance_type, CAST(:q AS VARCHAR(450)) AS q,
-        CAST(:opportunity_unit AS VARCHAR(20)) AS opportunity_unit) f
+        CAST(:unit AS VARCHAR(20)) AS unit, CAST(:include_offseason AS VARCHAR(1)) AS include_offseason,
+        CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services) f
     WHERE (f.filial = '' OR n.TJ_FILIAL = f.filial) AND (f.status = '' OR n.status = f.status)
         AND (f.equipment = '' OR n.TJ_CODBEM = f.equipment) AND (f.service = '' OR n.TJ_SERVICO = f.service)
         AND (f.service_name = '' OR n.service_name = f.service_name)
         AND (f.cost_center = '' OR n.TJ_CCUSTO = f.cost_center)
         AND (f.maintenance_type = '' OR n.TJ_TIPO = f.maintenance_type)
-        AND (f.opportunity_unit = ''
-            OR (f.opportunity_unit = 'factory' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) LIKE '31%')
-            OR (f.opportunity_unit = 'mill' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) LIKE '41%')
-            OR (f.opportunity_unit = 'other' AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) NOT LIKE '31%'
-                AND LTRIM(RTRIM(COALESCE(n.TJ_CCUSTO, ''))) NOT LIKE '41%'))
+        AND {{UNIT_SCOPE}}
+        AND (f.include_offseason = '1' OR NOT EXISTS (
+            SELECT 1 FROM OPENJSON(f.offseason_services)
+            WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') offseason
+            WHERE offseason.code = n.TJ_SERVICO AND offseason.name = n.service_name
+        ))
         AND (f.q = '' OR n.TJ_ORDEM LIKE f.q ESCAPE '~' OR n.TJ_CODBEM LIKE f.q ESCAPE '~'
             OR n.equipment_name LIKE f.q ESCAPE '~' OR n.TJ_SERVICO LIKE f.q ESCAPE '~'
             OR n.service_name LIKE f.q ESCAPE '~')
 )
 SQL;
 
-    private static function base(bool $area): string
+    private static function base(
+        bool $area,
+        string $eligibility = ProtheusOperationalEligibility::OPERATIONAL,
+    ): string
     {
-        return str_replace('{{AREA_SCOPE}}', $area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '', self::BASE);
+        return str_replace(
+            ['{{AREA_SCOPE}}', '{{UNIT_SCOPE}}', '{{ELIGIBILITY_SCOPE}}'],
+            [$area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '',
+                ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit'), $eligibility],
+            self::BASE,
+        );
     }
 
     public static function aggregates(bool $area = true): string
@@ -90,17 +102,14 @@ SQL;
         return self::base($area) . <<<'SQL'
 
 , grouped AS (
-    SELECT CASE WHEN GROUPING(status) = 0 AND GROUPING(TJ_SERVICO) = 0 THEN 'cards'
-        WHEN GROUPING(status) = 0 THEN 'status' WHEN GROUPING(TJ_TIPO) = 0 THEN 'maintenance'
-        WHEN GROUPING(TJ_CODBEM) = 0 THEN 'equipment' WHEN GROUPING(TJ_SERVICO) = 0 THEN 'services'
-        WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters' ELSE 'total' END AS dimension,
-        TJ_FILIAL, status, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name, TJ_CCUSTO,
+    SELECT CASE WHEN GROUPING(status) = 0 THEN 'cards' ELSE 'total' END AS dimension,
+        TJ_FILIAL, status, TJ_TIPO, NULL AS TJ_CODBEM, NULL AS equipment_name,
+        TJ_SERVICO, service_name, NULL AS TJ_CCUSTO,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches,
         SUM(CAST(CASE WHEN TRY_CONVERT(date, NULLIF(TJ_DTPRINI, ''), 112) IS NULL THEN 1 ELSE 0 END AS BIGINT)) AS missing_start
     FROM filtered
-    GROUP BY GROUPING SETS ((), (status, TJ_TIPO, TJ_SERVICO, service_name), (status), (TJ_TIPO),
-        (TJ_FILIAL, TJ_CODBEM, equipment_name), (TJ_FILIAL, TJ_SERVICO, service_name), (TJ_FILIAL, TJ_CCUSTO))
+    GROUP BY GROUPING SETS ((), (TJ_FILIAL, status, TJ_TIPO, TJ_SERVICO, service_name))
 ), ranked AS (
     SELECT g.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, TJ_FILIAL,
         status, TJ_TIPO, TJ_CODBEM, TJ_SERVICO, TJ_CCUSTO) AS position FROM grouped g
@@ -113,7 +122,7 @@ OPTION (RECOMPILE)
 SQL;
     }
 
-    /** Top equipment by every non-deleted OS in the selected sector and active manual filters. */
+    /** Physical Top 10 plus the explicit generic-equipment audit population. */
     public static function equipmentRanking(bool $area = true): string
     {
         $operationalScope = '      AND (' . ProtheusOperationalEligibility::OPERATIONAL . ')';
@@ -122,27 +131,36 @@ SQL;
         return $allValid . <<<'SQL'
 
 , grouped AS (
-    SELECT TJ_FILIAL, TJ_CODBEM, equipment_name, COUNT_BIG(*) AS quantity,
+    SELECT CASE WHEN
+SQL
+        . ProtheusGenericEquipment::predicate('TJ_FILIAL', 'TJ_CODBEM') . <<<'SQL'
+        THEN 'generic' ELSE 'equipment' END AS dimension,
+        TJ_FILIAL, TJ_CODBEM, equipment_name, COUNT_BIG(*) AS quantity,
         MAX(identity_count) AS identity_count, MAX(equipment_matches) AS equipment_matches,
         MAX(service_matches) AS service_matches
     FROM filtered
+    WHERE
+SQL
+        . ProtheusGenericEquipment::predicate('TJ_FILIAL', 'TJ_CODBEM') . <<<'SQL'
+       OR (NULLIF(LTRIM(RTRIM(TJ_CODBEM)), '') IS NOT NULL
+        AND NULLIF(LTRIM(RTRIM(equipment_name)), '') IS NOT NULL
+        AND NULLIF(LTRIM(RTRIM(TJ_CCUSTO)), '') IS NOT NULL)
     GROUP BY TJ_FILIAL, TJ_CODBEM, equipment_name
 ), ranked AS (
     SELECT grouped.*, ROW_NUMBER() OVER (
-        ORDER BY quantity DESC, TJ_FILIAL, TJ_CODBEM, equipment_name
-    ) AS position
-    FROM grouped
+        PARTITION BY dimension ORDER BY quantity DESC, TJ_FILIAL, TJ_CODBEM, equipment_name
+    ) AS position FROM grouped
 )
-SELECT TJ_FILIAL, TJ_CODBEM, equipment_name, quantity,
+SELECT dimension, TJ_FILIAL, TJ_CODBEM, equipment_name, quantity,
     identity_count, equipment_matches, service_matches
 FROM ranked
-WHERE position <= 10
-ORDER BY position
+WHERE (dimension = 'equipment' AND position <= 10) OR dimension = 'generic'
+ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
     }
 
-    /** Historical cost-center and maintenance rankings from the same all-valid scope as equipment. */
+    /** Cost-center Top 10 and maintenance distribution from the same all-valid scope. */
     public static function historicalRankings(bool $area = true): string
     {
         $operationalScope = '      AND (' . ProtheusOperationalEligibility::OPERATIONAL . ')';
@@ -151,15 +169,19 @@ SQL;
         return $allValid . <<<'SQL'
 
 , grouped AS (
-    SELECT CASE WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters' ELSE 'maintenance' END AS dimension,
-        TJ_CCUSTO, TJ_TIPO, COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
+    SELECT CASE WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters'
+        WHEN GROUPING(TJ_TIPO) = 0 THEN 'maintenance' ELSE 'services' END AS dimension,
+        TJ_FILIAL, TJ_CCUSTO, TJ_TIPO, TJ_SERVICO, service_name,
+        COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
-    FROM filtered GROUP BY GROUPING SETS ((TJ_CCUSTO), (TJ_TIPO))
+    FROM filtered GROUP BY GROUPING SETS ((TJ_CCUSTO), (TJ_TIPO), (TJ_FILIAL, TJ_SERVICO, service_name))
+    HAVING GROUPING(TJ_CCUSTO) = 1 OR NULLIF(LTRIM(RTRIM(TJ_CCUSTO)), '') IS NOT NULL
 ), ranked AS (
-    SELECT grouped.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, TJ_CCUSTO, TJ_TIPO) AS position
+    SELECT grouped.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, TJ_FILIAL, TJ_CCUSTO, TJ_TIPO, TJ_SERVICO) AS position
     FROM grouped
 )
-SELECT dimension, TJ_CCUSTO, TJ_TIPO, quantity, identity_count, equipment_matches, service_matches
+SELECT dimension, TJ_FILIAL, TJ_CCUSTO, TJ_TIPO, TJ_SERVICO, service_name,
+    quantity, identity_count, equipment_matches, service_matches
 FROM ranked WHERE dimension = 'maintenance' OR position <= 10
 ORDER BY dimension, position
 OPTION (RECOMPILE)
@@ -182,7 +204,7 @@ SQL;
     /** Same sector/master/manual-filter scope, exclusively L/N, with no planned-date cutoff. */
     private static function backlogBase(bool $area): string
     {
-        return str_replace(ProtheusOperationalEligibility::OPERATIONAL, ProtheusOperationalEligibility::OPEN, self::base($area)) . self::AGE;
+        return self::base($area, ProtheusOperationalEligibility::OPEN) . self::AGE;
     }
 
     public static function backlog(bool $area = true): string
@@ -190,14 +212,13 @@ SQL;
         return self::backlogBase($area) . <<<'SQL'
 
 , grouped AS (
-    SELECT CASE WHEN GROUPING(age_bucket) = 0 THEN 'age' WHEN GROUPING(TJ_TIPO) = 0 THEN 'maintenance'
-        WHEN GROUPING(TJ_CODBEM) = 0 THEN 'equipment' WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'costCenters'
-        ELSE 'total' END AS dimension,
-        age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_CCUSTO,
+    SELECT 'age' AS dimension,
+        age_bucket, NULL AS TJ_FILIAL, NULL AS TJ_TIPO, NULL AS TJ_CODBEM,
+        NULL AS equipment_name, NULL AS TJ_CCUSTO,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
     FROM bucketed
-    GROUP BY GROUPING SETS ((age_bucket), (TJ_TIPO), (TJ_FILIAL, TJ_CODBEM, equipment_name), (TJ_FILIAL, TJ_CCUSTO))
+    GROUP BY age_bucket
     UNION ALL
     -- A scalar aggregate always emits one total row, including an empty backlog.
     SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,
@@ -210,7 +231,7 @@ SQL;
 )
 SELECT dimension, age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_CCUSTO,
     quantity, identity_count, equipment_matches, service_matches
-FROM ranked WHERE dimension IN ('total', 'age', 'maintenance') OR position <= 10
+FROM ranked WHERE dimension IN ('total', 'age')
 ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
@@ -239,7 +260,9 @@ SQL : '';
 
 SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
+    CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, CONVERT(VARCHAR(8), origin_date, 112) AS TJ_DTORIGI,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
+    TJ_DTMRINI, TJ_HOMRINI, TJ_DTMRFIM, TJ_HOMRFIM,
     identity_count, equipment_matches, service_matches {$ageColumns}{$costCenterColumn}
 FROM {$source} filtered
 {$costCenterJoin}
@@ -253,8 +276,10 @@ WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, '
     AND (card.type = '' OR TJ_TIPO = card.type)
     AND (card.service1 = '' OR TJ_SERVICO IN (card.service1, card.service2))
     AND (card.season = '' OR EXISTS (
-        SELECT 1 FROM OPENJSON(:season_services) WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
-        WHERE allowed.code = filtered.TJ_SERVICO AND allowed.name = filtered.service_name
+        SELECT 1 FROM OPENJSON(:season_services) WITH (branch VARCHAR(100) '$.branch',
+            code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
+        WHERE allowed.branch = filtered.TJ_FILIAL AND allowed.code = filtered.TJ_SERVICO
+            AND allowed.name = filtered.service_name
     ))
 {$ageFilter}
 ORDER BY planned_date DESC, record_id DESC
@@ -306,8 +331,10 @@ WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, '
     AND (choice.type = '' OR filtered.TJ_TIPO = choice.type)
     AND (choice.service1 = '' OR filtered.TJ_SERVICO IN (choice.service1, choice.service2))
     AND (choice.season = '' OR EXISTS (
-        SELECT 1 FROM OPENJSON(:season_services) WITH (code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
-        WHERE allowed.code = filtered.TJ_SERVICO AND allowed.name = filtered.service_name))
+        SELECT 1 FROM OPENJSON(:season_services) WITH (branch VARCHAR(100) '$.branch',
+            code VARCHAR(100) '$.code', name VARCHAR(255) '$.name') allowed
+        WHERE allowed.branch = filtered.TJ_FILIAL AND allowed.code = filtered.TJ_SERVICO
+            AND allowed.name = filtered.service_name))
     AND (choice.entry_type = '' OR l.TL_TIPOREG = choice.entry_type)
     AND (choice.professional = '' OR (l.TL_TIPOREG = 'M' AND l.TL_CODIGO = choice.professional))
 {$ageFilter}

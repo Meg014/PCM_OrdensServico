@@ -47,8 +47,8 @@ final class PcmOperationalRevisionTest extends TestCase
             ['Liberada', 'Não', 'PRE', 'PREVEN', 'Preventiva'],
             ['Liberada', 'Não', 'COR', 'COREME', 'Nome antigo'],
             ['Liberada', 'Não', 'COR', 'CORPRO', 'Nome antigo'],
-            ['Liberada', 'Não', 'MEL', '2627ZZ', 'Revisão de entressafra'],
-            ['Liberada', 'Sim', 'COR', 'FUT', 'ENTRESSAFRA'],
+            ['Liberada', 'Não', 'MEL', '2425ME', 'Revisão de entressafra'],
+            ['Liberada', 'Sim', 'COR', 'ESMECA', 'ENTRESSAFRA'],
             ['Cancelada', 'Sim', 'PRE', 'COREME', 'Emergencial'],
             ['Cancelado', 'Não', 'COR', 'CORPRO', 'Programada'],
             ['Cancelada', 'Sim', 'MEL', 'X', 'ENTRESSAFRA'],
@@ -104,7 +104,7 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame(2, array_sum(array_column($summary, 'completed')));
         $this->assertSame(1, $summary['ENTRESSAFRA']['open']);
         $this->assertSame(1, $summary['ENTRESSAFRA']['completed']);
-        $this->assertSame(9, array_sum(array_column($dashboard['status'], 'quantity')));
+        $this->assertSame(9, $dashboard['indicators']['total']);
         $filters = $service->filters(['classification' => 'EMERGENCIAL', 'status' => 'EM ABERTO']);
         $this->assertSame(2, $service->detailQuery($this->areaId, $filters)?->count());
         $this->assertSame(2, $service->dashboard($this->areaId, $filters)['indicators']['emergency']);
@@ -132,8 +132,15 @@ final class PcmOperationalRevisionTest extends TestCase
         $this->assertSame('EMERGENCIAL', $classifier->classify(' coreme ', 'ENTRESSAFRA'));
         $this->assertSame('PROGRAMADA', $classifier->classify('corpro', 'Corretiva Emergencial'));
         $this->assertSame('EMERGENCIAL', $classifier->classify(null, 'manutenção CORRÉTIVA  EMERGENCIAL'));
-        $this->assertSame('ENTRESSAFRA', $classifier->classify('9999XX', 'Plano de éntrêssafra 2027'));
+        $this->assertSame('OUTROS', $classifier->classify('9999XX', 'Plano de éntrêssafra 2027', '01'));
         $this->assertSame('OUTROS', $classifier->classify('2425ME', 'Serviço comum'));
+        foreach (PcmServiceClassifier::OFFSEASON_SERVICES['01'] as $code) {
+            $this->assertSame('ENTRESSAFRA', $classifier->classify($code, 'DESCRIÇÃO ALTERADA', '01'));
+            $this->assertSame('OUTROS', $classifier->classify($code, 'ENTRESSAFRA', '02'));
+        }
+        $this->assertSame('OUTROS', $classifier->classify('NOVOES', 'ENTRESSAFRA NOVA', '01'));
+        $this->assertTrue($classifier->isOffseasonCandidate('Entressafra nova'));
+        $this->assertFalse($classifier->isOffseasonCandidate('Serviço normal'));
         $this->assertSame('OUTROS', $classifier->classify(null, 'Inspeção emergencial'));
         $this->assertSame('OUTROS', $classifier->classify(null, null));
     }
@@ -151,7 +158,7 @@ final class PcmOperationalRevisionTest extends TestCase
             'classification' => 'EMERGENCIAL', 'status' => 'EM ABERTO',
         ])?->count());
         $this->assertSame('OUTROS', (new PcmServiceClassifier())->classifySnapshot('MEL', 'CORPRO', 'Programada'));
-        $this->assertSame('ENTRESSAFRA', (new PcmServiceClassifier())->classifySnapshot('PRE', 'FUTURO', 'ENTRESSAFRA'));
+        $this->assertSame('ENTRESSAFRA', (new PcmServiceClassifier())->classifySnapshot('PRE', 'ESMECA', 'DESCRIÇÃO ALTERADA', '01'));
     }
 
     public function testOpenCutoffSeasonsAndEveryDrilldown(): void
@@ -178,7 +185,7 @@ final class PcmOperationalRevisionTest extends TestCase
                 $this->assertSame($counts[$key], $service->detailQuery(null, $filters + ['indicator' => $key])->count(), $key);
             }
         }
-        $this->insertRow($this->currentId, $this->areaId, 200, 'Liberada', 'Sim', 'MEL', 'FUT', 'Entressafra');
+        $this->insertRow($this->currentId, $this->areaId, 200, 'Liberada', 'Sim', 'MEL', 'ESMECA', 'Descrição alterada');
         $connection->update('work_order_snapshots', ['maintenance_planned_start' => '2027-01-01'], ['source_order_number' => '200']);
         $this->assertSame(2, (new PcmIndicatorService())->calculate()['offseason_completed']);
         $this->assertSame(25, $connection->execute('SELECT COUNT(*) FROM work_order_snapshots')->fetchColumn(0));
@@ -193,7 +200,7 @@ final class PcmOperationalRevisionTest extends TestCase
         $filters = ['season' => 'offseason', 'within' => ['safra_open'], 'indicator' => 'offseason_open'];
         $this->assertSame(0, (new SectorDashboardService())->detailQuery(null, $filters)->count());
         $dashboard = (new SectorDashboardService())->dashboard(null, []);
-        $this->assertSame(9, array_sum(array_column($dashboard['status'], 'quantity')));
+        $this->assertSame(9, $dashboard['indicators']['total']);
         $this->assertSame(9, (new \App\Service\DataQualityService())->summary()['total']);
         $this->assertSame(9, array_sum(array_column((new \App\Service\PcmHistoryService())->sectorComparison(), 'total')));
     }
@@ -210,7 +217,8 @@ final class PcmOperationalRevisionTest extends TestCase
                     $number++;
                     $this->insertRow($this->currentId, $this->areaId, $number,
                         $status === 'CANCELADA' ? 'Cancelada' : 'Liberada',
-                        $status === 'EM ABERTO' ? 'Não' : 'Sim', 'PRE', 'TEMP', $season);
+                        $status === 'EM ABERTO' ? 'Não' : 'Sim', 'PRE',
+                        $season === 'Entressafra' ? 'ESMECA' : 'TEMP', $season);
                     $connection->update('work_order_snapshots', [
                         'maintenance_planned_start' => $date,
                         'equipment_code' => 'TEMP-' . $number,
@@ -253,7 +261,7 @@ final class PcmOperationalRevisionTest extends TestCase
             }
         }
         $dashboard = $service->dashboard(null, []);
-        $this->assertSame($counts['total'], array_sum(array_column($dashboard['status'], 'quantity')));
+        $this->assertSame($counts['total'], $dashboard['indicators']['total']);
         $this->assertSame($counts['completed'], array_sum(array_column($dashboard['summary'], 'completed')));
         $this->assertSame($counts['total'], array_sum(array_column(
             (new \App\Service\PcmHistoryService())->sectorComparison(), 'total')));
@@ -279,12 +287,12 @@ final class PcmOperationalRevisionTest extends TestCase
         string $name,
     ): void {
         $connection = self::connection();
-        $connection->insert('work_orders', ['branch_code' => '1', 'source_order_number' => (string)$number,
+        $connection->insert('work_orders', ['branch_code' => '01', 'source_order_number' => (string)$number,
             'first_seen_report_date' => '2026-09-10', 'last_seen_report_date' => '2026-09-10',
             'created' => '2026-09-10', 'updated' => '2026-09-10']);
         $workOrder = (int)$connection->getDriver()->lastInsertId();
         $connection->insert('work_order_snapshots', ['work_order_id' => $workOrder, 'report_import_id' => $import,
-            'report_date' => '2026-09-10', 'maintenance_area_id' => $area, 'branch_code' => '1',
+            'report_date' => '2026-09-10', 'maintenance_area_id' => $area, 'branch_code' => '01',
             'maintenance_area_code' => $number === 13 ? 'FUTURO' : 'MECANI', 'cost_center_code' => 'CC-' . $number,
             'source_order_number' => (string)$number, 'source_situation' => $situation, 'finished_raw' => $finished,
             'maintenance_type' => $type, 'service_code' => $code, 'service_name' => $name,

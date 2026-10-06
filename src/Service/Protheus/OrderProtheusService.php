@@ -18,13 +18,14 @@ final class OrderProtheusService
     {
     }
 
-    public function load(array $snapshot, string $part = 'all', int $page = 1, ?string $selectedOrder = null): array
+    public function load(array $snapshot, string $part = 'all', int $page = 1, ?string $selectedOrder = null, string $unit = ''): array
     {
         $result = ['detail' => null, 'history' => null];
         try {
             if (!in_array($part, ['all', 'history', 'detail'], true) || $page < 1 || $page > 1000000) {
                 throw new RuntimeException('Invalid request.');
             }
+            $unit = ProtheusUnit::validate($unit);
             $number = rtrim((string)($snapshot['source_order_number'] ?? ''), ' ');
             if ($number === '' || !array_key_exists('branch_code', $snapshot) || $snapshot['branch_code'] === null) {
                 throw new RuntimeException('Missing identity.');
@@ -73,7 +74,7 @@ final class OrderProtheusService
                 return $result;
             }
             try {
-                $history = $this->reader->findEquipmentHistory($equipment, $branch, $page, 10);
+                $history = $this->reader->findEquipmentHistory($equipment, $branch, $page, 10, $unit);
                 $items = [];
                 foreach ($history['orders'] as $row) {
                     if (rtrim((string)$row['TJ_FILIAL']) !== $branch || rtrim((string)$row['TJ_CODBEM']) !== $equipment) {

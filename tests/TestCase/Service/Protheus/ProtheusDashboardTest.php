@@ -14,7 +14,7 @@ use RuntimeException;
 
 final class ProtheusDashboardTest extends TestCase
 {
-    public function testSeasonalCardsReuseLegacyClassifierWithoutInventingType(): void
+    public function testLiveSeasonalCardsUseOfficialBranchAndCodeInsteadOfDescription(): void
     {
         $calls = [];
         $rows = [$this->row('ELEPRE', 'PREVENTIVA ELETRICA', 2, 3),
@@ -23,10 +23,10 @@ final class ProtheusDashboardTest extends TestCase
             $this->row('CORPRO', 'ENTRESSAFRA', 1, 0)];
         $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['filial' => '01', 'bem' => "X'; DELETE--"]);
         self::assertTrue($result['available']);
-        self::assertSame(4, $result['indicators']['safra_open']);
-        self::assertSame(3, $result['indicators']['safra_completed']);
-        self::assertSame(4, $result['indicators']['offseason_open']);
-        self::assertSame(5, $result['indicators']['offseason_completed']);
+        self::assertSame(8, $result['indicators']['safra_open']);
+        self::assertSame(8, $result['indicators']['safra_completed']);
+        self::assertSame(0, $result['indicators']['offseason_open']);
+        self::assertSame(0, $result['indicators']['offseason_completed']);
         foreach (['preventive', 'corrective', 'improvement'] as $key) self::assertSame(0, $result['indicators'][$key]);
         foreach (['emergency', 'scheduled'] as $key) self::assertSame(1, $result['indicators'][$key]);
         self::assertCount(2, $result['screens']);
@@ -43,8 +43,8 @@ final class ProtheusDashboardTest extends TestCase
         foreach ([['COREME', 'ENTRESSAFRA'], ['CORPRO', 'ENTRESSAFRA'], ['X', 'CORRETIVA EMERGENCIAL ENTRESSAFRA'],
             ['X', 'CORRETIVA PROGRAMADA ENTRESSAFRA'], ['X', 'manutenção entressafra'], ['ELEPRE', 'PREVENTIVA ELETRICA']] as [$code, $name]) {
             foreach ([null, '', 'COR', 'PRE', 'MEL', 'UNKNOWN'] as $type) {
-                self::assertSame($classifier->classifySnapshot($type, $code, $name) === 'ENTRESSAFRA',
-                    $classifier->classify($code, $name) === 'ENTRESSAFRA');
+                self::assertSame($classifier->classifySnapshot($type, $code, $name, '01') === 'ENTRESSAFRA',
+                    $classifier->classify($code, $name, '01') === 'ENTRESSAFRA');
             }
         }
     }
@@ -139,6 +139,8 @@ final class ProtheusDashboardTest extends TestCase
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'equipment', 'code' => 'FAB 80 080 ', 'branch' => '01', 'quantity' => 37,
                 'identity_count' => 1, 'equipment_name' => 'EXPANDER EX-245 ', 'equipment_matches' => 1],
+            ['dimension' => 'generic', 'code' => 'FAB 80 020 ', 'branch' => '01', 'quantity' => 14,
+                'identity_count' => 1, 'equipment_name' => 'FABRICA ', 'equipment_matches' => 1],
             ['dimension' => 'cost_center', 'code' => 'CC100', 'branch' => '01', 'quantity' => 21,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
             ['dimension' => 'service', 'code' => 'COREME ', 'branch' => '01', 'quantity' => 19,
@@ -156,18 +158,17 @@ final class ProtheusDashboardTest extends TestCase
         $result = (new ProtheusDashboardService($this->repository([], $calls, $analysisRows)))->load(['area' => 'MECANI']);
         self::assertTrue($result['available']);
         self::assertSame(21, $result['analysis']['total']);
-        self::assertSame(['code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37],
-            $result['analysis']['equipment'][0]);
-        self::assertSame(['code' => 'CC100', 'mode' => 'exact', 'quantity' => 21],
-            $result['analysis']['costCenters'][0]);
+        self::assertSame(['code' => 'FAB 80 020', 'name' => 'FABRICA', 'branch' => '01', 'quantity' => 14],
+            $result['analysis']['genericEquipment'][0]);
         self::assertSame('Corretiva', $result['analysis']['maintenance'][0]['label']);
-        self::assertSame(['code' => 'COREME', 'name' => 'CORRETIVA EMERGENCIAL', 'branch' => '01', 'quantity' => 19],
-            $result['analysis']['services'][0]);
+        self::assertSame('FAB 80 080', $result['analysis']['equipment'][0]['code']);
+        self::assertSame('COREME', $result['analysis']['services'][0]['code']);
+        self::assertSame('CC100', $result['analysis']['costCenters'][0]['code']);
         self::assertSame('Mecânica', $result['analysis']['sectors'][0]['label']);
         self::assertSame(['completed' => 12, 'open' => 9], $result['analysis']['status']);
         self::assertCount(2, $calls);
         self::assertSame('MECANI', $calls[1][1]['area']);
-        foreach (["j.D_E_L_E_T_ <> '*'", 'COUNT_BIG(*)', 'GROUPING SETS', 'ROW_NUMBER()', 'ST9010', 'ST4010'] as $sql) {
+        foreach (["j.D_E_L_E_T_ <> '*'", 'COUNT_BIG(*)', 'GROUPING SETS', 'ROW_NUMBER()', 'ST9010'] as $sql) {
             self::assertStringContainsString($sql, $calls[1][0]);
         }
         foreach ([\App\Service\Protheus\ProtheusOperationalEligibility::OPEN,
@@ -188,12 +189,14 @@ final class ProtheusDashboardTest extends TestCase
 
         self::assertTrue($result['available']);
         self::assertSame('', $calls[0][1]['centro']);
-        self::assertArrayNotHasKey('unidade', $calls[0][1]);
+        self::assertSame('factory', $calls[0][1]['unidade']);
+        self::assertStringContainsString("f.unidade = 'factory'", $calls[0][0]);
         self::assertSame('factory', $calls[1][1]['unidade']);
         self::assertSame([['branch' => '01', 'code' => '2425ME'], ['branch' => '01', 'code' => 'ESMECA']],
             json_decode($calls[1][1]['offseason_services'], true));
         self::assertStringContainsString('OPENJSON(f.offseason_services)', $calls[1][0]);
-        self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $calls[1][0]);
+        self::assertStringContainsString("'generic' AS dimension", $calls[1][0]);
+        self::assertStringContainsString("CONVERT(date, '20250101', 112)", $calls[1][0]);
         self::assertStringContainsString("f.unidade = 'factory'", $calls[1][0]);
         self::assertStringContainsString("LIKE '31%'", $calls[1][0]);
         self::assertStringContainsString("f.unidade = 'mill'", $calls[1][0]);
@@ -202,10 +205,15 @@ final class ProtheusDashboardTest extends TestCase
         self::assertStringNotContainsString('FAB 80 020', $calls[0][0]);
     }
 
-    public function testHistoricalUnitRejectsUnsupportedValues(): void
+    public function testOtherUnitFiltersOperationalDashboardAndLeavesHistoricalPopulationEmpty(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        (new ProtheusDashboardService())->load(['unidade' => 'other']);
+        $calls = [];
+        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load(['unidade' => 'other']);
+        self::assertTrue($result['available']);
+        self::assertSame(0, $result['analysis']['total']);
+        self::assertCount(1, $calls);
+        self::assertSame('other', $calls[0][1]['unidade']);
+        self::assertStringContainsString("f.unidade = 'other'", $calls[0][0]);
     }
 
     public function testPresentationDoesNotQueryOrReturnDetailedAnalysis(): void
@@ -218,7 +226,7 @@ final class ProtheusDashboardTest extends TestCase
         self::assertSame(ProtheusQueries::MANAGEMENT, $calls[0][0]);
     }
 
-    public function testBlankAndNullCostCentersKeepTheRankingsOwnGroupingRule(): void
+    public function testRemovedCostCenterRankingRowsAreIgnored(): void
     {
         $calls = [];
         $base = static fn ($code, int $quantity): array => ['dimension' => 'cost_center', 'code' => $code,
@@ -237,10 +245,7 @@ final class ProtheusDashboardTest extends TestCase
         ];
         $result = (new ProtheusDashboardService($this->repository([], $calls, $analysis)))->load();
         self::assertTrue($result['available']);
-        self::assertSame([
-            ['code' => '', 'mode' => 'blank', 'quantity' => 2],
-            ['code' => '', 'mode' => 'null', 'quantity' => 1],
-        ], $result['analysis']['costCenters']);
+        self::assertSame([], $result['analysis']['costCenters']);
     }
 
     public function testPresentationOmitsBlankAreasAndUsesFriendlyNames(): void

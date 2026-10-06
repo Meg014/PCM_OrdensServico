@@ -30,15 +30,13 @@ final class ProtheusDashboardService
             }
             $filters[$key] = trim($value);
         }
-        if (!in_array($filters['unidade'], ['', 'factory', 'mill'], true)) {
-            throw new InvalidArgumentException('Unidade invÃ¡lida.');
-        }
+        $filters['unidade'] = ProtheusUnit::validate($filters['unidade']);
         $payload = ['available' => false, 'source' => 'Protheus', 'queried_at' => null,
             'filters' => $filters, 'record_count' => null, 'groups' => [],
             'indicators' => array_fill_keys(self::CARDS, null), 'screens' => [], 'analysis' => null, 'detail' => null];
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5);
-            $rows = $repository->dashboard($filters, true);
+            $rows = $repository->dashboard($filters, true, $includeAnalysis);
             $counts = array_fill_keys(self::CARDS, 0);
             $screens = ['general' => ['key' => 'general', 'title' => 'PCM - VISÃO GERAL'] + $counts];
             $classifier = new PcmServiceClassifier();
@@ -62,7 +60,7 @@ final class ProtheusDashboardService
                 }
                 // classifySnapshot changes EMERGENCIAL/PROGRAMADA to OUTROS for non-COR;
                 // neither result is ENTRESSAFRA, so the seasonal split is type-independent.
-                $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 $typeKey = ['PRE' => 'preventive', 'COR' => 'corrective', 'MEL' => 'improvement'][rtrim((string)($row['TJ_TIPO'] ?? ''), ' ')] ?? null;
                 $serviceKey = ['COREME' => 'emergency', 'CORPRO' => 'scheduled',
                     'MECOPO' => 'opportunity', 'ELECOP' => 'opportunity'][rtrim((string)$row['TJ_SERVICO'], ' ')] ?? null;
@@ -84,11 +82,13 @@ final class ProtheusDashboardService
             uksort($screens, static fn ($a, $b) => [($order[substr($a, 5)] ?? PHP_INT_MAX), $a] <=> [($order[substr($b, 5)] ?? PHP_INT_MAX), $b]);
             $payload['screens'] = [$general, ...array_values($screens)];
             if ($includeAnalysis) {
-                $payload['analysis'] = $this->analysis($repository->dashboard($filters));
+                $payload['analysis'] = $filters['unidade'] === ProtheusUnit::OTHER
+                    ? $this->emptyAnalysis() : $this->analysis($repository->dashboard($filters));
                 $detailQuery = [
                     'filial' => $filters['filial'], 'equipment' => $filters['bem'],
                     'service' => $filters['servico'], 'cost_center' => $filters['centro'],
                     'maintenance_type' => $filters['tipo'],
+                    'unit' => $filters['unidade'],
                     'status' => $filters['termino'] === 'N' ? 'EM ABERTO' : ($filters['termino'] === 'S' ? 'FECHADA' : ''),
                     'page' => $query['page'] ?? 1, 'limit' => $query['limit'] ?? 20,
                 ];
@@ -114,8 +114,7 @@ final class ProtheusDashboardService
 
     private function analysis(array $rows): array
     {
-        $result = ['total' => 0, 'equipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
-            'status' => ['completed' => 0, 'open' => 0]];
+        $result = $this->emptyAnalysis();
         foreach ($rows as $row) {
             $code = rtrim((string)$row['code']);
             $quantity = (int)$row['quantity'];
@@ -124,10 +123,11 @@ final class ProtheusDashboardService
             } elseif ($row['dimension'] === 'equipment') {
                 $result['equipment'][] = ['code' => $code, 'name' => rtrim((string)$row['equipment_name']),
                     'branch' => rtrim((string)$row['branch']), 'quantity' => $quantity];
+            } elseif ($row['dimension'] === 'generic') {
+                $result['genericEquipment'][] = ['code' => $code, 'name' => rtrim((string)$row['equipment_name']),
+                    'branch' => rtrim((string)$row['branch']), 'quantity' => $quantity];
             } elseif ($row['dimension'] === 'cost_center') {
-                $result['costCenters'][] = ['code' => $code,
-                    'mode' => $row['code'] === null ? 'null' : ($code === '' ? 'blank' : 'exact'),
-                    'quantity' => $quantity];
+                if ($code !== '') $result['costCenters'][] = ['code' => $code, 'mode' => 'exact', 'quantity' => $quantity];
             } elseif ($row['dimension'] === 'service') {
                 $result['services'][] = ['code' => $code, 'name' => rtrim((string)$row['service_name']),
                     'branch' => rtrim((string)$row['branch']), 'quantity' => $quantity];
@@ -151,5 +151,11 @@ final class ProtheusDashboardService
         }
 
         return $result;
+    }
+
+    private function emptyAnalysis(): array
+    {
+        return ['total' => 0, 'equipment' => [], 'genericEquipment' => [], 'services' => [], 'costCenters' => [],
+            'maintenance' => [], 'sectors' => [], 'status' => ['completed' => 0, 'open' => 0]];
     }
 }

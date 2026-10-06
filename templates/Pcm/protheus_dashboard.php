@@ -11,15 +11,13 @@ $orderContextFilters = static fn (array $dashboardFilters): array => array_filte
         'historico' => '1',
     ], static fn ($value) => $value !== '');
 $costCenterFilters = static function (array $dashboardFilters, array $costCenter) use ($orderContextFilters): array {
-    $query = $orderContextFilters($dashboardFilters);
-    $query['centro'] = $costCenter['code'];
-    $query['centro_modo'] = $costCenter['mode'];
-    return $query;
+    return array_replace($orderContextFilters($dashboardFilters), [
+        'centro' => $costCenter['code'], 'centro_modo' => $costCenter['mode'],
+    ]);
 };
 $serviceFilters = static function (array $dashboardFilters, array $service) use ($orderContextFilters): array {
     return array_replace($orderContextFilters($dashboardFilters), [
-        'filial' => $service['branch'],
-        'servico' => $service['code'],
+        'filial' => $service['branch'], 'servico' => $service['code'],
     ]);
 };
 $equipmentFilters = static function (array $dashboardFilters, array $equipment) use ($orderContextFilters): array {
@@ -74,7 +72,7 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <div class="<?= $presentation ? 'pcm-presentation-cards' : 'row g-3 pcm-kpi-grid-large' ?>" aria-live="polite">
 <?php foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label): ?>
 <?php foreach (['open' => 'em aberto', 'completed' => 'fechadas'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
-<div class="<?= $presentation ? '' : 'col-12 col-sm-6' ?>"><article class="<?= $presentation ? 'pcm-presentation-card pcm-presentation-' . $status : 'pcm-kpi-card pcm-kpi-' . ($status === 'open' ? 'total' : 'completed') ?>">
+<div class="<?= $presentation ? '' : 'col-12 col-sm-6' ?>"><article class="<?= $presentation ? 'pcm-presentation-card pcm-presentation-' . $status : 'pcm-kpi-card pcm-season-card pcm-kpi-' . ($status === 'open' ? 'total' : 'completed') ?>">
 <p class="pcm-kpi-label"><?= h($label . ' — O.S. ' . $statusLabel) ?></p>
 <strong class="pcm-kpi-value" data-dashboard-card="<?= h($key) ?>"><?= $payload['indicators'][$key] === null ? '—' : h(number_format($payload['indicators'][$key], 0, ',', '.')) ?></strong>
 </article></div><?php endforeach; endforeach; ?></div>
@@ -89,19 +87,19 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php endif; ?>
 <?php if (!$presentation): ?>
 <?php if (($payload['detail']['available'] ?? false) === true): ?><?= $this->element('protheus_general_detail', ['payload' => $payload, 'part' => 'before']) ?><?php endif; ?>
-<?php $analysis = $payload['analysis'] ?? ['total' => 0, 'equipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
+<?php $analysis = $payload['analysis'] ?? ['total' => 0, 'equipment' => [], 'genericEquipment' => [], 'services' => [], 'costCenters' => [], 'maintenance' => [], 'sectors' => [],
     'status' => ['completed' => 0, 'open' => 0]]; ?>
 <section class="pcm-dashboard-section mt-4" data-dashboard-analysis>
 <div class="pcm-section-title"><p>ANÁLISE GERAL · SAFRA</p><h2>Visão histórica das O.S.</h2></div>
 <p class="text-body-secondary">A partir desta seção, os indicadores consideram exclusivamente O.S. da Safra nas unidades Fábrica e Usina. O.S. de Entressafra não fazem parte desta análise.</p>
 <div class="pcm-panel pcm-filter-panel pcm-history-scope-filter mb-4">
-<div class="pcm-panel-heading"><h3>Filtros da análise</h3></div>
+<div class="pcm-panel-heading"><h3>Filtro de Unidade</h3><p>Aplica-se aos indicadores operacionais e à análise histórica abaixo.</p></div>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?><div class="row g-3 align-items-end">
 <?php foreach (['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'] as $key): ?>
 <?php if (($payload['filters'][$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $payload['filters'][$key]]) ?><?php endif; ?>
 <?php endforeach; ?>
 <div class="col-12 col-sm-7 col-md-5 col-lg-4"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
-    'options' => ['factory' => 'Fábrica', 'mill' => 'Usina'], 'value' => $payload['filters']['unidade'] ?? '',
+    'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $payload['filters']['unidade'] ?? '',
     'class' => 'form-select']) ?></div>
 <div class="col-12 col-sm-auto"><div class="pcm-filter-actions"><button type="submit" class="btn pcm-primary-action">Aplicar</button></div></div>
 </div><?= $this->Form->end() ?></div>
@@ -116,7 +114,7 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php foreach ($analysis['services'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-orders', '?' => $serviceFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <div class="col-xl-4"><article class="pcm-chart-card"><h3>Top 10 centros de custo por O.S.</h3><p>Quantidade histórica; não representa custo financeiro.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="costCenters">
-<?php foreach ($analysis['costCenters'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'] ?: 'Sem centro de custo', ['_name' => 'pcm-orders', '?' => $costCenterFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+<?php foreach ($analysis['costCenters'] as $row): ?><li class="list-group-item d-flex justify-content-between align-items-start gap-3 px-0"><?= $this->Html->link($row['code'], ['_name' => 'pcm-orders', '?' => $costCenterFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
 </ul></article></div>
 <?php foreach ([['maintenance', 'O.S. por Tipo de Manutenção'], ['sectors', 'O.S. por Setor']] as [$key, $heading]): ?>
 <div class="col-xl-6"><article class="pcm-chart-card"><h3><?= h($heading) ?></h3><p>Distribuição no mesmo universo histórico.</p><ul class="list-group list-group-flush mt-3" data-analysis-list="<?= h($key) ?>">
@@ -126,12 +124,12 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
 <?php foreach (['completed' => ['Finalizadas', 'pcm-kpi-completed'], 'open' => ['Não finalizadas', 'pcm-kpi-progress']] as $key => [$label, $class]): ?><div class="col-12 col-md-6 d-flex"><div class="pcm-kpi-card <?= h($class) ?> flex-column align-items-start text-start gap-3 p-4 w-100"><p class="pcm-kpi-label mb-0"><?= h($label) ?></p><strong class="pcm-kpi-value" data-analysis-status="<?= h($key) ?>"><?= number_format($analysis['status'][$key], 0, ',', '.') ?></strong></div></div><?php endforeach; ?>
 </div></article></div>
 </div></section>
-<section class="pcm-dashboard-section" data-analysis-charts><div class="pcm-section-title"><p>VISÃO CONSOLIDADA</p><h2>Situação e concentração das O.S.</h2></div><div class="row g-4">
-<?php foreach (['status' => 'Distribuição por situação', 'maintenance' => 'Perfil de manutenção',
-    'equipment' => 'Top 10 equipamentos', 'services' => 'Top 10 serviços',
-    'costCenters' => 'Top 10 centros de custo', 'sectors' => 'Distribuição por setor'] as $key => $heading): ?>
-<div class="col-lg-6"><article class="pcm-chart-card pcm-chart-card-tall"><h3><?= h($heading) ?></h3><div class="pcm-chart-wrap"><canvas data-analysis-chart="<?= h($key) ?>"></canvas></div></article></div>
-<?php endforeach; ?></div></section>
+<?php if (!empty($analysis['genericEquipment'])): ?><section class="pcm-dashboard-section"><div class="pcm-section-title"><p>AUDITORIA</p><h2>Equipamentos genéricos</h2></div>
+<p class="text-body-secondary">Estas O.S. permanecem na análise, mas os agrupadores não competem com equipamentos físicos.</p><div class="pcm-panel p-3"><ul class="list-group list-group-flush">
+<?php foreach ($analysis['genericEquipment'] as $row): ?><li class="list-group-item d-flex justify-content-between gap-3"><?= $this->Html->link($row['code'] . ' — ' . $row['name'], ['_name' => 'pcm-orders', '?' => $equipmentFilters($payload['filters'], $row)], ['class' => 'pcm-ranking-link']) ?><strong><?= number_format($row['quantity'], 0, ',', '.') ?></strong></li><?php endforeach; ?>
+</ul></div></section><?php endif; ?>
+<section class="pcm-dashboard-section" data-analysis-charts><div class="pcm-section-title"><p>VISÃO CONSOLIDADA</p><h2>Distribuição das O.S.</h2></div>
+<article class="pcm-chart-card pcm-chart-card-tall"><h3>Distribuição por setor</h3><div class="pcm-chart-wrap"><canvas data-analysis-chart="sectors"></canvas></div></article></section>
 <?php if (($payload['detail']['available'] ?? false) === true): ?><?= $this->element('protheus_general_detail', ['payload' => $payload, 'part' => 'after']) ?><?php endif; ?>
 <details class="mt-3 text-body-secondary"><summary>Informação técnica</summary>
 O.S. não excluídas nos filtros selecionados: <span data-dashboard-count>—</span> (não é o total operacional).

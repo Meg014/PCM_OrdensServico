@@ -171,13 +171,8 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringNotContainsString('Importe um XLSX', $html);
         $view->set('presentation', false);
         $generalPayload = $view->get('payload');
-        $generalPayload['analysis'] = ['total' => 37, 'equipment' => [[
-            'code' => 'FAB 80 080', 'name' => 'EXPANDER EX-245', 'branch' => '01', 'quantity' => 37,
-        ]], 'services' => [[
-            'code' => 'CORMEC', 'name' => 'CORRETIVA MECANICA', 'branch' => '01', 'quantity' => 962,
-        ]], 'costCenters' => [
-            ['code' => '', 'mode' => 'blank', 'quantity' => 15],
-        ], 'maintenance' => [], 'sectors' => [],
+        $generalPayload['analysis'] = ['total' => 37, 'equipment' => [], 'genericEquipment' => [], 'services' => [],
+            'costCenters' => [], 'maintenance' => [], 'sectors' => [],
             'status' => ['completed' => 0, 'open' => 0]];
         $generalPayload['detail'] = ['available' => true,
             'operational' => ['total' => 10, 'open' => 3, 'closed' => 7],
@@ -189,16 +184,18 @@ final class ProtheusOrderAccessTest extends TestCase
         $general = $view->render('protheus_dashboard', false);
         self::assertStringContainsString('Fonte: Protheus', $general);
         self::assertStringContainsString('ANÁLISE GERAL', $general);
-        self::assertStringContainsString('Top 10 equipamentos por O.S.', $general);
-        self::assertStringContainsString('Top 10 serviços por O.S.', $general);
-        self::assertStringContainsString('Top 10 centros de custo por O.S.', $general);
+        self::assertStringContainsString('Top 10 equipamentos', $general);
+        self::assertStringContainsString('Top 10 serviços', $general);
+        self::assertStringContainsString('Top 10 centros de custo', $general);
         self::assertStringContainsString('O.S. por Tipo de Manutenção', $general);
         self::assertStringContainsString('O.S. por Setor', $general);
         self::assertStringContainsString('Situação das O.S.', $general);
-        self::assertStringContainsString('Situação e concentração das O.S.', $general);
+        self::assertStringContainsString('Distribuição das O.S.', $general);
         foreach (['Resumo operacional geral', 'Detalhamento por classificação', 'Backlog / O.S. em aberto',
-            'Pontos de atenção', 'Ordens de Serviço'] as $heading) self::assertStringContainsString($heading, $general);
-        self::assertSame(6, substr_count($general, 'data-analysis-chart='));
+            'Ordens de Serviço'] as $heading) self::assertStringContainsString($heading, $general);
+        self::assertStringNotContainsString('Pontos de atenção', $general);
+        self::assertStringNotContainsString('Situação / término', $general);
+        self::assertSame(1, substr_count($general, 'data-analysis-chart='));
         $scripts = $view->fetch('script');
         self::assertMatchesRegularExpression('~/js/chart\.umd\.min\.js\?[0-9]+~', $scripts);
         self::assertMatchesRegularExpression('~/js/pcm-protheus-dashboard\.js\?[0-9]+~', $scripts);
@@ -209,11 +206,6 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('exclusivamente O.S. da Safra', $general);
         self::assertStringContainsString('pcm-filter-panel pcm-history-scope-filter', $general);
         self::assertStringContainsString('class="form-select"', $general);
-        self::assertStringContainsString('/pcm/ordens?historico=1&amp;filial=01&amp;bem=FAB+80+080', $general);
-        self::assertStringContainsString('/pcm/ordens?historico=1&amp;centro=&amp;centro_modo=blank', $general);
-        self::assertStringContainsString('/pcm/ordens?historico=1&amp;filial=01&amp;servico=CORMEC', $general);
-        self::assertStringContainsString('CORMEC — CORRETIVA MECANICA', $general);
-        self::assertStringContainsString('Sem centro de custo', $general);
         self::assertStringNotContainsString('setor=', $general);
         self::assertSame(4, substr_count($general, 'data-dashboard-card='));
         foreach (['Preventivas', 'Corretivas', 'Melhorias', 'Paradas por Oportunidade'] as $label) {
@@ -243,12 +235,13 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertSame('protheusOrder', Router::parseRequest($request)['action']);
         $controller = new PcmController($request);
         $controller->protheusOrder('004368');
-        self::assertSame(['source_order_number' => '004368', 'branch_code' => '01'], $controller->viewBuilder()->getVar('identity'));
+        self::assertSame(['source_order_number' => '004368', 'branch_code' => '01', 'unit' => ''], $controller->viewBuilder()->getVar('identity'));
         $view = new View($request);
         $view->setTemplatePath('Pcm');
         $view->set('identity', $controller->viewBuilder()->getVar('identity'));
         $html = $view->render('protheus_order', false);
         self::assertStringContainsString('/pcm/protheus/os/004368/dados?filial=01', $html);
+        self::assertStringContainsString('unit=', $html);
         self::assertStringNotContainsString('/pcm/os/42', $html);
         self::assertStringContainsString('Fonte: Protheus', $html);
     }
@@ -295,6 +288,23 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('nome_bem=BOMBA', $html);
         self::assertStringContainsString('Nome do equipamento', $html);
         self::assertStringContainsString('value="BOMBA"', $html);
+        $listing['filters'] += ['area' => 'MECANI', 'card' => 'offseason', 'card_status' => 'EM ABERTO',
+            'backlog_age' => '', 'q' => '', 'status' => '', 'service_name' => ''];
+        $listing['drilldown'] = ['label' => 'Entressafra · Em aberto', 'total' => 376];
+        $view->set('listing', $listing);
+        $drilldownHtml = $view->render('orders', false);
+        self::assertStringContainsString('Filtro ativo: Mecânica · Entressafra · Em aberto', $drilldownHtml);
+        self::assertStringContainsString('376 O.S. encontradas', $drilldownHtml);
+        self::assertStringContainsString('card=offseason', $drilldownHtml);
+        self::assertStringContainsString('card_status=EM+ABERTO', $drilldownHtml);
+        self::assertStringNotContainsString('backlog_age=', $drilldownHtml);
+        self::assertStringNotContainsString('safra=', $drilldownHtml);
+        self::assertStringContainsString('page=2', $drilldownHtml);
+        self::assertStringContainsString('<form method="get"', $drilldownHtml);
+        self::assertStringContainsString('type="hidden" name="card" value="offseason"', $drilldownHtml);
+        self::assertStringContainsString('type="hidden" name="card_status" value="EM ABERTO"', $drilldownHtml);
+        self::assertStringNotContainsString('type="hidden" name="backlog_age" value=""', $drilldownHtml);
+        self::assertStringNotContainsString('type="hidden" name="safra" value=""', $drilldownHtml);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
         $friendly = $row;

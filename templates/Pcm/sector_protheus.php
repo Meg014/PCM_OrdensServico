@@ -1,24 +1,27 @@
 <?php
 $this->assign('title', $sector['name']);
-$this->Html->script(['chart.umd.min', 'pcm-protheus-sector'], ['block' => true, 'defer' => true]);
+$this->Html->script('pcm-protheus-sector', ['block' => true, 'defer' => true]);
+$sectorNavigationFilters = array_filter($sector['filters'], static fn ($value): bool => $value !== '');
 ?>
-<section data-protheus-sector data-url="<?= h($this->Url->build(['_name' => 'pcm-sector-data', 'code' => $sector['code'], '?' => $sector['filters'] + ['page' => $sector['page'], 'limit' => $sector['limit']]])) ?>">
+<section data-protheus-sector data-url="<?= $this->Url->build(['_name' => 'pcm-sector-data', 'code' => $sector['code'], '?' => $sectorNavigationFilters + ['page' => $sector['page'], 'limit' => $sector['limit']]]) ?>">
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($sector['name']) ?></h1>
 <span class="badge text-bg-secondary">Fonte: Protheus</span>
 <p class="pcm-updated" data-sector-updated><?= h($sector['queried_at'] ? 'Dados atualizados em: ' . (new \App\Service\PcmTimeFormatter())->format(new \DateTimeImmutable($sector['queried_at']), 'd/m/Y, H:i:s') : 'Consulta indisponível') ?></p></div>
 </header>
-<?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-sector-excel', 'code' => $sector['code'], '?' => $sector['filters']], ['class' => 'btn btn-outline-success mb-3']) ?>
-<?= $this->Html->link('Exportar apontamentos', ['_name' => 'pcm-sector-entries-excel', 'code' => $sector['code'], '?' => $sector['filters']], ['class' => 'btn btn-outline-primary mb-3 ms-2']) ?>
+<?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-sector-excel', 'code' => $sector['code'], '?' => $sectorNavigationFilters], ['class' => 'btn btn-outline-success mb-3']) ?>
+<?= $this->Html->link('Exportar apontamentos', ['_name' => 'pcm-sector-entries-excel', 'code' => $sector['code'], '?' => $sectorNavigationFilters], ['class' => 'btn btn-outline-primary mb-3 ms-2']) ?>
 <p class="text-body-secondary small">As exportações processam todos os resultados dos filtros aplicados em lotes, sem limite total arbitrário.</p>
 <p data-sector-notice role="status" class="text-body-secondary"><?= $sector['available'] ? '' : 'Dados do Protheus temporariamente indisponíveis.' ?></p>
 <section class="pcm-panel pcm-filter-panel"><h2>Filtros do setor</h2>
 <p>Carteira operacional: abertas elegíveis desde 01/01/2026 e fechadas, sem canceladas.</p>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'pcm-filter-form']) ?>
-<?= $this->Form->hidden('card', ['value' => $sector['filters']['card']]) ?>
-<?= $this->Form->hidden('card_status', ['value' => $sector['filters']['card_status']]) ?>
-<?= $this->Form->hidden('backlog_age', ['value' => $sector['filters']['backlog_age']]) ?>
+<?php foreach (['card', 'card_status', 'backlog_age'] as $key): ?>
+<?php if ($sector['filters'][$key] !== ''): ?><?= $this->Form->hidden($key, ['value' => $sector['filters'][$key]]) ?><?php endif; ?>
+<?php endforeach; ?>
 <?php if ($sector['filters']['filial'] !== ''): ?><?= $this->Form->hidden('filial', ['value' => $sector['filters']['filial']]) ?><?php endif; ?>
 <div class="row g-3">
+<div class="col-md-4"><?= $this->Form->control('unit', ['label' => 'Unidade', 'empty' => 'Todas',
+    'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $sector['filters']['unit'], 'class' => 'form-select']) ?></div>
 <?php foreach (['status' => 'Status', 'equipment' => 'Equipamento/Bem (código)', 'service' => 'Serviço (código)',
     'service_name' => 'Nome do serviço (exato)', 'cost_center' => 'Centro de custo', 'maintenance_type' => 'Tipo Manut.',
     'q' => 'Pesquisar OS, bem ou serviço', 'date_start' => 'Início planejado: de', 'date_end' => 'Início planejado: até'] as $key => $label): ?>
@@ -35,4 +38,3 @@ O período planejado filtra somente a tabela.</p>
 <div data-sector-content><?= $sector['available'] ? $this->element('protheus_sector_content', compact('sector')) : '' ?></div>
 <small>Atualização automática a cada 5 minutos.</small>
 </section>
-<script type="application/json" data-sector-charts><?= json_encode($sector['charts'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>

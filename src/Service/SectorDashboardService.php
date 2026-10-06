@@ -92,29 +92,14 @@ final class SectorDashboardService
         $base = $this->query($areaId, $filters, true);
         $indicators = (new PcmIndicatorService($this->current))->calculate($areaId, $filters);
         $total = (int)$indicators['total'];
-        $status = $this->aggregate($base, 'treated_status', 'treated_status', $total);
-        $maintenanceProfile = $this->aggregate($base, 'maintenance_type', 'maintenance_type', $total);
-        $equipment = $this->aggregate($base, 'equipment_code', 'equipment_name', $total);
-        $services = $this->aggregate($base, 'service_code', 'service_name', $total);
-        $costCenters = $this->aggregate($base, 'cost_center_code', 'cost_center_code', $total);
         $summary = $this->serviceSummary($base);
-        $missingStart = $base === null ? 0 : (clone $base)->where(['general_actual_start IS' => null])->count();
 
         $result = compact(
             'indicators',
-            'status',
-            'maintenanceProfile',
-            'equipment',
-            'services',
-            'costCenters',
             'summary',
         );
 
-        return $result + [
-            'attention' => ['cancelled' => $indicators['cancelled'], 'missingStart' => $missingStart,
-                'topEquipment' => $equipment[0] ?? null, 'topService' => $services[0] ?? null],
-            'options' => $this->options($areaId),
-        ];
+        return $result + ['options' => $this->options($areaId)];
     }
 
     /** Returns only the fields needed by the paginated list. */
@@ -137,31 +122,6 @@ final class SectorDashboardService
             ->orderBy(['WorkOrderSnapshots.maintenance_planned_start' => 'DESC', 'WorkOrderSnapshots.id' => 'DESC']);
     }
 
-    /** Groups distinct dimensions on the database rather than loading snapshots. */
-    private function aggregate(?SelectQuery $base, string $code, string $label, int $total): array
-    {
-        if ($base === null) {
-            return [];
-        }
-        $query = clone $base;
-        $rows = $query->select(['dimension_code' => $code, 'dimension_label' => $query->func()->min($label),
-            'quantity' => $query->func()->count('*')])->groupBy($code)
-            ->orderBy(['quantity' => 'DESC', 'dimension_label' => 'ASC'])->limit(10)->disableHydration();
-        $result = [];
-        foreach ($rows as $row) {
-            $key = (string)($row['dimension_code'] ?? '');
-            $name = (string)($row['dimension_label'] ?? '');
-            if ($code === 'equipment_code') {
-                $name = ($key ?: '—') . ' — ' . ($name ?: 'Sem nome');
-            }
-            $result[] = ['key' => $key, 'label' => $name ?: ($key ?: 'Sem classificação'),
-                'quantity' => (int)$row['quantity'],
-                'percentage' => $total > 0 ? (int)$row['quantity'] / $total * 100 : 0.0];
-        }
-
-        return $result;
-    }
-
     /** Produces non-overlapping operational service groups from aggregated rows. */
     private function serviceSummary(?SelectQuery $base): array
     {
@@ -174,7 +134,7 @@ final class SectorDashboardService
         }
         if ($base !== null) {
             $query = clone $base;
-            $fields = ['service_code', 'service_name', 'maintenance_type', 'treated_status'];
+            $fields = ['branch_code', 'service_code', 'service_name', 'maintenance_type', 'treated_status'];
             $rows = $query->select($fields + ['quantity' => $query->func()->count('*')])
                 ->groupBy($fields)->disableHydration();
             $classifier = new PcmServiceClassifier();
@@ -183,6 +143,7 @@ final class SectorDashboardService
                     $row['maintenance_type'],
                     $row['service_code'],
                     $row['service_name'],
+                    $row['branch_code'],
                 );
                 $type = PcmIndicatorService::maintenanceTypeKey($row['maintenance_type']);
                 if ($key === 'OUTROS' && $type === 'preventive') {

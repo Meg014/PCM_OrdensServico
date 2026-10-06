@@ -22,14 +22,16 @@ $statusName = static function (array $row): string {
     if ($situation === 'L' && $ending === 'S') return 'Fechada';
     return ['C' => 'Cancelada', 'P' => 'Pendente'][$situation] ?? '—';
 };
-$pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + ['page' => $page, 'limite' => $listing['limit']]];
+$navigationFilters = array_filter($filters, static fn ($value): bool => $value !== '');
+$pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
+    '?' => array_replace($navigationFilters, ['page' => $page, 'limite' => $listing['limit']])];
 ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | ORDENS DE SERVIÇO</p>
 <h1>Ordens de Serviço</h1><span class="badge text-bg-secondary">Fonte: Protheus</span>
 <p class="text-body-secondary mt-2">Consulta direta ao TOTVS.</p></div>
 </header>
-<?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-orders-excel', '?' => $filters], ['class' => 'btn btn-outline-success mb-3']) ?>
-<?= $this->Html->link('Exportar apontamentos', ['_name' => 'pcm-order-entries-excel', '?' => $filters], ['class' => 'btn btn-outline-primary mb-3 ms-2']) ?>
+<?= $this->Html->link('Exportar Excel', ['_name' => 'pcm-orders-excel', '?' => $navigationFilters], ['class' => 'btn btn-outline-success mb-3']) ?>
+<?= $this->Html->link('Exportar apontamentos', ['_name' => 'pcm-order-entries-excel', '?' => $navigationFilters], ['class' => 'btn btn-outline-primary mb-3 ms-2']) ?>
 <p class="text-body-secondary small">As exportações processam todos os resultados em lotes, sem limite total arbitrário.</p>
 <section class="pcm-panel p-3 mb-4">
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-3']) ?>
@@ -46,7 +48,10 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <div class="w-100 d-none d-md-block"></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-nome-bem">Nome do equipamento</label>
 <input class="form-control" id="filter-nome-bem" name="nome_bem" maxlength="100" value="<?= h($filters['nome_bem'] ?? '') ?>" placeholder="Ex.: BOMBA"></div>
-<?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'unidade'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
+<?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'safra', 'analitico', 'card', 'card_status',
+    'backlog_age', 'q', 'status', 'service_name'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
+    'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $filters['unidade'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($area) ?></option><?php endforeach; ?>
@@ -60,6 +65,10 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
 <span class="text-body-secondary ms-2">Códigos exatos; nome do equipamento por trecho.</span></div>
 <?= $this->Form->end() ?></section>
+<?php if (($filters['analitico'] ?? '') === '1'): ?><p class="alert alert-secondary">Escopo analítico: Data de origem a partir de 01/01/2025.</p><?php endif; ?>
+<?php if (!empty($listing['drilldown'])): ?><p class="alert alert-secondary pcm-active-drilldown"><strong>Filtro ativo: <?= h($areaName($filters['area'] ?? '')) ?> · <?= h($listing['drilldown']['label']) ?></strong>
+<span class="d-block"><?= h(number_format($listing['drilldown']['total'], 0, ',', '.')) ?> O.S. encontradas</span>
+<?= $this->Html->link('Limpar drill-down', ['_name' => 'pcm-orders', '?' => array_filter(['area' => $filters['area'] ?? '', 'unidade' => $filters['unidade'] ?? ''])], ['class' => 'alert-link']) ?></p><?php endif; ?>
 <?php if (!$listing['available']): ?>
 <div class="alert alert-secondary" role="status">Ordens do Protheus temporariamente indisponíveis. Tente novamente em instantes.</div>
 <?php else: ?>
@@ -67,7 +76,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders', '?' => $filters + 
 <table class="table pcm-orders-table pcm-order-listing align-middle"><thead><tr><th class="pcm-order-number">O.S.</th><th class="pcm-order-description">Descrição</th><?php foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL']]]) ?></td>
+<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?></td>
 <td class="pcm-order-description"><?= h($display($row['descricao'] ?? null)) ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate($row['TJ_DTMRINI'] ?? null)) ?></td>

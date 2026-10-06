@@ -9,5 +9,5 @@ interface ProtheusReaderInterface
 
     public function findOrderIdentity(string $numero, string $filial): ?array;
 
-    public function findEquipmentHistory(string $equipmentCode, ?string $branch = null, int $page = 1, int $limit = 20): array;
+    public function findEquipmentHistory(string $equipmentCode, ?string $branch = null, int $page = 1, int $limit = 20, string $unit = ''): array;
 }

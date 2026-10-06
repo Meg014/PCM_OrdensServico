@@ -18,7 +18,7 @@ final class EquipmentHistoryService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $values = [];
-        foreach (['bem', 'filial', 'setor', 'date_start', 'date_end', 'type', 'status'] as $key) {
+        foreach (['bem', 'filial', 'setor', 'date_start', 'date_end', 'type', 'status', 'unit'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) {
                 throw new InvalidArgumentException('Parâmetro inválido.');
@@ -31,6 +31,7 @@ final class EquipmentHistoryService
             || !in_array($values['type'], ['', 'COR', 'PRE', 'MEL'], true)) {
             throw new InvalidArgumentException('Informe bem, filial e filtros válidos.');
         }
+        $values['unit'] = ProtheusUnit::validate($values['unit']);
         foreach (['date_start', 'date_end'] as $key) {
             if ($values[$key] === '') continue;
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', $values[$key]);

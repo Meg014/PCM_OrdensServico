@@ -104,10 +104,10 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertStringContainsString("c.D_E_L_E_T_ <> '*'", $sql);
         self::assertStringContainsString('AS cost_center_name', $sql);
         self::assertStringContainsString('f.cost_center = \'\' OR n.TJ_CCUSTO = f.cost_center', $sql);
-        self::assertStringContainsString("f.opportunity_unit = 'factory'", $sql);
+        self::assertStringContainsString("f.unit = 'factory'", $sql);
         self::assertStringContainsString("LIKE '31%'", $sql);
-        self::assertStringContainsString("f.opportunity_unit = 'mill'", $sql);
+        self::assertStringContainsString("f.unit = 'mill'", $sql);
         self::assertStringContainsString("LIKE '41%'", $sql);
-        self::assertStringContainsString("f.opportunity_unit = 'other'", $sql);
+        self::assertStringContainsString("f.unit = 'other'", $sql);
     }
 }

@@ -5,5 +5,5 @@
 <?= $this->Html->link('Pesquisar ordens', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?></header>
 <?= $this->element('protheus_order', ['protheusUrl' => $this->Url->build([
     '_name' => 'pcm-protheus-order-data', 'number' => $identity['source_order_number'],
-    '?' => ['filial' => $identity['branch_code']],
+    '?' => ['filial' => $identity['branch_code'], 'unit' => $identity['unit'] ?? ''],
 ])]) ?>

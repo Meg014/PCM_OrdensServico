@@ -25,15 +25,15 @@ final class SectorDashboardServiceTest extends TestCase
         parent::tearDownAfterClass();
     }
 
-    public function testAggregatesStatusAndRankingsForSector(): void
+    public function testKeepsIndicatorsAndServiceSummaryAfterAnalyticalCleanup(): void
     {
         $result = (new SectorDashboardService())->dashboard(self::$ids['mechanicalId'], []);
         $this->assertSame(375, $result['indicators']['total']);
-        $this->assertSame('EQ-M1', $result['equipment'][0]['key']);
-        $this->assertSame(250, $result['equipment'][0]['quantity']);
-        $this->assertSame('CORMEC', $result['services'][0]['key']);
-        $this->assertSame(220, $result['services'][0]['quantity']);
-        $this->assertSame(188, $result['costCenters'][0]['quantity']);
+        $this->assertArrayHasKey('summary', $result);
+        $this->assertArrayNotHasKey('equipment', $result);
+        $this->assertArrayNotHasKey('services', $result);
+        $this->assertArrayNotHasKey('costCenters', $result);
+        $this->assertArrayNotHasKey('maintenanceProfile', $result);
     }
 
     public function testValidatedFiltersAffectEveryAggregateAndDetailQuery(): void

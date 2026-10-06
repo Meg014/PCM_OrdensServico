@@ -18,7 +18,7 @@ final class ProtheusSectorService
     public const SERVICES = ['emergency' => ['COREME'], 'scheduled' => ['CORPRO'], 'opportunity' => ['MECOPO', 'ELECOP']];
     public const BACKLOG_AGES = ['0_7' => '0–7 dias', '8_15' => '8–15 dias', '16_30' => '16–30 dias',
         '31_60' => '31–60 dias', 'over_60' => '+60 dias', 'unknown' => 'Sem data válida', 'future' => 'Data futura'];
-    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'opportunity_unit'];
+    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'unit'];
     public function __construct(private ?ProtheusRepository $repository = null, private readonly ?\Closure $diagnostic = null)
     {
     }
@@ -27,6 +27,9 @@ final class ProtheusSectorService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         if ($area !== '' && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
+        if (!array_key_exists('unit', $query) && array_key_exists('opportunity_unit', $query)) {
+            $query['unit'] = $query['opportunity_unit']; // Compatibility with existing opportunity-stop links.
+        }
         $filters = [];
         foreach (self::FILTERS as $key) {
             $value = $query[$key] ?? '';
@@ -35,7 +38,7 @@ final class ProtheusSectorService
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
         if (!in_array($filters['backlog_age'], ['', 'all', ...array_keys(self::BACKLOG_AGES)], true)) throw new InvalidArgumentException('Faixa de backlog inválida.');
-        if (!in_array($filters['opportunity_unit'], ['', 'factory', 'mill', 'other'], true)) throw new InvalidArgumentException('Unidade inválida.');
+        $filters['unit'] = ProtheusUnit::validate($filters['unit']);
         if (!in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(self::CATEGORIES)], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
         foreach (['date_start', 'date_end'] as $key) {
@@ -50,8 +53,8 @@ final class ProtheusSectorService
             'max_range' => $export ? \App\Service\StreamingXlsxReport::BATCH_SIZE : 100]]);
         if ($page === false || $limit === false || $page > intdiv(PHP_INT_MAX, (int)$limit)) throw new InvalidArgumentException('Paginação inválida.');
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
-            'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'charts' => [],
-            'top_equipment' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
+            'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'rankings' => [],
+            'top_equipment' => [], 'generic_equipment' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
         $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status', 'backlog_age']));
         if ($area !== '') $params['area'] = $area;
         $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
@@ -70,17 +73,21 @@ final class ProtheusSectorService
             $cards = array_fill_keys(ProtheusDashboardService::CARDS, 0);
             $breakdown = array_fill_keys(array_keys(self::CATEGORIES), ['open' => 0, 'closed' => 0]);
             $operational = ['total' => 0, 'open' => 0, 'closed' => 0];
-            $charts = array_fill_keys(['status', 'maintenance', 'equipment', 'services', 'costCenters'], []);
             $total = null;
             $missing = 0;
             $classifier = new PcmServiceClassifier();
+            foreach ($data['comparison_aggregates'] as $row) {
+                if ($row['dimension'] !== 'cards') continue;
+                if ($row['service_name'] === null) throw new RuntimeException('Cadastro de serviÃ§o ausente.');
+                $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                $cards[$season . ($row['status'] === 'EM ABERTO' ? '_open' : '_completed')] += (int)$row['quantity'];
+            }
             foreach ($data['aggregates'] as $row) {
                 $dimension = $row['dimension'];
                 $quantity = (int)$row['quantity'];
                 if ($dimension === 'total') { $total = $quantity; $missing = (int)$row['missing_start']; continue; }
                 if ($dimension === 'cards') {
                     if ($row['service_name'] === null) throw new RuntimeException('Cadastro de serviço ausente.');
-                    $season = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                     $statusKey = $row['status'] === 'EM ABERTO' ? 'open' : 'closed';
                     $operational[$statusKey] += $quantity;
                     foreach (self::CATEGORIES as $category => $_label) {
@@ -91,19 +98,8 @@ final class ProtheusSectorService
                             if ($statusKey === 'open') $cards[$category] += $quantity;
                         }
                     }
-                    $cards[$season . ($row['status'] === 'EM ABERTO' ? '_open' : '_completed')] += $quantity;
                     continue;
                 }
-                [$key, $label] = match ($dimension) {
-                    'status' => [$row['status'], $row['status']],
-                    'maintenance' => [$row['TJ_TIPO'], ['PRE' => 'Preventivas', 'COR' => 'Corretivas', 'MEL' => 'Melhorias'][$row['TJ_TIPO']] ?? $row['TJ_TIPO']],
-                    'equipment' => [$row['TJ_CODBEM'], $row['TJ_CODBEM'] . ' — ' . ($row['equipment_name'] ?? 'Sem nome')],
-                    'services' => [$row['TJ_SERVICO'], $row['TJ_SERVICO'] . ' — ' . ($row['service_name'] ?? 'Sem nome')],
-                    'costCenters' => [$row['TJ_CCUSTO'], $row['TJ_CCUSTO']],
-                };
-                $branch = $row['TJ_FILIAL'] ?? '';
-                $charts[$dimension][] = ['key' => $key ?? '', 'label' => $label ?: 'Não informado',
-                    'branch' => $branch, 'quantity' => $quantity];
             }
             $stage = 'validation: aggregates / totals';
             if ($total === null) throw new RuntimeException('Resultado incompleto.');
@@ -111,37 +107,38 @@ final class ProtheusSectorService
             if ($total !== $operational['open'] + $operational['closed']) throw new RuntimeException('Contagens inconsistentes.');
             $stage = 'validation: backlog / dimensions and totals';
             $backlog = ['total' => null, 'ages' => array_fill_keys(array_keys(self::BACKLOG_AGES), 0),
-                'equipment' => [], 'costCenters' => [], 'maintenance' => [], 'as_of' => $selection['as_of']];
+                'as_of' => $selection['as_of']];
+            $genericEquipment = [];
             $topEquipment = [];
             foreach ($data['equipment_ranking'] as $row) {
-                $topEquipment[] = ['key' => $row['TJ_CODBEM'] ?? '',
+                $ranking = ($row['dimension'] ?? '') === 'generic' ? $genericEquipment : $topEquipment;
+                $ranking[] = ['key' => $row['TJ_CODBEM'] ?? '',
                     'label' => ($row['TJ_CODBEM'] ?: 'Sem código') . ' — ' . ($row['equipment_name'] ?? 'Sem nome'),
                     'quantity' => (int)$row['quantity'], 'branch' => $row['TJ_FILIAL'] ?? ''];
+                if (($row['dimension'] ?? '') === 'generic') $genericEquipment = $ranking;
+                else $topEquipment = $ranking;
             }
-            $historical = ['costCenters' => [], 'maintenance' => []];
+            $historical = ['costCenters' => [], 'maintenance' => [], 'services' => []];
             foreach ($data['historical_rankings'] as $row) {
                 $dimension = $row['dimension'];
-                $code = $dimension === 'costCenters' ? ($row['TJ_CCUSTO'] ?? '') : ($row['TJ_TIPO'] ?? '');
-                $label = $dimension === 'costCenters' ? ($code ?: 'Não informado')
-                    : (['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$code] ?? ($code ?: 'Não informado'));
-                $historical[$dimension][] = ['key' => $code, 'label' => $label, 'quantity' => (int)$row['quantity'], 'branch' => ''];
+                $code = match ($dimension) { 'costCenters' => $row['TJ_CCUSTO'] ?? '', 'services' => $row['TJ_SERVICO'] ?? '', default => $row['TJ_TIPO'] ?? '' };
+                $label = match ($dimension) {
+                    'costCenters' => $code ?: 'Não informado',
+                    'services' => ($code ?: 'Sem código') . ' — ' . ($row['service_name'] ?? 'Sem nome'),
+                    default => ['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$code] ?? ($code ?: 'Não informado'),
+                };
+                $historical[$dimension][] = ['key' => $code, 'label' => $label,
+                    'quantity' => (int)$row['quantity'], 'branch' => $row['TJ_FILIAL'] ?? ''];
             }
             foreach ($data['backlog'] as $row) {
                 $quantity = (int)$row['quantity'];
                 $dimension = $row['dimension'];
                 if ($dimension === 'total') { $backlog['total'] = $quantity; continue; }
                 if ($dimension === 'age') { $backlog['ages'][$row['age_bucket']] = $quantity; continue; }
-                $label = match ($dimension) {
-                    'equipment' => ($row['TJ_CODBEM'] ?: 'Sem código') . ' — ' . ($row['equipment_name'] ?? 'Sem nome'),
-                    'costCenters' => $row['TJ_CCUSTO'] ?: 'Não informado',
-                    'maintenance' => ['PRE' => 'Preventiva', 'COR' => 'Corretiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? ($row['TJ_TIPO'] ?: 'Não informado'),
-                };
-                $backlog[$dimension][] = ['key' => $dimension === 'equipment' ? ($row['TJ_CODBEM'] ?? '') : '',
-                    'label' => $label, 'quantity' => $quantity, 'branch' => $row['TJ_FILIAL'] ?? ''];
             }
             if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) {
                 // Counts only: enough to diagnose the SQL result contract without exposing OS data.
-                $dimensions = array_fill_keys(['total', 'age', 'equipment', 'costCenters', 'maintenance'], 0);
+                $dimensions = array_fill_keys(['total', 'age'], 0);
                 $ageRowsSum = 0;
                 foreach ($data['backlog'] as $row) {
                     if (isset($dimensions[$row['dimension']])) $dimensions[$row['dimension']]++;
@@ -154,11 +151,10 @@ final class ProtheusSectorService
                     json_encode($dimensions, JSON_THROW_ON_ERROR), json_encode($backlog['ages'], JSON_THROW_ON_ERROR),
                 ));
             }
-            foreach ($charts as &$rows) foreach ($rows as &$row) $row['percentage'] = $total > 0 ? $row['quantity'] / $total * 100 : 0;
-            unset($rows, $row);
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),
                 'orders' => $data['orders'], 'cards' => $cards, 'breakdown' => $breakdown, 'operational' => $operational,
-                'charts' => $charts, 'backlog' => $backlog, 'top_equipment' => $topEquipment,
+                'rankings' => ['services' => $historical['services']], 'backlog' => $backlog, 'top_equipment' => $topEquipment,
+                'generic_equipment' => $genericEquipment,
                 'historical_rankings' => $historical,
                 'missing_start' => $missing, 'has_more' => $data['has_more']]);
         } catch (Throwable $exception) {

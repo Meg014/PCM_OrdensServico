@@ -114,8 +114,8 @@ final class OrderListingTest extends TestCase
         self::assertStringContainsString("f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro", $sql);
         self::assertStringContainsString(">= CONVERT(date, NULLIF(f.date_start, ''), 23)", $sql);
         self::assertStringContainsString("<= CONVERT(date, NULLIF(f.date_end, ''), 23)", $sql);
-        self::assertSame(3, substr_count($sql, "TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)"));
-        self::assertStringNotContainsString('COALESCE(', $sql);
+        self::assertSame(4, substr_count($sql, "TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)"));
+        self::assertStringContainsString("COALESCE(j.TJ_CCUSTO, '')", $sql);
         self::assertLessThan(strpos($sql, 'OFFSET :offset'), strpos($sql, 'f.date_end ='));
     }
 
@@ -162,7 +162,8 @@ final class OrderListingTest extends TestCase
             self::assertSame('factory', $params['unidade']);
             self::assertSame('[]', $params['offseason_services']);
             self::assertStringContainsString('OPENJSON(f.offseason_services)', $sql);
-            self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $sql);
+            self::assertStringContainsString("CONVERT(date, '20250101', 112)", $sql);
+            self::assertStringNotContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $sql);
             self::assertStringContainsString("LIKE '31%'", $sql);
             self::assertStringContainsString("LIKE '41%'", $sql);
             self::assertStringContainsString("j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C'", $sql);
@@ -173,10 +174,13 @@ final class OrderListingTest extends TestCase
         }
     }
 
-    public function testHistoricalUnitCannotBeUsedOutsideHistoricalDrilldown(): void
+    public function testUnitCanBeUsedGloballyOutsideHistoricalDrilldown(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        (new OrderListingService())->load(['unidade' => 'mill']);
+        $calls = [];
+        $result = (new OrderListingService($this->repository([], $calls)))->load(['unidade' => 'mill']);
+        self::assertTrue($result['available']);
+        self::assertSame('mill', $calls[0][1]['unidade']);
+        self::assertStringContainsString("f.unidade = 'mill'", $calls[0][0]);
     }
 
     public function testEquipmentNameIsCaseInsensitiveLiteralSubstringBeforePagination(): void

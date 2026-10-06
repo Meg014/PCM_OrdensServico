@@ -19,12 +19,12 @@ final class OrderEntryExportServiceTest extends TestCase
         $rows = [$this->entry('M', '008382'), $this->entry('M', '009999'), $this->entry('P', '002075')];
         $result = (new OrderEntryExportService($this->repository($calls, $rows)))->load('ELETRI', [
             'status' => 'EM ABERTO', 'equipment' => 'VAU 50 003', 'maintenance_type' => 'COR',
-            'q' => 'motor%_', 'entry_type' => 'M', 'professional' => '008382',
+            'q' => 'motor%_', 'entry_type' => 'M', 'professional' => '008382', 'unit' => 'mill',
         ]);
         self::assertTrue($result['available']);
         self::assertCount(3, $result['entries']);
-        self::assertCount(1, $calls);
-        [$sql, $params] = $calls[0];
+        self::assertCount(2, $calls);
+        [$sql, $params] = $calls[1];
         self::assertTrue(ProtheusQueries::allows($sql));
         foreach (['dbo.STL010', 'dbo.ST1010', 'dbo.SB1010', 'dbo.CTT010'] as $table) self::assertStringContainsString($table, $sql);
         self::assertStringContainsString('INNER JOIN dbo.STL010', $sql); // OS without entries are intentionally excluded.
@@ -34,6 +34,7 @@ final class OrderEntryExportServiceTest extends TestCase
         self::assertSame('%motor~%~_%', $params['q']);
         self::assertSame('M', $params['entry_type']);
         self::assertSame('008382', $params['professional']);
+        self::assertSame('mill', $params['unit']);
         self::assertSame(1001, $params['fetch']);
         self::assertSame('ELETRI', $params['area']);
     }
@@ -73,7 +74,8 @@ final class OrderEntryExportServiceTest extends TestCase
             self::assertStringContainsString('dbo.CTT010', $call[0]);
             self::assertStringContainsString('c.CTT_CUSTO=n.TJ_CCUSTO', $call[0]);
             self::assertStringContainsString('c.CTT_FILIAL=n.TJ_FILIAL', $call[0]);
-            self::assertStringContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $call[0]);
+            self::assertStringContainsString("CONVERT(date, '20250101', 112)", $call[0]);
+            self::assertStringNotContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $call[0]);
             self::assertStringContainsString("LIKE '41%'", $call[0]);
             self::assertTrue(ProtheusQueries::allows($call[0]));
         }
@@ -101,6 +103,20 @@ final class OrderEntryExportServiceTest extends TestCase
         self::assertNull($result['entries'][1]['cost_center_name']);
         self::assertSame('', $result['entries'][2]['TJ_CCUSTO']);
         self::assertNull($result['entries'][2]['cost_center_name']);
+    }
+
+    public function testGeneralEntryExportKeepsGlobalUnitFilter(): void
+    {
+        $calls = [];
+        $result = (new OrderEntryExportService($this->repository($calls, [$this->entry('M', '008382')])))
+            ->loadGeneral(['unidade' => 'other', 'area' => 'MECANI'], 2);
+
+        self::assertTrue($result['available']);
+        self::assertSame('other', $calls[0][1]['unidade']);
+        self::assertSame('MECANI', $calls[0][1]['area']);
+        self::assertSame(1000, $calls[0][1]['offset']);
+        self::assertStringContainsString("f.unidade = 'other'", $calls[0][0]);
+        self::assertStringContainsString("NOT LIKE '31%'", $calls[0][0]);
     }
 
     private function repository(array &$calls, array $rows, bool $fail = false): ProtheusRepository

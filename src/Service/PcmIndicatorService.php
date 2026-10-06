@@ -56,7 +56,7 @@ final class PcmIndicatorService
                 $query->where(['maintenance_area_id' => $maintenanceAreaId]);
             }
             $query->find('filtered', filters: $filters);
-            $fields = ['treated_status', 'maintenance_type', 'service_code', 'service_name'];
+            $fields = ['branch_code', 'treated_status', 'maintenance_type', 'service_code', 'service_name'];
             $rows = $query->select($fields + ['quantity' => $query->func()->count('*')])
                 ->groupBy($fields)->disableHydration();
             $classifier = new PcmServiceClassifier();
@@ -64,7 +64,7 @@ final class PcmIndicatorService
                 $status = $row['treated_status'];
                 $quantity = (int)$row['quantity'];
                 $statusCounts[$status] = ($statusCounts[$status] ?? 0) + $quantity;
-                $classification = $classifier->classifySnapshot($row['maintenance_type'], $row['service_code'], $row['service_name']);
+                $classification = $classifier->classifySnapshot($row['maintenance_type'], $row['service_code'], $row['service_name'], $row['branch_code']);
                 $season = $classification === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 $seasons[$season . ($status === WorkOrderStatusResolver::OPEN ? '_open' : '_completed')] += $quantity;
                 if ($status === WorkOrderStatusResolver::OPEN) {
@@ -74,6 +74,7 @@ final class PcmIndicatorService
                         $row['maintenance_type'],
                         $row['service_code'],
                         $row['service_name'],
+                        $row['branch_code'],
                     );
                     $serviceCounts[$class] = ($serviceCounts[$class] ?? 0) + $quantity;
                 }

@@ -34,7 +34,7 @@ final class OpportunityStopService
             throw new InvalidArgumentException('Unidade inválida.');
         }
         $fixed = ['card' => 'opportunity', 'card_status' => 'EM ABERTO', 'status' => 'EM ABERTO'];
-        $filters = array_replace($query, $fixed, ['opportunity_unit' => $unit]);
+        $filters = array_replace($query, $fixed, ['unit' => $unit, 'opportunity_unit' => $unit]);
         $data = $this->loader !== null
             ? ($this->loader)($area, $filters, $export, $exportPage)
             : ($this->sectorService ?? new ProtheusSectorService())->load($area, $filters, $export, $exportPage);
@@ -77,11 +77,7 @@ final class OpportunityStopService
 
     public static function unitForCostCenter(string $code): string
     {
-        return match (substr(trim($code), 0, 2)) {
-            '31' => 'factory',
-            '41' => 'mill',
-            default => 'other',
-        };
+        return ProtheusUnit::classify($code);
     }
 
     public static function costCenterLabel(array $row): string

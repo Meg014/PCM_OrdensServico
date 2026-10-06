@@ -33,7 +33,7 @@ final class EquipmentHistoryTest extends TestCase
         self::assertStringContainsString('j.R_E_C_N_O_ DESC', $calls[2][0]);
         self::assertStringContainsString('OFFSET :offset ROWS FETCH NEXT :fetch ROWS ONLY', $calls[2][0]);
         self::assertStringContainsString("TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112)", $calls[2][0]);
-        self::assertStringNotContainsString('COALESCE(', $calls[2][0]);
+        self::assertStringContainsString("COALESCE(j.TJ_CCUSTO, '')", $calls[2][0]);
         foreach ($calls as [$sql]) {
             self::assertStringNotContainsString('STL010', $sql);
             self::assertFalse(ProtheusQueries::allows($sql . '; SELECT 2'));
@@ -81,6 +81,24 @@ final class EquipmentHistoryTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         (new EquipmentHistoryService())->load(['bem' => 'MEL 80 115', 'filial' => '01', 'date_start' => '2026-02-30']);
+    }
+
+    public function testUnitCombinesWithEquipmentPeriodAndExportScope(): void
+    {
+        $calls = [];
+        $result = (new EquipmentHistoryService($this->repository($calls)))->load([
+            'bem' => 'MEL 80 115', 'filial' => '01', 'unit' => 'other',
+            'date_start' => '2026-01-01', 'status' => 'open',
+        ], true);
+
+        self::assertTrue($result['available']);
+        self::assertSame('other', $result['filters']['unit']);
+        foreach ([1, 2] as $index) {
+            self::assertSame('other', $calls[$index][1]['unit']);
+            self::assertStringContainsString("f.unit = 'other'", $calls[$index][0]);
+            self::assertStringContainsString("NOT LIKE '31%'", $calls[$index][0]);
+            self::assertStringContainsString("NOT LIKE '41%'", $calls[$index][0]);
+        }
     }
 
     public function testOptionalSectorFiltersEveryEquipmentAggregateAndPageButGeneralAccessRemainsUnscoped(): void
@@ -199,7 +217,7 @@ final class EquipmentHistoryTest extends TestCase
         $filters = ['bem' => '000123', 'filial' => '01', 'status' => 'open', 'type' => 'COR', 'date_start' => '2026-01-01', 'date_end' => '2026-09-25'];
         $data = (new EquipmentHistoryService($this->repository($calls)))->load($filters + ['page' => 9, 'limit' => 1], true);
         self::assertTrue($data['available']);
-        self::assertEquals($filters + ['setor' => ''], $data['filters']);
+        self::assertEquals($filters + ['setor' => '', 'unit' => ''], $data['filters']);
         self::assertCount(2, $data['orders']);
         $params = $calls[count($calls) - 1][1];
         foreach ($filters as $key => $value) self::assertSame($value, $params[$key]);

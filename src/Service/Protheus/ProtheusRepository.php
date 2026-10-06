@@ -108,14 +108,35 @@ final class ProtheusRepository implements ProtheusReaderInterface
             throw new InvalidArgumentException('Paginação inválida.');
         }
         $areaScoped = isset($params['area']) && $params['area'] !== '';
-        $this->sectorStage = 'SQL: ProtheusSectorQueries::aggregates()';
+        // The first aggregate is the only sector read allowed to include Entressafra:
+        // it resolves the exact centralized classifier population for the comparison cards.
+        $this->sectorStage = 'SQL: ProtheusSectorQueries::aggregates() / comparison';
+        $comparisonAggregate = $this->read(ProtheusSectorQueries::aggregates($areaScoped), $params + [
+            'include_offseason' => '1', 'offseason_services' => '[]',
+        ]);
+        $classifier = new PcmServiceClassifier();
+        $offseasonServices = [];
+        $comparisonGroups = 0;
+        foreach ($comparisonAggregate as $row) {
+            if (($row['dimension'] ?? '') !== 'cards') continue;
+            if (++$comparisonGroups > 2000 || $row['service_name'] === null) {
+                throw new RuntimeException('ClassificaÃ§Ã£o incompleta.');
+            }
+            if ($classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA') {
+                $pair = ['code' => $row['TJ_SERVICO'], 'name' => $row['service_name']];
+                $offseasonServices[json_encode($pair, JSON_THROW_ON_ERROR)] = $pair;
+            }
+        }
+        $params += ['include_offseason' => '',
+            'offseason_services' => json_encode(array_values($offseasonServices), JSON_THROW_ON_ERROR)];
+        $this->sectorStage = 'SQL: ProtheusSectorQueries::aggregates() / safra';
         $aggregate = $this->read(ProtheusSectorQueries::aggregates($areaScoped), $params);
         $this->sectorStage = 'SQL: ProtheusSectorQueries::equipmentRanking()';
-        $equipmentRankingParams = $params;
-        unset($equipmentRankingParams['cutoff']);
-        $equipmentRanking = $this->read(ProtheusSectorQueries::equipmentRanking($areaScoped), $equipmentRankingParams);
+        $allValidParams = $params;
+        unset($allValidParams['cutoff']);
+        $equipmentRanking = $this->read(ProtheusSectorQueries::equipmentRanking($areaScoped), $allValidParams);
         $this->sectorStage = 'SQL: ProtheusSectorQueries::historicalRankings()';
-        $historicalRankings = $this->read(ProtheusSectorQueries::historicalRankings($areaScoped), $equipmentRankingParams);
+        $historicalRankings = $this->read(ProtheusSectorQueries::historicalRankings($areaScoped), $allValidParams);
         $backlogParams = $params;
         unset($backlogParams['cutoff']);
         $backlogParams['as_of'] = $selection['as_of'] ?? (new DateTimeImmutable())->format('Y-m-d');
@@ -124,21 +145,22 @@ final class ProtheusRepository implements ProtheusReaderInterface
         $backlogAge = $selection['backlog_age'] ?? '';
         $pageParams = $backlogAge === '' ? $params : $backlogParams + ['backlog_age' => $backlogAge, 'backlog_bucket' => $backlogAge];
         $season = $selection['season'] ?? '';
+        if ($season === 'offseason') $pageParams['include_offseason'] = '1';
         $seasonServices = [];
         if ($season !== '') {
             $this->sectorStage = 'validation: aggregates / season';
-            $classifier = new PcmServiceClassifier();
             $groupCount = 0;
-            foreach ($aggregate as $row) {
+            foreach ($comparisonAggregate as $row) {
                 if (($row['dimension'] ?? '') !== 'cards') {
                     continue;
                 }
                 if (++$groupCount > 2000 || $row['service_name'] === null) {
                     throw new RuntimeException('Classificação incompleta.');
                 }
-                $resolved = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                $resolved = $classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 if ($resolved === $season) {
-                    $pair = ['code' => $row['TJ_SERVICO'], 'name' => $row['service_name']];
+                    $pair = ['branch' => $row['TJ_FILIAL'], 'code' => $row['TJ_SERVICO'],
+                        'name' => $row['service_name']];
                     $seasonServices[json_encode($pair, JSON_THROW_ON_ERROR)] = $pair;
                 }
             }
@@ -154,12 +176,29 @@ final class ProtheusRepository implements ProtheusReaderInterface
             'card_season' => $season, 'season_services' => json_encode(array_values($seasonServices), JSON_THROW_ON_ERROR)],
             ['offset' => 'integer', 'fetch' => 'integer'],
         );
+        if ($backlogAge !== '') {
+            foreach ($rows as $row) {
+                if (($row['TJ_SITUACA'] ?? null) !== 'L' || ($row['TJ_TERMINO'] ?? null) !== 'N') {
+                    throw new RuntimeException('Drill-down de backlog retornou O.S. fora da população em aberto.');
+                }
+            }
+        }
+        if ($season !== '') {
+            foreach ($rows as $row) {
+                $resolved = $classifier->classify(
+                    $row['TJ_SERVICO'] ?? null,
+                    $row['service_name'] ?? null,
+                    $row['TJ_FILIAL'] ?? null,
+                ) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                if ($resolved !== $season || (($selection['status'] ?? '') !== ''
+                    && ($row['status'] ?? null) !== $selection['status'])) {
+                    throw new RuntimeException('Drill-down de Safra/Entressafra retornou O.S. fora da população solicitada.');
+                }
+            }
+        }
         $cardGroups = 0;
-        foreach (array_merge($aggregate, $equipmentRanking, $historicalRankings, $backlogRows, $rows) as $index => $row) {
-            $this->sectorStage = 'validation: ' . ($index < count($aggregate) ? 'aggregates'
-                : ($index < count($aggregate) + count($equipmentRanking) ? 'equipment ranking'
-                : ($index < count($aggregate) + count($equipmentRanking) + count($historicalRankings) ? 'historical rankings'
-                : ($index < count($aggregate) + count($equipmentRanking) + count($historicalRankings) + count($backlogRows) ? 'backlog' : 'page'))));
+        foreach (array_merge($comparisonAggregate, $aggregate, $equipmentRanking, $historicalRankings, $backlogRows, $rows) as $index => $row) {
+            $this->sectorStage = 'validation: sector result';
             $cardGroups += ($row['dimension'] ?? '') === 'cards' ? 1 : 0;
             if ((int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1 || (int)$row['service_matches'] > 1) {
                 $this->sectorStage .= sprintf(
@@ -171,12 +210,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 throw new RuntimeException('Identidade ou cadastro ambíguo.');
             }
         }
-        if ($cardGroups > 2000) {
+        if ($cardGroups > 4000) {
             $this->sectorStage = 'validation: aggregates / group limit';
             throw new RuntimeException('Agregação incompleta.');
         }
 
-        return ['aggregates' => $aggregate, 'equipment_ranking' => $equipmentRanking, 'historical_rankings' => $historicalRankings,
+        return ['aggregates' => $aggregate, 'comparison_aggregates' => $comparisonAggregate,
+            'equipment_ranking' => $equipmentRanking, 'historical_rankings' => $historicalRankings,
             'backlog' => $backlogRows, 'orders' => array_slice($rows, 0, $limit),
             'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
     }
@@ -190,27 +230,42 @@ final class ProtheusRepository implements ProtheusReaderInterface
         ) {
             throw new InvalidArgumentException('Limite de apontamentos inválido.');
         }
+        $comparisonAggregate = $this->read(ProtheusSectorQueries::aggregates(), $params + [
+            'include_offseason' => '1', 'offseason_services' => '[]',
+        ]);
+        $classifier = new PcmServiceClassifier();
+        $offseason = [];
+        foreach ($comparisonAggregate as $row) {
+            if (($row['dimension'] ?? '') !== 'cards') continue;
+            if ($row['service_name'] === null) throw new RuntimeException('ClassificaÃ§Ã£o incompleta.');
+            if ($classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA') {
+                $pair = ['code' => $row['TJ_SERVICO'], 'name' => $row['service_name']];
+                $offseason[json_encode($pair, JSON_THROW_ON_ERROR)] = $pair;
+            }
+        }
+        $params += ['include_offseason' => '',
+            'offseason_services' => json_encode(array_values($offseason), JSON_THROW_ON_ERROR)];
         $season = $selection['season'] ?? '';
         $seasonServices = [];
         if ($season !== '') {
-            $aggregate = $this->read(ProtheusSectorQueries::aggregates(), $params);
-            $classifier = new PcmServiceClassifier();
             $groups = 0;
-            foreach ($aggregate as $row) {
+            foreach ($comparisonAggregate as $row) {
                 if (($row['dimension'] ?? '') !== 'cards') {
                     continue;
                 }
                 if (++$groups > 2000 || $row['service_name'] === null) {
                     throw new RuntimeException('Classificação incompleta.');
                 }
-                $resolved = $classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                $resolved = $classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
                 if ($resolved === $season) {
-                    $seasonServices[] = ['code' => $row['TJ_SERVICO'], 'name' => $row['service_name']];
+                    $seasonServices[] = ['branch' => $row['TJ_FILIAL'], 'code' => $row['TJ_SERVICO'],
+                        'name' => $row['service_name']];
                 }
             }
         }
         $backlogAge = $selection['backlog_age'] ?? '';
         $queryParams = $params;
+        if ($season === 'offseason') $queryParams['include_offseason'] = '1';
         if ($backlogAge !== '') {
             unset($queryParams['cutoff']);
             $queryParams += ['as_of' => $selection['as_of'], 'backlog_age' => $backlogAge, 'backlog_bucket' => $backlogAge];
@@ -223,6 +278,20 @@ final class ProtheusRepository implements ProtheusReaderInterface
             'entry_type' => $selection['entry_type'] ?? '', 'professional' => $selection['professional'] ?? '',
         ], ['offset' => 'integer', 'fetch' => 'integer']);
         foreach ($rows as &$row) {
+            if ($backlogAge !== '' && ($row['status'] ?? null) !== 'EM ABERTO') {
+                throw new RuntimeException('Exportação de backlog retornou O.S. fora da população em aberto.');
+            }
+            if ($season !== '') {
+                $resolved = $classifier->classify(
+                    $row['TJ_SERVICO'] ?? null,
+                    $row['service_name'] ?? null,
+                    $row['TJ_FILIAL'] ?? null,
+                ) === 'ENTRESSAFRA' ? 'offseason' : 'safra';
+                if ($resolved !== $season || (($selection['status'] ?? '') !== ''
+                    && ($row['status'] ?? null) !== $selection['status'])) {
+                    throw new RuntimeException('Exportação de Safra/Entressafra retornou O.S. fora da população solicitada.');
+                }
+            }
             if (
                 (int)$row['identity_count'] > 1 || (int)$row['equipment_matches'] > 1
                 || (int)$row['service_matches'] > 1 || (int)$row['professional_matches'] > 1
@@ -246,7 +315,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** SQL aggregates only: 61 ranking rows or at most 2000 management groups. */
-    public function dashboard(array $filters, bool $management = false): array
+    public function dashboard(array $filters, bool $management = false, bool $unitFilter = false): array
     {
         $params = [];
         foreach (['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino'] as $key) {
@@ -256,18 +325,20 @@ final class ProtheusRepository implements ProtheusReaderInterface
             }
             $params[$key] = trim($value);
         }
-        if (!$management) {
+        if (!$management || $unitFilter) {
             $unit = $filters['unidade'] ?? '';
-            if (!is_string($unit) || !in_array($unit, ['', 'factory', 'mill'], true)) {
+            if (!is_string($unit) || (!$management && !in_array($unit, ['', 'factory', 'mill'], true))) {
                 throw new InvalidArgumentException('Unidade invÃ¡lida.');
             }
-            $params['unidade'] = $unit;
+            $params['unidade'] = $management ? ProtheusUnit::validate($unit) : $unit;
+        }
+        if (!$management) {
             $params['offseason_services'] = $this->historicalOffseasonServices();
         }
         if ($management) {
             $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
         }
-        $rows = $this->read($management ? ProtheusQueries::MANAGEMENT : ProtheusQueries::DASHBOARD, $params);
+        $rows = $this->read($management ? ProtheusQueries::management($unitFilter) : ProtheusQueries::dashboardAnalysis(), $params);
         if ($management && count($rows) > 2000) {
             throw new RuntimeException('Limite de grupos excedido; resultado incompleto.');
         }
@@ -276,7 +347,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 throw new RuntimeException('Identidade de OS ambígua.');
             }
             if (
-                !$management && $row['dimension'] === 'equipment'
+                !$management && in_array($row['dimension'], ['equipment', 'generic'], true)
                 && ((int)$row['equipment_matches'] !== 1 || $row['equipment_name'] === null)
             ) {
                 throw new RuntimeException('Cadastro de equipamento indisponível ou ambíguo.');
@@ -296,7 +367,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = '', string $equipmentName = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = '', string $equipmentName = '', string $analytical = '', string $safra = ''): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -313,22 +384,29 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if (!in_array($costCenterMode, ['', 'exact', 'blank', 'null'], true)) {
             throw new InvalidArgumentException('Filtro de centro de custo inválido.');
         }
-        if (!in_array($historical, ['', '1'], true) || !in_array($unit, ['', 'factory', 'mill'], true)
-            || ($unit !== '' && $historical !== '1')) {
+        if (!in_array($historical, ['', '1'], true)) {
             throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
+        }
+        if (!in_array($safra, ['', '1'], true)) throw new InvalidArgumentException('Escopo de Safra invÃ¡lido.');
+        if (!in_array($analytical, ['', '1'], true)) {
+            throw new InvalidArgumentException('Escopo analítico inválido.');
+        }
+        $unit = ProtheusUnit::validate($unit);
+        if ($historical === '1' && $unit === ProtheusUnit::OTHER) {
+            throw new InvalidArgumentException('A visão histórica não inclui Outros / Sem unidade.');
         }
         if (strlen($equipmentName) > 202) {
             throw new InvalidArgumentException('Nome do equipamento invÃ¡lido.');
         }
         $extraFilters = $costCenter !== '' || $costCenterMode !== '' || $dateStart !== '' || $dateEnd !== ''
             || $area !== '' || $service !== '' || $type !== '' || $situation !== '' || $ending !== ''
-            || $historical !== '' || $equipmentName !== '';
+            || $historical !== '' || $safra !== '' || $analytical !== '' || $equipmentName !== '' || $unit !== '';
         if ($extraFilters) {
             $params += ['centro' => $costCenter, 'centro_modo' => $costCenterMode, 'area' => $area,
                 'servico' => $service, 'tipo' => $type, 'situacao' => $situation, 'termino' => $ending,
-                'date_start' => $dateStart, 'date_end' => $dateEnd, 'nome_bem' => $equipmentName];
-            if ($historical === '1') {
-                $params['unidade'] = $unit;
+                'date_start' => $dateStart, 'date_end' => $dateEnd, 'nome_bem' => $equipmentName,
+                'unidade' => $unit, 'analitico' => $analytical];
+            if ($historical === '1' || $safra === '1') {
                 $params['offseason_services'] = $this->historicalOffseasonServices();
             }
         }
@@ -339,6 +417,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $equipment !== null,
                 $extraFilters,
                 $historical === '1',
+                $safra === '1',
             ),
             $params,
             ['offset' => 'integer', 'fetch' => 'integer'],
@@ -362,7 +441,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
         ) {
             throw new InvalidArgumentException('Paginação inválida.');
         }
-        $filters['offseason_services'] = ($filters['historico'] ?? '') === '1'
+        $filters['offseason_services'] = (($filters['historico'] ?? '') === '1' || ($filters['safra'] ?? '') === '1')
             ? $this->historicalOffseasonServices() : '[]';
         $rows = $this->read(ProtheusQueries::generalEntries(), $filters + [
             'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
@@ -398,7 +477,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
             if ((int)($row['service_matches'] ?? 0) !== 1 || ($row['service_name'] ?? null) === null) {
                 throw new RuntimeException('Cadastro de serviÃ§o indisponÃ­vel ou ambÃ­guo.');
             }
-            if ($classifier->classify($row['TJ_SERVICO'], $row['service_name']) === 'ENTRESSAFRA') {
+            if ($classifier->classify($row['TJ_SERVICO'], $row['service_name'], $row['TJ_FILIAL']) === 'ENTRESSAFRA') {
                 $services[] = ['branch' => rtrim((string)$row['TJ_FILIAL']),
                     'code' => rtrim((string)$row['TJ_SERVICO'])];
             }
@@ -480,7 +559,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
      * @return array{equipment_code: string, branch: ?string, page: int, limit: int,
      *   has_more: bool, orders: array, user_columns: array}
      */
-    public function findEquipmentHistory(string $equipmentCode, ?string $branch = null, int $page = 1, int $limit = 20): array
+    public function findEquipmentHistory(string $equipmentCode, ?string $branch = null, int $page = 1, int $limit = 20, string $unit = ''): array
     {
         $equipmentCode = rtrim($equipmentCode, ' ');
         $branch = $branch === null ? null : rtrim($branch, ' ');
@@ -490,15 +569,18 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if ($page < 1 || $limit < 1 || $limit > 100 || $page > intdiv(PHP_INT_MAX, $limit)) {
             throw new InvalidArgumentException('Use página positiva e limite entre 1 e 100.');
         }
+        $unit = ProtheusUnit::validate($unit);
         $this->historyUserColumns ??= $this->read(ProtheusQueries::HISTORY_USER_COLUMNS)[0];
         $params = ['bem' => $equipmentCode, 'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1];
         if ($branch !== null) {
             $params['filial'] = $branch;
         }
+        if ($unit !== '') $params['unit'] = $unit;
         $rows = $this->read(ProtheusQueries::equipmentHistory(
             $branch !== null,
             $this->historyUserColumns['inicio'] !== null,
             $this->historyUserColumns['fim'] !== null,
+            $unit !== '',
         ), $params, ['offset' => 'integer', 'fetch' => 'integer']);
         $hasMore = count($rows) > $limit;
         $identities = [];

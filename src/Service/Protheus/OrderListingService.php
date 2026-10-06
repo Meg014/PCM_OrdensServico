@@ -18,7 +18,8 @@ final class OrderListingService
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
         foreach (['os', 'filial', 'bem', 'nome_bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
-            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'unidade'] as $key) {
+            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'safra', 'analitico', 'unidade',
+            'card', 'card_status', 'backlog_age', 'q', 'status', 'service_name'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > 100) {
                 throw new InvalidArgumentException('Filtros inválidos.');
@@ -32,10 +33,26 @@ final class OrderListingService
         if ($filters['centro'] !== '' && $filters['centro_modo'] === '') {
             $filters['centro_modo'] = 'exact';
         }
-        if (!in_array($filters['historico'], ['', '1'], true)
-            || !in_array($filters['unidade'], ['', 'factory', 'mill'], true)
-            || ($filters['unidade'] !== '' && $filters['historico'] !== '1')) {
+        if (!in_array($filters['historico'], ['', '1'], true)) {
             throw new InvalidArgumentException('Escopo histÃ³rico invÃ¡lido.');
+        }
+        if (!in_array($filters['safra'], ['', '1'], true)) throw new InvalidArgumentException('Escopo de Safra invÃ¡lido.');
+        if (!in_array($filters['analitico'], ['', '1'], true)) {
+            throw new InvalidArgumentException('Escopo analítico inválido.');
+        }
+        $filters['unidade'] = ProtheusUnit::validate($filters['unidade']);
+        if (!in_array($filters['card'], ['', 'safra', 'offseason'], true)
+            || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)
+            || !in_array($filters['backlog_age'], ['', 'all', ...array_keys(ProtheusSectorService::BACKLOG_AGES)], true)) {
+            throw new InvalidArgumentException('Drill-down invÃ¡lido.');
+        }
+        $drilldown = $filters['card'] !== '' || $filters['backlog_age'] !== '';
+        if ($drilldown && $filters['area'] === '') throw new InvalidArgumentException('Setor do drill-down invÃ¡lido.');
+        if (!$drilldown && ($filters['q'] !== '' || $filters['status'] !== '' || $filters['service_name'] !== '')) {
+            throw new InvalidArgumentException('Filtro exclusivo de drill-down.');
+        }
+        if ($filters['historico'] === '1' && $filters['unidade'] === ProtheusUnit::OTHER) {
+            throw new InvalidArgumentException('A visão histórica não inclui Outros / Sem unidade.');
         }
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] !== '') {
@@ -58,6 +75,32 @@ final class OrderListingService
             throw new InvalidArgumentException('Paginação inválida.');
         }
         try {
+            if ($drilldown) {
+                $sector = (new ProtheusSectorService($this->repository))->load($filters['area'], [
+                    'filial' => $filters['filial'], 'equipment' => $filters['bem'],
+                    'service' => $filters['servico'], 'service_name' => $filters['service_name'],
+                    'cost_center' => $filters['centro'], 'maintenance_type' => $filters['tipo'],
+                    'q' => $filters['q'], 'status' => $filters['status'],
+                    'date_start' => $filters['date_start'], 'date_end' => $filters['date_end'],
+                    'card' => $filters['card'], 'card_status' => $filters['card_status'],
+                    'backlog_age' => $filters['backlog_age'], 'unit' => $filters['unidade'],
+                    'page' => (string)$page, 'limit' => (string)$limit,
+                ], $export, $exportPage);
+                if (!$sector['available']) throw new \RuntimeException('Drill-down indisponÃ­vel.');
+                if ($filters['backlog_age'] !== '') {
+                    $age = $filters['backlog_age'];
+                    $total = $age === 'all' ? $sector['backlog']['total'] : $sector['backlog']['ages'][$age];
+                    $label = 'Backlog · ' . ($age === 'all' ? 'Total de O.S. em aberto' : ProtheusSectorService::BACKLOG_AGES[$age]);
+                } else {
+                    $state = $filters['card_status'] === 'EM ABERTO' ? 'open' : 'completed';
+                    $total = $sector['cards'][$filters['card'] . '_' . $state];
+                    $label = ($filters['card'] === 'safra' ? 'Safra' : 'Entressafra') . ' · '
+                        . ($state === 'open' ? 'Em aberto' : 'Fechadas');
+                }
+                return ['orders' => $sector['orders'], 'page' => $sector['page'], 'limit' => $sector['limit'],
+                    'has_more' => $sector['has_more'], 'filters' => $filters, 'available' => true,
+                    'drilldown' => ['label' => $label, 'total' => $total]];
+            }
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope);
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
@@ -66,6 +109,7 @@ final class OrderListingService
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
                 $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
                 $filters['historico'], $filters['unidade'], self::equipmentNamePattern($filters['nome_bem']),
+                $filters['analitico'], $filters['safra'],
             );
 
             return $result + ['filters' => $filters, 'available' => true];

@@ -20,19 +20,26 @@ SQL;
     }
     public const FILTER_JOIN = <<<'SQL'
 CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_end AS VARCHAR(10)) AS end_date,
-    CAST(:type AS VARCHAR(100)) AS maintenance_type, CAST(:status AS VARCHAR(10)) AS status) f
+    CAST(:type AS VARCHAR(100)) AS maintenance_type, CAST(:status AS VARCHAR(10)) AS status,
+    CAST(:unit AS VARCHAR(20)) AS unit) f
 SQL;
     public const FILTER = "(f.start_date = '' OR " . ProtheusQueries::ORIGIN_DATE . " >= CONVERT(date, NULLIF(f.start_date, ''), 23))"
         . " AND (f.end_date = '' OR " . ProtheusQueries::ORIGIN_DATE . " <= CONVERT(date, NULLIF(f.end_date, ''), 23))"
         . " AND (f.maintenance_type = '' OR j.TJ_TIPO = f.maintenance_type)"
         . " AND (f.status = '' OR (f.status = 'open' AND " . ProtheusOperationalEligibility::OPEN . ')'
-        . " OR (f.status = 'closed' AND " . ProtheusOperationalEligibility::CLOSED . '))';
+        . " OR (f.status = 'closed' AND " . ProtheusOperationalEligibility::CLOSED . '))'
+        . ' AND {{UNIT_SCOPE}}';
+
+    public static function filter(): string
+    {
+        return str_replace('{{UNIT_SCOPE}}', ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unit'), self::FILTER);
+    }
 
     public static function summary(bool $sector = false): string
     {
         $scope = self::scope($sector);
         $join = self::FILTER_JOIN;
-        $filter = self::FILTER;
+        $filter = self::filter();
         $open = ProtheusOperationalEligibility::OPEN;
         $closed = ProtheusOperationalEligibility::CLOSED;
         return <<<SQL

@@ -64,29 +64,19 @@
                 if (!Number.isSafeInteger(item.quantity) || item.quantity < 0) throw new Error('Invalid analysis count');
                 const row = document.createElement('li');
                 row.className = 'list-group-item d-flex justify-content-between align-items-start gap-3 px-0';
-                if (key === 'equipment' || key === 'services' || key === 'costCenters') {
+                if (['equipment', 'services', 'costCenters'].includes(key)) {
                     const link = document.createElement('a');
                     link.className = 'pcm-ranking-link';
-                    const filterNames = {filial: 'filial', area: 'area', bem: 'bem', servico: 'servico',
-                        tipo: 'tipo', situacao: 'situacao', termino: 'termino', unidade: 'unidade'};
                     const query = new URLSearchParams();
-                    for (const [source, target] of Object.entries(filterNames)) {
-                        if (payload.filters?.[source]) query.set(target, payload.filters[source]);
-                    }
+                    const names = {filial: 'filial', area: 'area', bem: 'bem', servico: 'servico', tipo: 'tipo',
+                        situacao: 'situacao', termino: 'termino', unidade: 'unidade'};
+                    for (const [source, target] of Object.entries(names)) if (payload.filters?.[source]) query.set(target, payload.filters[source]);
                     query.set('historico', '1');
-                    if (key === 'equipment') {
-                        query.set('filial', item.branch);
-                        query.set('bem', item.code);
-                    } else if (key === 'services') {
-                        query.set('filial', item.branch);
-                        query.set('servico', item.code);
-                    } else {
-                        query.set('centro', item.code);
-                        query.set('centro_modo', item.mode);
-                    }
+                    if (key === 'equipment') { query.set('filial', item.branch); query.set('bem', item.code); }
+                    if (key === 'services') { query.set('filial', item.branch); query.set('servico', item.code); }
+                    if (key === 'costCenters') { query.set('centro', item.code); query.set('centro_modo', item.mode); }
                     link.href = `${root.dataset.ordersUrl}?${query}`;
-                    link.textContent = ['equipment', 'services'].includes(key) ? `${item.code} — ${item.name}`
-                        : (item.code || 'Sem centro de custo');
+                    link.textContent = key === 'costCenters' ? item.code : `${item.code} — ${item.name}`;
                     row.appendChild(link);
                 } else {
                     const label = document.createElement('span');
@@ -110,14 +100,6 @@
         if (typeof Chart === 'undefined') return;
         analysisCharts.splice(0).forEach(chart => chart.destroy());
         const rows = {
-            status: [
-                {label: 'Finalizadas', quantity: analysis.status.completed},
-                {label: 'Não finalizadas', quantity: analysis.status.open},
-            ],
-            maintenance: analysis.maintenance,
-            equipment: analysis.equipment.map(item => ({label: `${item.code} — ${item.name}`, quantity: item.quantity})),
-            services: analysis.services.map(item => ({label: `${item.code} — ${item.name}`, quantity: item.quantity})),
-            costCenters: analysis.costCenters.map(item => ({label: item.code || 'Sem centro de custo', quantity: item.quantity})),
             sectors: analysis.sectors,
         };
         for (const canvas of analysisCanvases) {
@@ -127,7 +109,7 @@
                 labels: values.map(item => item.label),
                 datasets: [{data: values.map(item => item.quantity), backgroundColor: '#356796', borderRadius: 5}],
             }, options: {responsive: true, maintainAspectRatio: false,
-                indexAxis: ['equipment', 'services', 'costCenters', 'sectors'].includes(key) ? 'y' : 'x',
+                indexAxis: key === 'sectors' ? 'y' : 'x',
                 plugins: {legend: {display: false}, tooltip: {callbacks: {label: context => {
                     const percentage = analysis.total > 0 ? (Number(context.raw) * 100 / analysis.total) : 0;
                     return `${format.format(context.raw)} O.S. (${percentage.toFixed(1)}%)`;

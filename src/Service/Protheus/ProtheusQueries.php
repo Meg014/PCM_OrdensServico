@@ -8,13 +8,51 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    /** Fixed aggregate-only audit used to verify the analytical boundary against Protheus. */
+    public const ANALYTICAL_AUDIT = <<<'SQL'
+WITH source AS (
+    SELECT RTRIM(j.TJ_FILIAL) AS branch, RTRIM(j.TJ_CODBEM) AS equipment, RTRIM(j.TJ_SERVICO) AS service,
+        RTRIM(j.TJ_CODAREA) AS area, LTRIM(RTRIM(COALESCE(j.TJ_CCUSTO, ''))) AS cost_center,
+        TRY_CONVERT(date, NULLIF(j.TJ_DTORIGI, ''), 112) AS origin_date
+    FROM dbo.STJ010 j
+    WHERE j.D_E_L_E_T_ <> '*' AND (j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C')
+), classified AS (
+    SELECT *, CASE WHEN cost_center LIKE '31%' THEN 'factory'
+        WHEN cost_center LIKE '41%' THEN 'mill' ELSE 'other' END AS unit_name,
+        CASE WHEN branch = '01' AND equipment IN ('FAB 80 020', 'SET 50 002', 'SET 50 001', 'SET 80 004')
+            THEN 1 ELSE 0 END AS is_generic
+    FROM source
+)
+SELECT CASE WHEN GROUPING(unit_name) = 0 THEN 'unit:' + unit_name
+        WHEN GROUPING(equipment) = 0 THEN 'generic:' + equipment ELSE 'all' END AS metric,
+    COUNT_BIG(*) AS total,
+    SUM(CAST(CASE WHEN origin_date >= CONVERT(date, '20250101', 112) THEN 1 ELSE 0 END AS BIGINT)) AS since_2025
+FROM classified
+GROUP BY GROUPING SETS ((), (unit_name), (equipment, is_generic))
+HAVING GROUPING(equipment) = 1 OR is_generic = 1
+UNION ALL
+SELECT 'historical:safra_factory_mill', COUNT_BIG(*),
+    SUM(CAST(CASE WHEN origin_date >= CONVERT(date, '20250101', 112) THEN 1 ELSE 0 END AS BIGINT))
+FROM classified
+WHERE unit_name IN ('factory', 'mill')
+  AND NOT (branch = '01' AND service IN ('2425CA', '2425CI', '2425EL', '2425ME', '2425US',
+      'ESCALD', 'ESDEST', 'ESMECA'))
+ORDER BY metric
+SQL;
+
     public const HISTORICAL_SERVICE_DEFINITIONS = <<<'SQL'
 WITH grouped AS (
     SELECT j.TJ_FILIAL, j.TJ_SERVICO
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*' AND (j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C')
-      AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
-      AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%' OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
+      AND
+SQL
+        . ProtheusUnit::STJ_FACTORY_OR_MILL . <<<'SQL'
+
+      AND
+SQL
+        . ProtheusAnalyticalScope::STJ_PREDICATE . <<<'SQL'
+
     GROUP BY j.TJ_FILIAL, j.TJ_SERVICO
 )
 SELECT g.TJ_FILIAL, g.TJ_SERVICO,
@@ -94,6 +132,23 @@ ORDER BY c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.TJ_TIPO
 OPTION (RECOMPILE)
 SQL;
 
+    public static function management(bool $unit = false): string
+    {
+        if (!$unit) return self::MANAGEMENT;
+        $sql = str_replace(
+            'CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino) f',
+            'CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, '
+                . 'CAST(:unidade AS VARCHAR(20)) AS unidade) f',
+            self::MANAGEMENT,
+        );
+
+        return str_replace(
+            "AND (f.termino = '' OR j.TJ_TERMINO = f.termino)",
+            "AND (f.termino = '' OR j.TJ_TERMINO = f.termino)\n      AND " . ProtheusUnit::STJ_PREDICATE,
+            $sql,
+        );
+    }
+
     /** One bounded aggregate result; all filtering precedes aggregation on SQL Server. */
     public const DASHBOARD = <<<'SQL'
 WITH base AS (
@@ -125,30 +180,33 @@ SQL
       AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)
       AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
-      AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
+      AND
+SQL
+        . ProtheusAnalyticalScope::STJ_PREDICATE . <<<'SQL'
+
       AND NOT EXISTS (
         SELECT 1 FROM OPENJSON(f.offseason_services)
         WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason
         WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO
       )
-      AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')
-        OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
-        OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'
-          OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))
+      AND
+SQL
+        . ProtheusUnit::STJ_FACTORY_OR_MILL . <<<'SQL'
+
+      AND
+SQL
+        . ProtheusUnit::STJ_PREDICATE . <<<'SQL'
+
 ), grouped AS (
     SELECT CASE
         WHEN GROUPING(TJ_CODAREA) = 0 THEN 'area'
-        WHEN GROUPING(TJ_CODBEM) = 0 THEN 'equipment'
         WHEN GROUPING(TJ_SERVICO) = 0 THEN 'service'
-        WHEN GROUPING(TJ_CCUSTO) = 0 THEN 'cost_center'
         WHEN GROUPING(TJ_TIPO) = 0 THEN 'type'
         WHEN GROUPING(status_group) = 0 THEN 'status'
         ELSE 'total' END AS dimension,
         CASE
         WHEN GROUPING(TJ_CODAREA) = 0 THEN TJ_CODAREA
-        WHEN GROUPING(TJ_CODBEM) = 0 THEN TJ_CODBEM
         WHEN GROUPING(TJ_SERVICO) = 0 THEN TJ_SERVICO
-        WHEN GROUPING(TJ_CCUSTO) = 0 THEN TJ_CCUSTO
         WHEN GROUPING(TJ_TIPO) = 0 THEN TJ_TIPO
         WHEN GROUPING(status_group) = 0 THEN status_group
         ELSE '' END AS code,
@@ -156,18 +214,40 @@ SQL
         CASE WHEN GROUPING(TJ_FILIAL) = 0 THEN TJ_FILIAL ELSE '' END AS branch,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count
     FROM base
-    GROUP BY GROUPING SETS ((), (TJ_CODAREA), (TJ_FILIAL, TJ_CODBEM), (TJ_FILIAL, TJ_SERVICO),
-        (TJ_CCUSTO), (TJ_TIPO), (status_group))
+    GROUP BY GROUPING SETS ((), (TJ_CODAREA), (TJ_FILIAL, TJ_SERVICO), (TJ_TIPO), (status_group))
+    UNION ALL
+    SELECT 'equipment', TJ_CODBEM, '', TJ_FILIAL, COUNT_BIG(*), MAX(identity_count)
+    FROM base j WHERE NULLIF(LTRIM(RTRIM(TJ_CODBEM)), '') IS NOT NULL
+      AND NULLIF(LTRIM(RTRIM(TJ_CCUSTO)), '') IS NOT NULL AND NOT
+SQL
+        . ProtheusGenericEquipment::STJ_PREDICATE . <<<'SQL'
+      AND (EXISTS (SELECT 1 FROM dbo.ST9010 eb WHERE eb.T9_CODBEM = j.TJ_CODBEM
+            AND eb.T9_FILIAL = j.TJ_FILIAL AND eb.D_E_L_E_T_ <> '*'
+            AND NULLIF(LTRIM(RTRIM(eb.T9_NOME)), '') IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM dbo.ST9010 eb WHERE eb.T9_CODBEM = j.TJ_CODBEM
+            AND eb.T9_FILIAL = '' AND eb.D_E_L_E_T_ <> '*'
+            AND NULLIF(LTRIM(RTRIM(eb.T9_NOME)), '') IS NOT NULL))
+    GROUP BY TJ_FILIAL, TJ_CODBEM
+    UNION ALL
+    SELECT 'cost_center', TJ_CCUSTO, '', '', COUNT_BIG(*), MAX(identity_count)
+    FROM base WHERE NULLIF(LTRIM(RTRIM(TJ_CCUSTO)), '') IS NOT NULL GROUP BY TJ_CCUSTO
+    UNION ALL
+    SELECT 'generic' AS dimension, TJ_CODBEM AS code, '' AS ending, TJ_FILIAL AS branch,
+        COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count
+    FROM base j WHERE
+SQL
+        . ProtheusGenericEquipment::STJ_PREDICATE . <<<'SQL'
+    GROUP BY TJ_FILIAL, TJ_CODBEM
 ), ranked AS (
     SELECT dimension, code, ending, branch, quantity, identity_count,
         ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, branch, code, ending) AS position
     FROM grouped
 )
 SELECT r.dimension, r.code, r.ending, r.branch, r.quantity, r.identity_count,
-    CASE WHEN r.dimension = 'equipment' THEN
+    CASE WHEN r.dimension IN ('equipment', 'generic') THEN
         CASE WHEN local_equipment.matches > 0 THEN local_equipment.name ELSE shared_equipment.name END
     END AS equipment_name,
-    CASE WHEN r.dimension = 'equipment' THEN
+    CASE WHEN r.dimension IN ('equipment', 'generic') THEN
         CASE WHEN local_equipment.matches > 0 THEN local_equipment.matches ELSE shared_equipment.matches END
     ELSE 0 END AS equipment_matches
     ,CASE WHEN r.dimension = 'service' THEN
@@ -178,10 +258,10 @@ SELECT r.dimension, r.code, r.ending, r.branch, r.quantity, r.identity_count,
     ELSE 0 END AS service_matches
 FROM ranked r
 OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
-    WHERE r.dimension = 'equipment' AND b.T9_CODBEM = r.code AND b.T9_FILIAL = r.branch
+    WHERE r.dimension IN ('equipment', 'generic') AND b.T9_CODBEM = r.code AND b.T9_FILIAL = r.branch
       AND b.D_E_L_E_T_ <> '*') local_equipment
 OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
-    WHERE r.dimension = 'equipment' AND b.T9_CODBEM = r.code AND b.T9_FILIAL = ''
+    WHERE r.dimension IN ('equipment', 'generic') AND b.T9_CODBEM = r.code AND b.T9_FILIAL = ''
       AND b.D_E_L_E_T_ <> '*') shared_equipment
 OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
     WHERE r.dimension = 'service' AND s.T4_SERVICO = r.code AND s.T4_FILIAL = r.branch
@@ -194,6 +274,11 @@ ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
 
+    public static function dashboardAnalysis(): string
+    {
+        return self::DASHBOARD;
+    }
+
     /** Optional columns are probed without executing arbitrary SQL or scanning STJ010. */
     public const HISTORY_USER_COLUMNS = <<<'SQL'
 SELECT COL_LENGTH('dbo.STJ010', 'TJ_USUAINI') AS inicio,
@@ -205,21 +290,23 @@ SQL;
      * SQL Server equality pads CHAR/VARCHAR operands, respecting trailing spaces
      * without wrapping indexed equipment/branch columns in RTRIM.
      */
-    public static function equipmentHistory(bool $branch, bool $startUser = false, bool $endUser = false): string
+    public static function equipmentHistory(bool $branch, bool $startUser = false, bool $endUser = false, bool $unit = false): string
     {
         $branchFilter = $branch ? ' AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100))' : '';
-        return self::orderPage("j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}", $startUser, $endUser);
+        $unitFilter = $unit ? ' AND ' . ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unit') : '';
+        $join = $unit ? 'CROSS JOIN (SELECT CAST(:unit AS VARCHAR(20)) AS unit) f' : '';
+        return self::orderPage("j.TJ_CODBEM = CAST(:bem AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'{$branchFilter}{$unitFilter}", $startUser, $endUser, true, $join);
     }
 
     /** Dedicated equipment page, sharing the established history joins and ordering. */
     public static function equipmentPortfolioPage(bool $sector = false): string
     {
-        return self::orderPage(ProtheusEquipmentQueries::scope($sector) . ' AND ' . ProtheusEquipmentQueries::FILTER,
+        return self::orderPage(ProtheusEquipmentQueries::scope($sector) . ' AND ' . ProtheusEquipmentQueries::filter(),
             false, false, true, ProtheusEquipmentQueries::FILTER_JOIN, self::ORIGIN_DATE);
     }
 
     /** Eight closed variants: exact order, branch and equipment filters. */
-    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false, bool $historical = false): string
+    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false, bool $historical = false, bool $safra = false): string
     {
         $where = "j.D_E_L_E_T_ <> '*'";
         if ($number) {
@@ -234,7 +321,8 @@ SQL;
 
         $join = '';
         if ($filters) {
-            $unitField = $historical ? ', CAST(:unidade AS VARCHAR(20)) AS unidade, CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services' : '';
+            $unitField = ', CAST(:unidade AS VARCHAR(20)) AS unidade, CAST(:analitico AS VARCHAR(1)) AS analitico'
+                . (($historical || $safra) ? ', CAST(:offseason_services AS NVARCHAR(MAX)) AS offseason_services' : '');
             $join = "CROSS JOIN (SELECT CAST(:centro AS VARCHAR(100)) AS centro, CAST(:centro_modo AS VARCHAR(10)) AS centro_modo, CAST(:area AS VARCHAR(100)) AS area, CAST(:servico AS VARCHAR(100)) AS servico, CAST(:tipo AS VARCHAR(100)) AS tipo, CAST(:situacao AS VARCHAR(100)) AS situacao, CAST(:termino AS VARCHAR(100)) AS termino, CAST(:date_start AS VARCHAR(10)) AS date_start, CAST(:date_end AS VARCHAR(10)) AS date_end, CAST(:nome_bem AS VARCHAR(202)) AS nome_bem{$unitField}) f";
             $date = self::ORIGIN_DATE;
             $where .= " AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro) OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))"
@@ -245,14 +333,13 @@ SQL;
                 . " AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)"
                 . " AND (f.termino = '' OR j.TJ_TERMINO = f.termino)"
                 . " AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))"
-                . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))";
-            if ($historical) {
-                $where .= " AND RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'"
-                    . " AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services) WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)"
-                    . " AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')"
-                    . " OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')"
-                    . " OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'"
-                    . " OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))";
+                . " AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))"
+                . " AND (f.analitico = '' OR " . ProtheusAnalyticalScope::STJ_PREDICATE . ')'
+                . ' AND ' . ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade');
+            if ($historical || $safra) {
+                $where .= " AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services) WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)"
+                    . ' AND ' . ProtheusAnalyticalScope::STJ_PREDICATE;
+                if ($historical) $where .= ' AND ' . ProtheusUnit::STJ_FACTORY_OR_MILL;
             }
         }
 
@@ -265,6 +352,9 @@ SQL;
     {
         $date = self::ORIGIN_DATE;
         $notCanceled = ProtheusOperationalEligibility::notCanceled('j');
+        $unitScope = ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade');
+        $factoryOrMill = ProtheusUnit::STJ_FACTORY_OR_MILL;
+        $analyticalScope = ProtheusAnalyticalScope::STJ_PREDICATE;
         return <<<SQL
 WITH filtered AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
@@ -280,6 +370,8 @@ WITH filtered AS (
         CAST(:tipo AS VARCHAR(100)) tipo, CAST(:situacao AS VARCHAR(100)) situacao,
         CAST(:termino AS VARCHAR(100)) termino, CAST(:date_start AS VARCHAR(10)) date_start,
         CAST(:date_end AS VARCHAR(10)) date_end, CAST(:historico AS VARCHAR(1)) historico,
+        CAST(:safra AS VARCHAR(1)) safra,
+        CAST(:analitico AS VARCHAR(1)) analitico,
         CAST(:unidade AS VARCHAR(20)) unidade, CAST(:offseason_services AS NVARCHAR(MAX)) offseason_services) f
     WHERE j.D_E_L_E_T_ <> '*' AND {$notCanceled} AND (f.numero = '' OR j.TJ_ORDEM = f.numero)
       AND (f.filial = '' OR j.TJ_FILIAL = f.filial) AND (f.bem = '' OR j.TJ_CODBEM = f.bem)
@@ -299,14 +391,16 @@ WITH filtered AS (
       AND (f.termino = '' OR j.TJ_TERMINO = f.termino)
       AND (f.date_start = '' OR {$date} >= CONVERT(date, NULLIF(f.date_start, ''), 23))
       AND (f.date_end = '' OR {$date} <= CONVERT(date, NULLIF(f.date_end, ''), 23))
-      AND (f.historico = '' OR (RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'
-        AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services)
+      AND (f.analitico = '' OR {$analyticalScope})
+      AND {$unitScope}
+      AND (f.historico = '' OR (NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services)
           WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason
           WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)
-        AND ((f.unidade = 'factory' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%')
-          OR (f.unidade = 'mill' AND LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')
-          OR (f.unidade = '' AND (LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '31%'
-            OR LTRIM(RTRIM(j.TJ_CCUSTO)) LIKE '41%')))))
+        AND {$analyticalScope}
+        AND {$factoryOrMill}))
+      AND (f.safra = '' OR NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services)
+          WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason
+          WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO))
 ), named AS (
     SELECT j.*, CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END equipment_name,
         CASE WHEN bl.matches > 0 THEN bl.matches ELSE bs.matches END equipment_matches,
@@ -511,9 +605,11 @@ SQL;
             foreach ([false, true] as $branch) {
                 foreach ([false, true] as $equipment) {
                     foreach ([false, true] as $historical) {
-                        if ($sql === self::orders($number, $branch, $equipment)
-                            || $sql === self::orders($number, $branch, $equipment, true, $historical)) {
-                            return true;
+                        foreach ([false, true] as $safra) {
+                            if ($sql === self::orders($number, $branch, $equipment)
+                                || $sql === self::orders($number, $branch, $equipment, true, $historical, $safra)) {
+                                return true;
+                            }
                         }
                     }
                 }
@@ -522,17 +618,19 @@ SQL;
         foreach ([false, true] as $branch) {
             foreach ([false, true] as $startUser) {
                 foreach ([false, true] as $endUser) {
-                    if ($sql === self::equipmentHistory($branch, $startUser, $endUser)) {
-                        return true;
+                    foreach ([false, true] as $unit) {
+                        if ($sql === self::equipmentHistory($branch, $startUser, $endUser, $unit)) {
+                            return true;
+                        }
                     }
                 }
             }
         }
         return in_array($sql, [
-            self::DASHBOARD, self::MANAGEMENT, self::AREAS, self::HISTORICAL_SERVICE_DEFINITIONS,
+            self::dashboardAnalysis(), self::management(), self::management(true), self::AREAS, self::HISTORICAL_SERVICE_DEFINITIONS,
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
-            self::HISTORY_USER_COLUMNS,
+            self::HISTORY_USER_COLUMNS, self::ANALYTICAL_AUDIT,
             self::HEALTH, self::ORDER, self::ORDER_BRANCH, self::EQUIPMENT,
             self::SERVICE, self::ENTRIES, self::PROFESSIONAL, self::PRODUCT,
         ], true);

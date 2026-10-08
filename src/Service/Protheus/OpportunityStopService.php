@@ -88,6 +88,18 @@ final class OpportunityStopService
         return $name !== '' && $name !== $code ? $code . ' — ' . $name : $code;
     }
 
+    /** Presentation for this page and its Excel only; preserves the source maintenance type. */
+    public static function maintenanceTypeLabel(array $row): string
+    {
+        $service = trim((string)($row['TJ_SERVICO'] ?? ''));
+        if (in_array($service, ProtheusSectorService::SERVICES['opportunity'], true)) {
+            return 'Parada por Oportunidade';
+        }
+        $type = trim((string)($row['TJ_TIPO'] ?? ''));
+
+        return ['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'][$type] ?? $type;
+    }
+
     /** Returns code => official CTT description; the code remains the filter value. */
     public function costCenters(string $area = ''): array
     {

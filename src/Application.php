@@ -113,11 +113,12 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
     /** Configures session and email/password authentication. */
     public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface
     {
-        $service = new AuthenticationService(['unauthenticatedRedirect' => '/login']);
+        $loginUrl = \Cake\Routing\Router::url(['controller' => 'Auth', 'action' => 'login']);
+        $service = new AuthenticationService(['unauthenticatedRedirect' => $loginUrl]);
         $service->loadAuthenticator('Authentication.Session');
         $service->loadAuthenticator('Authentication.Form', [
             'fields' => ['username' => 'email', 'password' => 'password'],
-            'loginUrl' => '/login',
+            'loginUrl' => $loginUrl,
             'identifier' => ['Authentication.Password' => [
                 'fields' => ['username' => 'email', 'password' => 'password'],
                 'resolver' => ['className' => 'Authentication.Orm', 'userModel' => 'Users', 'finder' => 'active'],

@@ -175,12 +175,11 @@ final class OpportunityStopExcelReport
         $description = trim((string)($source['descricao'] ?? ''));
         $equipment = trim((string)($source['TJ_CODBEM'] ?? '')) . ' — ' . trim((string)($source['equipment_name'] ?? ''));
         $area = trim((string)($source['TJ_CODAREA'] ?? ''));
-        $type = trim((string)($source['TJ_TIPO'] ?? ''));
         foreach (
             ['A' => trim((string)$source['TJ_ORDEM']), 'C' => $description, 'D' => trim($equipment, ' —'),
             'E' => OpportunityStopService::costCenterLabel($source),
             'F' => OpportunityStopService::WORKSHOPS[$area] ?? $area,
-            'G' => ['COR' => 'Corretiva','PRE' => 'Preventiva','MEL' => 'Melhoria'][$type] ?? $type] as $column => $value
+            'G' => OpportunityStopService::maintenanceTypeLabel($source)] as $column => $value
         ) {
             $this->text($sheet, $column . $row, $value);
         }

@@ -11,6 +11,62 @@ use PHPUnit\Framework\TestCase;
 
 final class OpportunityStopServiceTest extends TestCase
 {
+    public function testMaintenancePresentationUsesOnlyExactOpportunityServices(): void
+    {
+        foreach (['ELECOP', 'MECOPO '] as $code) {
+            $row = ['TJ_ORDEM' => '006035', 'TJ_SERVICO' => $code, 'TJ_TIPO' => 'COR'];
+            $original = $row;
+            self::assertSame('Parada por Oportunidade', OpportunityStopService::maintenanceTypeLabel($row));
+            self::assertSame($original, $row);
+        }
+        foreach (['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria', 'OTHER' => 'OTHER', '' => ''] as $type => $label) {
+            foreach (['CORPRO', 'ELECOPX', 'MEC OPO', ''] as $code) {
+                self::assertSame($label, OpportunityStopService::maintenanceTypeLabel([
+                    'TJ_SERVICO' => $code, 'TJ_TIPO' => $type,
+                    'service_name' => 'MANUT.CORRET.PARADA POR OPORT.',
+                ]));
+            }
+        }
+    }
+
+    public function testOpportunityTablePresentsOrder006035WithoutChangingOriginalType(): void
+    {
+        if (!defined('ROOT')) {
+            require dirname(__DIR__, 4) . '/config/paths.php';
+        }
+        require_once CAKE . 'Core/functions_global.php';
+        \Cake\Core\Configure::write('App.namespace', 'App');
+        \Cake\Core\Configure::write('App.encoding', 'UTF-8');
+        \Cake\Core\Configure::write('App.paths.templates', [ROOT . '/templates/']);
+        if (!\Cake\Cache\Cache::getConfig('_cake_translations_')) {
+            \Cake\Cache\Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
+        }
+        \Cake\Routing\Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(\Cake\Routing\Router::createRouteBuilder('/'));
+        $orders = [];
+        foreach (['ELECOP', 'MECOPO'] as $index => $code) {
+            $orders[] = ['TJ_ORDEM' => $index === 0 ? '006035' : '006036', 'TJ_FILIAL' => '01',
+                'TJ_SERVICO' => $code, 'TJ_TIPO' => 'COR', 'TJ_CODAREA' => 'ELETRI',
+                'TJ_CODBEM' => 'EQ001', 'descricao' => 'MANUT.CORRET.PARADA POR OPORT.'];
+        }
+        $stops = ['available' => true, 'filters' => ['cost_center' => ''], 'area' => '', 'unit' => '',
+            'total' => 2, 'page' => 2, 'limit' => 2, 'has_more' => true, 'orders' => $orders];
+        $view = new \Cake\View\View(new \Cake\Http\ServerRequest(['url' => '/pcm/paradas-oportunidade']));
+        $view->setTemplatePath('Pcm');
+        $view->set(['stops' => $stops, 'workshops' => OpportunityStopService::WORKSHOPS,
+            'units' => OpportunityStopService::UNITS, 'costCenters' => []]);
+        $html = $view->render('opportunity_stops', false);
+        self::assertStringContainsString('006035', $html);
+        self::assertSame(2, substr_count($html, '<td>Parada por Oportunidade</td>'));
+        self::assertStringNotContainsString('<td>Corretiva</td>', $html);
+        self::assertStringContainsString('Total: 2 O.S.', $html);
+        self::assertStringContainsString('page=1', $html);
+        self::assertStringContainsString('page=3', $html);
+        self::assertStringContainsString('Exportar para Excel', $html);
+        self::assertSame($orders, $stops['orders']);
+    }
+
     public function testUsesTheExactCardRuleAndItsOpenCount(): void
     {
         $received = [];

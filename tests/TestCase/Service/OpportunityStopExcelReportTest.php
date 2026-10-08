@@ -33,7 +33,7 @@ final class OpportunityStopExcelReportTest extends TestCase
                 'filters' => ['cost_center' => '3101005'],
                 'has_more' => false,
                 'orders' => [[
-                    'TJ_ORDEM' => '005464',
+                    'TJ_ORDEM' => '006035',
                     'descricao' => '=SUM(1,1)',
                     'TJ_CODBEM' => 'EQ001',
                     'equipment_name' => 'MÁQUINA ÁGUA',
@@ -41,6 +41,7 @@ final class OpportunityStopExcelReportTest extends TestCase
                     'TJ_CCUSTO' => '3101005',
                     'cost_center_name' => 'EXTRACAO',
                     'TJ_TIPO' => 'COR',
+                    'TJ_SERVICO' => 'ELECOP ',
                     'service_name' => 'MANUT. CORRETIVA PARADA POR OPORTUNIDADE',
                 ]],
             ];
@@ -52,7 +53,8 @@ final class OpportunityStopExcelReportTest extends TestCase
             $book = IOFactory::load(stream_get_meta_data($result['stream'])['uri']);
             $sheet = $book->getSheetByName('Paradas por Oportunidade');
             self::assertNotNull($sheet);
-            self::assertSame('005464', $sheet->getCell('A6')->getValue());
+            self::assertSame('006035', $sheet->getCell('A6')->getValue());
+            self::assertSame('Parada por Oportunidade', $sheet->getCell('G6')->getValue());
             self::assertSame(DataType::TYPE_STRING, $sheet->getCell('A6')->getDataType());
             self::assertSame('=SUM(1,1)', $sheet->getCell('C6')->getValue());
             self::assertSame(DataType::TYPE_STRING, $sheet->getCell('C6')->getDataType());
@@ -97,12 +99,17 @@ final class OpportunityStopExcelReportTest extends TestCase
             'orders' => [[
                 'TJ_ORDEM' => str_pad((string)$page, 6, '0', STR_PAD_LEFT), 'descricao' => 'OS',
                 'TJ_CODBEM' => '', 'equipment_name' => '', 'TJ_CODAREA' => '', 'TJ_CCUSTO' => '',
-                'TJ_TIPO' => '', 'service_name' => '',
+                'TJ_TIPO' => 'COR', 'TJ_SERVICO' => $page === 1 ? 'MECOPO' : 'CORPRO', 'service_name' => '',
             ]],
         ];
         $result = (new OpportunityStopExcelReport())->write([], new DateTimeImmutable(), $fetch);
         try {
             self::assertSame(2, $result['count']);
+            $book = IOFactory::load(stream_get_meta_data($result['stream'])['uri']);
+            $sheet = $book->getSheetByName('Paradas por Oportunidade');
+            self::assertSame('Parada por Oportunidade', $sheet->getCell('G6')->getValue());
+            self::assertSame('Corretiva', $sheet->getCell('G7')->getValue());
+            $book->disconnectWorksheets();
         } finally {
             fclose($result['stream']);
         }

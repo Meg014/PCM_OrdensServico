@@ -52,6 +52,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
+    public function actionPlan(string $start, string $end): array
+    {
+        return $this->read(ActionPlanQuery::SQL, ['date_start' => $start, 'date_end' => $end]);
+    }
+
     public function findAreas(): array
     {
         return $this->read(ProtheusQueries::AREAS);

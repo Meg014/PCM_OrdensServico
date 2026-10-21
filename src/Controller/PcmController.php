@@ -22,6 +22,34 @@ use InvalidArgumentException;
 
 final class PcmController extends AppController
 {
+    public function actionPlan(): void
+    {
+        $this->request->allowMethod(['get']);
+        $this->set('navigationAreas', []);
+    }
+
+    public function exportActionPlan(): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        try {
+            $period = \App\Service\ActionPlanService::period($this->request->getQueryParams());
+            $orders = (new \App\Service\ActionPlanService())->load($period);
+            $stream = (new \App\Service\ActionPlanExcelReport())->write($orders);
+        } catch (InvalidArgumentException $error) {
+            return $this->exportError($error->getMessage(), 400);
+        } catch (\DomainException $error) {
+            return $this->exportError($error->getMessage(), 422);
+        } catch (\Throwable) {
+            return $this->exportError('Não foi possível consultar o TOTVS ou gerar o Plano de Ação. Tente novamente.', 503);
+        }
+
+        return $this->response->withType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->withHeader('Cache-Control', 'no-store')->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withDownload('plano-de-acao_' . $period['date_start'] . '_' . $period['date_end'] . '.xlsx')
+            ->withBody(new \Laminas\Diactoros\Stream($stream));
+    }
+
     public function exportSector(string $code): Response
     {
         return $this->exportExcel('sector', strtoupper(trim($code)));

@@ -46,6 +46,30 @@ final class ProtheusOrderAccessTest extends TestCase
         $controller->Authentication->startup();
     }
 
+    public function testActionPlanFormAndInvalidPeriodDoNotQueryTotvs(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $request = new ServerRequest(['url' => '/pcm/plano-de-acao',
+            'environment' => ['REQUEST_METHOD' => 'GET'],
+            'params' => ['controller' => 'Pcm', 'action' => 'actionPlan']]);
+        $controller = new PcmController($request);
+        $controller->actionPlan();
+        $view = new View($request);
+        $view->setTemplatePath('Pcm');
+        $html = $view->render('action_plan', false);
+        self::assertStringContainsString('Baixar Plano de Ação', $html);
+        self::assertStringContainsString('name="date_start"', $html);
+        self::assertStringContainsString('name="date_end"', $html);
+        self::assertStringContainsString('/pcm/plano-de-acao/excel', $html);
+        $response = (new PcmController($request->withQueryParams([
+            'date_start' => '2026-02-30', 'date_end' => '2026-03-01',
+        ])))->exportActionPlan();
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
+    }
+
     public function testTvRemainsBlockedAndRegularLoggedInUserKeepsAccess(): void
     {
         foreach (['TV', 'ADMIN'] as $role) {
@@ -94,6 +118,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $routes = require ROOT . '/config/routes.php';
         $routes(Router::createRouteBuilder('/'));
         foreach (['/pcm/ordens/excel' => 'exportOrders', '/pcm/equipamento/excel' => 'exportEquipment',
+            '/pcm/plano-de-acao' => 'actionPlan', '/pcm/plano-de-acao/excel' => 'exportActionPlan',
             '/pcm/ordens/apontamentos/excel' => 'exportOrderEntries',
             '/pcm/setor/ELETRI/excel' => 'exportSector', '/pcm/setor/MECANI/excel' => 'exportSector',
             '/pcm/setor/ELETRI/apontamentos/excel' => 'exportSectorEntries'] as $url => $action) {

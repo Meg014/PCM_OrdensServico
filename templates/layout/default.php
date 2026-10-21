@@ -57,6 +57,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                     <li class="nav-item"><?= $this->Html->link('Meu Perfil', '/meu-perfil', ['class' => 'nav-link']) ?></li>
                     <?php if (!$currentUser->must_change_password): ?>
                     <li class="nav-item"><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'nav-link']) ?></li>
+                    <li class="nav-item"><?= $this->Html->link('Plano de Ação', ['_name' => 'pcm-action-plan'], ['class' => 'nav-link']) ?></li>
                     <?php if ($currentUser->role === 'ADMIN'): ?>
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>

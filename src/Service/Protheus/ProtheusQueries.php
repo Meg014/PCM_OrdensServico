@@ -564,6 +564,9 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if ($sql === ActionPlanQuery::SQL) {
+            return true;
+        }
         if (self::allowsBase($sql)) return true;
         $base = str_replace(self::AREA_SCOPE, '', $sql);
 

@@ -24,8 +24,8 @@ final class OrderListingTest extends TestCase
         $result = $service->load(['os' => '004368', 'filial' => '01', 'page' => '2', 'limite' => '1']);
         self::assertTrue($result['available']);
         self::assertTrue($result['has_more']);
-        self::assertSame([['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'TJ_TIPO' => 'COR']], $result['orders']);
-        self::assertCount(1, $calls);
+        self::assertSame([['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'TJ_TIPO' => 'COR', 'descricao' => null]], $result['orders']);
+        self::assertCount(2, $calls);
         self::assertSame(['offset' => 1, 'fetch' => 2, 'numero' => '004368', 'filial' => '01'], $calls[0][1]);
         self::assertSame('integer', $calls[0][2]['fetch']);
         self::assertSame('string', $calls[0][2]['numero']);
@@ -224,15 +224,15 @@ final class OrderListingTest extends TestCase
         self::assertSame('bomba', $result['filters']['nome_bem']);
     }
 
-    public function testExportIncludes483RowsUsingOneReadAndPreservesScope(): void
+    public function testExportIncludes483RowsUsingTwoBatchReadsAndPreservesScope(): void
     {
         $calls = [];
-        $rows = array_fill(0, 483, ['TJ_ORDEM' => '0001', 'identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1]);
+        $rows = array_fill(0, 483, ['TJ_FILIAL' => '01', 'TJ_ORDEM' => '0001', 'identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1]);
         $filters = ['os' => '0001', 'filial' => '01', 'bem' => '0002', 'centro' => '0003', 'area' => 'ELETRI', 'date_start' => '2026-01-01'];
         $result = (new OrderListingService($this->repository($rows, $calls)))->load($filters + ['page' => 8, 'limite' => 1], true);
         self::assertTrue($result['available']);
         self::assertCount(483, $result['orders']);
-        self::assertCount(1, $calls);
+        self::assertCount(2, $calls);
         self::assertSame(0, $calls[0][1]['offset']);
         self::assertSame(1001, $calls[0][1]['fetch']);
         self::assertFalse($result['has_more']);
@@ -262,7 +262,7 @@ final class OrderListingTest extends TestCase
                 throw new RuntimeException('SQLSTATE sensitive host user password');
             }
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($rows);
+            $statement->method('fetchAll')->willReturn($sql === \App\Service\Protheus\OrderDescriptionQueries::BATCH ? [] : $rows);
             $statement->expects(self::once())->method('closeCursor');
 
             return $statement;

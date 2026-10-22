@@ -11,7 +11,7 @@ final readonly class OrderSupplement
      * null means unknown/unmapped, not zero. Lists preserve individual entries.
      *
      * @param list<array{professional: ?string, code: ?string, date: ?string,
-     *   start_time: ?string, end_time: ?string, hours: ?string, end_date?: ?string, unit?: ?string}> $labor
+     *   start_time: ?string, end_time: ?string, hours: ?string, end_date?: ?string, unit?: ?string, description?: ?string}> $labor
      * @param list<array{code: ?string, description: ?string, quantity: ?string,
      *   unit: ?string, used_date: ?string, used_time: ?string}> $materials
      * @param array<string, ?string> $maintenance
@@ -24,6 +24,7 @@ final readonly class OrderSupplement
         public array $labor = [],
         public array $materials = [],
         public array $maintenance = [],
+        public array $descriptions = [],
     ) {
     }
 }

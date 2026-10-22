@@ -46,6 +46,29 @@ final class ProtheusOrderAccessTest extends TestCase
         $controller->Authentication->startup();
     }
 
+    public function testAnonymousCannotRequestEquipmentSuggestions(): void
+    {
+        $request = new ServerRequest(['url' => '/pcm/ordens/equipamentos',
+            'environment' => ['REQUEST_METHOD' => 'GET'],
+            'params' => ['controller' => 'Pcm', 'action' => 'equipmentSuggestions']]);
+        $controller = new PcmController($request);
+        $this->expectException(UnauthenticatedException::class);
+        $controller->Authentication->startup();
+    }
+
+    public function testInvalidEquipmentSuggestionDoesNotQueryTotvs(): void
+    {
+        $request = new ServerRequest(['url' => '/pcm/ordens/equipamentos',
+            'environment' => ['REQUEST_METHOD' => 'GET'],
+            'params' => ['controller' => 'Pcm', 'action' => 'equipmentSuggestions']]);
+        foreach (['', 'x', ['invalid'], str_repeat('a', 101)] as $term) {
+            $response = (new PcmController($request->withQueryParams(['q' => $term])))->equipmentSuggestions();
+            self::assertSame(400, $response->getStatusCode());
+            self::assertSame('application/json', $response->getHeaderLine('Content-Type'));
+            self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
+        }
+    }
+
     public function testActionPlanFormAndInvalidPeriodDoNotQueryTotvs(): void
     {
         Router::reload();
@@ -62,12 +85,20 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('Baixar Plano de Ação', $html);
         self::assertStringContainsString('name="date_start"', $html);
         self::assertStringContainsString('name="date_end"', $html);
+        self::assertStringContainsString('name="unidade"', $html);
+        foreach (['Todas', 'Fábrica', 'Usina', 'Outros / Sem unidade'] as $label) {
+            self::assertStringContainsString($label, $html);
+        }
         self::assertStringContainsString('/pcm/plano-de-acao/excel', $html);
         $response = (new PcmController($request->withQueryParams([
             'date_start' => '2026-02-30', 'date_end' => '2026-03-01',
         ])))->exportActionPlan();
         self::assertSame(400, $response->getStatusCode());
         self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
+        $response = (new PcmController($request->withQueryParams([
+            'date_start' => '2026-10-01', 'date_end' => '2026-10-22', 'unidade' => 'invalid',
+        ])))->exportActionPlan();
+        self::assertSame(400, $response->getStatusCode());
     }
 
     public function testTvRemainsBlockedAndRegularLoggedInUserKeepsAccess(): void
@@ -311,7 +342,7 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('historico=1', $html);
         self::assertStringContainsString('unidade=factory', $html);
         self::assertStringContainsString('nome_bem=BOMBA', $html);
-        self::assertStringContainsString('Nome do equipamento', $html);
+        self::assertStringContainsString('Bem / Equipamento', $html);
         self::assertStringContainsString('value="BOMBA"', $html);
         $listing['filters'] += ['area' => 'MECANI', 'card' => 'offseason', 'card_status' => 'EM ABERTO',
             'backlog_age' => '', 'q' => '', 'status' => '', 'service_name' => ''];

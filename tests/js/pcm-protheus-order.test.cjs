@@ -52,10 +52,12 @@ const ok = payload => ({ok: true, redirected: false, headers: {get: () => 'appli
 const detail = {
     state: 'available', number: '004368', branch: '01', origin_date: '2026-09-23',
     description: '<script>alert("xss")</script>\n□\u0000',
+    descriptions: [{source: 'Apontamento · 21/09/2026 · Ana', text: 'Inspecionar\nLubrificar <b>peça</b>'}],
     maintenance: {equipment_code: 'MEL 80 115', equipment_name: 'MOTOR ROSCA RO-02 - SILO 01',
         service_code: 'ELEPRE', service_name: 'PREVENTIVA ELETRICA', actual_end_date: '2026-08-18'},
-    labor: [{professional: 'DAMIAO GONCALVES', code: '008382', hours: '1.00', unit: 'H'},
-        {professional: 'Outro profissional', code: '000001', hours: '0', unit: 'H'}],
+    labor: [{professional: 'DAMIAO GONCALVES', code: '008382', hours: '0.75', unit: 'H',
+        hours_display: '45 min (0,75 h)', hours_note: null, description: 'Inspeção do motor\nLinha <b>literal</b>'},
+        {professional: 'Outro profissional', code: '000001', hours: '0', unit: 'H', description: null}],
     materials: [{code: '002075', description: 'ROLAMENTO 6203', quantity: '1', unit: 'UN'},
         {code: '000110', description: 'ROLAMENTO 6203 ZZ C3', quantity: '1', unit: 'UN'}],
 };
@@ -72,13 +74,26 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.match(h.targets.detail.textContent, /Outro profissional/);
     assert.match(h.targets.detail.textContent, /ROLAMENTO 6203 ZZ C3/);
     assert.match(h.targets.detail.textContent, /<script>/);
-    assert.match(h.targets.detail.textContent, /Descrição do serviço/);
+    assert.match(h.targets.detail.textContent, /Descrição da manutenção/);
+    assert.match(h.targets.detail.textContent, /Descrições e atividades registradas/);
+    assert.match(h.targets.detail.textContent, /21\/09\/2026 · Ana/);
+    assert.match(h.targets.detail.textContent, /Inspecionar\nLubrificar <b>peça<\/b>/);
+    assert.match(h.targets.detail.textContent, /45 min \(0,75 h\)/);
+    assert.doesNotMatch(h.targets.detail.textContent, /Registrado no TOTVS:/);
+    const laborTable = all(h.targets.detail).find(el => el.className?.includes('pcm-labor-table'));
+    assert.match(laborTable.textContent, /Descrição do apontamento/);
+    assert.doesNotMatch(laborTable.textContent, /Unidade/);
+    const laborRows = laborTable.children[1].children;
+    assert.equal(laborRows[0].children[7].textContent, 'Inspeção do motor\nLinha <b>literal</b>');
+    assert.equal(laborRows[1].children[7].textContent, 'Sem descrição registrada');
+    assert.equal(laborRows[0].children.length, 8);
+    assert.match(laborRows[0].children[6].textContent, /45 min \(0,75 h\)/);
     assert.match(h.targets.detail.textContent, /Data de origem 23\/09\/2026/);
     assert.doesNotMatch(h.targets.detail.textContent, /Registrada em|24\/09\/2026 11:44/);
     assert.doesNotMatch(h.targets.detail.textContent, /O que foi feito|□|\u0000/);
     assert.equal(all(h.targets.detail).some(el => el.tag === 'script'), false);
     assert.match(h.targets.history.textContent, /18\/08\/2026/);
-    assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 3);
+    assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 4);
     assert.equal(all(h.targets.history).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 1);
     all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Ver mais').listeners.click();
     await tick();
@@ -89,6 +104,20 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.equal(h.targets.dialog.open, true);
     assert.match(h.targets.selected.textContent, /OS 004368/);
     assert.equal(h.calls.length, 3);
+});
+
+test('keeps both calculated duration and recorded quantity when hours diverge', async () => {
+    const payload = {...detail, labor: [{professional: 'Ana', code: '000001', hours: '3.5', unit: 'H',
+        hours_display: 'Duração entre horários: 4h (4,00 h)',
+        hours_note: 'Quantidade registrada: 3.5 H · Divergência: a duração não considera possíveis intervalos ou ajustes do apontamento.',
+        description: 'Atividade deste apontamento'}]};
+    const h = harness(() => ok({detail: payload, history}));
+    await tick();
+    const laborTable = all(h.targets.detail).find(el => el.className?.includes('pcm-labor-table'));
+    assert.match(laborTable.textContent, /4h \(4,00 h\)/);
+    assert.match(laborTable.textContent, /Quantidade registrada: 3.5 H · Divergência/);
+    assert.match(laborTable.textContent, /Atividade deste apontamento/);
+    assert.doesNotMatch(laborTable.textContent, /Registrado no TOTVS:/);
 });
 
 test('network failure, invalid response and expired login only show the public fallback', async () => {

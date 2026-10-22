@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Service\Protheus\ProtheusRepository;
+use App\Service\Protheus\ProtheusUnit;
 use DateTimeImmutable;
 use DomainException;
 use InvalidArgumentException;
@@ -34,7 +35,8 @@ final class ActionPlanService
     public function load(array $query): array
     {
         $period = self::period($query);
-        $rows = (new ProtheusRepository())->actionPlan($period['date_start'], $period['date_end']);
+        $unit = ProtheusUnit::validate($query['unidade'] ?? ProtheusUnit::ALL);
+        $rows = (new ProtheusRepository())->actionPlan($period['date_start'], $period['date_end'], $unit);
 
         return $this->group($rows);
     }

@@ -34,7 +34,7 @@ final class PcmController extends AppController
         $this->request->getSession()->close();
         try {
             $period = \App\Service\ActionPlanService::period($this->request->getQueryParams());
-            $orders = (new \App\Service\ActionPlanService())->load($period);
+            $orders = (new \App\Service\ActionPlanService())->load($this->request->getQueryParams());
             $stream = (new \App\Service\ActionPlanExcelReport())->write($orders);
         } catch (InvalidArgumentException $error) {
             return $this->exportError($error->getMessage(), 400);
@@ -213,6 +213,29 @@ final class PcmController extends AppController
         }
         $this->set(['listing' => $listing, 'areas' => $areas, 'navigationAreas' => []]);
         $this->response = $this->response->withHeader('Cache-Control', 'no-store');
+    }
+
+    public function equipmentSuggestions(): Response
+    {
+        $this->request->allowMethod(['get']);
+        $this->request->getSession()->close();
+        $term = $this->request->getQuery('q', '');
+        try {
+            if (!is_string($term) || mb_strlen(trim($term)) < 2 || strlen(trim($term)) > 100
+                || preg_match('/[\x00-\x1F\x7F]/', $term)) throw new InvalidArgumentException('Pesquisa inválida.');
+            $rows = (new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5))->suggestEquipment(trim($term));
+            $payload = ['results' => $rows];
+            $status = 200;
+        } catch (InvalidArgumentException) {
+            $payload = ['error' => 'Digite entre 2 e 100 caracteres.'];
+            $status = 400;
+        } catch (\Throwable) {
+            $payload = ['error' => 'Não foi possível consultar os equipamentos. Tente novamente.'];
+            $status = 503;
+        }
+
+        return $this->response->withStatus($status)->withType('application/json')->withHeader('Cache-Control', 'no-store')
+            ->withStringBody(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 
     /** Legacy report and dashboard drilldowns retain their original snapshot rules. */

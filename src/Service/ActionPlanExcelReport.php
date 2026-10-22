@@ -125,7 +125,7 @@ final class ActionPlanExcelReport
                     }
                 }
             }
-            // Only sheetData and the necessary range endpoints change. Other ZIP parts stay byte-identical.
+            // Keep the original layout; only data, range endpoints and export color rules change.
             $xml = preg_replace_callback('~<sheetData\b[^>]*>.*?</sheetData>~s', fn() => $dom->saveXML($data), $xml, 1);
             $last = max(8, count($orders) + 8);
             $xml = preg_replace('/(<autoFilter\b[^>]*\bref=")[^"]*(")/', '${1}B7:L' . $last . '$2', $xml, 1);
@@ -171,7 +171,7 @@ final class ActionPlanExcelReport
         }
     }
 
-    /** Highest-priority differential styles change only exported L cells, keeping their base styles. */
+    /** Override inherited colors only in exported K/L cells, preserving borders and base styles. */
     private function statusColors(ZipArchive $zip, string $xml, int $last): string
     {
         $styles = $zip->getFromName('xl/styles.xml');
@@ -187,29 +187,32 @@ final class ActionPlanExcelReport
             throw new DomainException('As formatações condicionais do modelo não estão disponíveis.');
         }
         $firstId = $xpath->query('s:dxf', $dxfs)->length;
-        foreach (['FFC00000', 'FF008000'] as $color) {
+        foreach (['FFC00000', 'FF008000', 'FFFFFFFF'] as $offset => $color) {
             $dxf = $dxfs->appendChild($dom->createElementNS(self::NS, 'dxf'));
             $font = $dxf->appendChild($dom->createElementNS(self::NS, 'font'));
-            $font->appendChild($dom->createElementNS(self::NS, 'color'))->setAttribute('rgb', 'FFFFFFFF');
+            $font->appendChild($dom->createElementNS(self::NS, 'color'))->setAttribute('rgb', $offset === 2 ? 'FF000000' : 'FFFFFFFF');
             $fill = $dxf->appendChild($dom->createElementNS(self::NS, 'fill'));
             $pattern = $fill->appendChild($dom->createElementNS(self::NS, 'patternFill'));
             $pattern->setAttribute('patternType', 'solid');
             $pattern->appendChild($dom->createElementNS(self::NS, 'fgColor'))->setAttribute('rgb', $color);
             $pattern->appendChild($dom->createElementNS(self::NS, 'bgColor'))->setAttribute('rgb', $color);
         }
-        $dxfs->setAttribute('count', (string)($firstId + 2));
+        $dxfs->setAttribute('count', (string)($firstId + 3));
         $styles = preg_replace_callback('~<dxfs\b[^>]*>.*?</dxfs>~s', fn() => $dom->saveXML($dxfs), $styles, 1);
         if (!$zip->addFromString('xl/styles.xml', $styles)) {
             throw new DomainException('Não foi possível aplicar as cores dos status.');
         }
-        // Excel evaluates smaller priorities first. stopIfTrue prevents old rules from recoloring L.
+        // Excel evaluates smaller priorities first. Block old rules only in the exported K/L cells.
         $xml = preg_replace_callback('/(<cfRule\b[^>]*\bpriority=")([0-9]+)(")/',
-            static fn(array $match): string => $match[1] . ((int)$match[2] + 2) . $match[3], $xml);
+            static fn(array $match): string => $match[1] . ((int)$match[2] + 3) . $match[3], $xml);
         $rules = '<conditionalFormatting sqref="L9:L' . $last . '">'
             . '<cfRule type="cellIs" dxfId="' . $firstId . '" priority="1" operator="equal" stopIfTrue="1">'
             . '<formula>"Aberta"</formula></cfRule>'
             . '<cfRule type="cellIs" dxfId="' . ($firstId + 1) . '" priority="2" operator="equal" stopIfTrue="1">'
-            . '<formula>"Finalizada"</formula></cfRule></conditionalFormatting>';
+            . '<formula>"Finalizada"</formula></cfRule></conditionalFormatting>'
+            . '<conditionalFormatting sqref="K9:K' . $last . '">'
+            . '<cfRule type="expression" dxfId="' . ($firstId + 2) . '" priority="3" stopIfTrue="1">'
+            . '<formula>TRUE</formula></cfRule></conditionalFormatting>';
 
         return preg_replace_callback('/<conditionalFormatting\b/', static fn(): string => $rules . '<conditionalFormatting', $xml, 1);
     }

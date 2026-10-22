@@ -327,7 +327,7 @@ SQL;
             $date = self::ORIGIN_DATE;
             $where .= " AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro) OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))"
                 . " AND (f.area = '' OR j.TJ_CODAREA = f.area)"
-                . " AND (f.nome_bem = '' OR EXISTS (SELECT 1 FROM dbo.ST9010 name_local WHERE name_local.T9_CODBEM = j.TJ_CODBEM AND name_local.T9_FILIAL = j.TJ_FILIAL AND name_local.D_E_L_E_T_ <> '*' AND UPPER(name_local.T9_NOME) LIKE f.nome_bem ESCAPE '~') OR (NOT EXISTS (SELECT 1 FROM dbo.ST9010 any_local WHERE any_local.T9_CODBEM = j.TJ_CODBEM AND any_local.T9_FILIAL = j.TJ_FILIAL AND any_local.D_E_L_E_T_ <> '*') AND EXISTS (SELECT 1 FROM dbo.ST9010 name_shared WHERE name_shared.T9_CODBEM = j.TJ_CODBEM AND name_shared.T9_FILIAL = '' AND name_shared.D_E_L_E_T_ <> '*' AND UPPER(name_shared.T9_NOME) LIKE f.nome_bem ESCAPE '~')))"
+                . " AND (f.nome_bem = '' OR UPPER(j.TJ_CODBEM) LIKE f.nome_bem ESCAPE '~' OR EXISTS (SELECT 1 FROM dbo.ST9010 name_local WHERE name_local.T9_CODBEM = j.TJ_CODBEM AND name_local.T9_FILIAL = j.TJ_FILIAL AND name_local.D_E_L_E_T_ <> '*' AND UPPER(name_local.T9_NOME) LIKE f.nome_bem ESCAPE '~') OR (NOT EXISTS (SELECT 1 FROM dbo.ST9010 any_local WHERE any_local.T9_CODBEM = j.TJ_CODBEM AND any_local.T9_FILIAL = j.TJ_FILIAL AND any_local.D_E_L_E_T_ <> '*') AND EXISTS (SELECT 1 FROM dbo.ST9010 name_shared WHERE name_shared.T9_CODBEM = j.TJ_CODBEM AND name_shared.T9_FILIAL = '' AND name_shared.D_E_L_E_T_ <> '*' AND UPPER(name_shared.T9_NOME) LIKE f.nome_bem ESCAPE '~')))"
                 . " AND (f.servico = '' OR j.TJ_SERVICO = f.servico)"
                 . " AND (f.tipo = '' OR j.TJ_TIPO = f.tipo)"
                 . " AND (f.situacao = '' OR j.TJ_SITUACA = f.situacao)"
@@ -378,6 +378,7 @@ WITH filtered AS (
       AND (f.centro_modo = '' OR (f.centro_modo = 'exact' AND j.TJ_CCUSTO = f.centro)
         OR (f.centro_modo = 'blank' AND j.TJ_CCUSTO = '') OR (f.centro_modo = 'null' AND j.TJ_CCUSTO IS NULL))
       AND (f.nome_bem = ''
+        OR UPPER(j.TJ_CODBEM) LIKE f.nome_bem ESCAPE '~'
         OR EXISTS (SELECT 1 FROM dbo.ST9010 name_local WHERE name_local.T9_CODBEM = j.TJ_CODBEM
           AND name_local.T9_FILIAL = j.TJ_FILIAL AND name_local.D_E_L_E_T_ <> '*'
           AND UPPER(name_local.T9_NOME) LIKE f.nome_bem ESCAPE '~')
@@ -528,13 +529,13 @@ WHERE RTRIM(b.T9_CODBEM) = :codigo AND b.D_E_L_E_T_ <> '*'
 SQL;
 
     public const SERVICE = <<<'SQL'
-SELECT TOP (2) s.*
+SELECT TOP (2) s.*, CONVERT(VARCHAR(MAX), s.T4_DESCRIC) AS pcm_service_description
 FROM dbo.ST4010 s
 WHERE RTRIM(s.T4_SERVICO) = :codigo AND s.D_E_L_E_T_ <> '*'
 SQL;
 
     public const ENTRIES = <<<'SQL'
-SELECT l.*
+SELECT l.*, CONVERT(VARCHAR(MAX), l.TL_OBSERVA) AS pcm_entry_description
 FROM dbo.STL010 l
 INNER JOIN dbo.STJ010 j ON RTRIM(j.TJ_ORDEM) = RTRIM(l.TL_ORDEM)
     AND RTRIM(j.TJ_FILIAL) = RTRIM(l.TL_FILIAL) AND j.D_E_L_E_T_ <> '*' AND
@@ -543,6 +544,7 @@ SQL
 
 WHERE RTRIM(j.TJ_ORDEM) = :numero AND RTRIM(j.TJ_FILIAL) = :filial
     AND l.D_E_L_E_T_ <> '*'
+ORDER BY l.TL_DTINICI, l.TL_HOINICI, l.R_E_C_N_O_
 SQL;
 
     public const PROFESSIONAL = <<<'SQL'
@@ -564,6 +566,12 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        $withoutEquipment = EquipmentLookupQueries::withoutSubstring($sql);
+        if ($withoutEquipment !== $sql) {
+            return EquipmentLookupQueries::withSubstring($withoutEquipment) === $sql && self::allows($withoutEquipment);
+        }
+        if ($sql === EquipmentLookupQueries::SEARCH) return true;
+        if (in_array($sql, [OrderDescriptionQueries::METADATA, OrderDescriptionQueries::PERMISSIONS, OrderDescriptionQueries::BATCH], true)) return true;
         if ($sql === ActionPlanQuery::SQL) {
             return true;
         }

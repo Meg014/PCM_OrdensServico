@@ -7,6 +7,7 @@ use App\Service\ActionPlanExcelReport;
 use App\Service\ActionPlanService;
 use App\Service\Protheus\ActionPlanQuery;
 use App\Service\Protheus\ProtheusQueries;
+use App\Service\Protheus\ProtheusUnit;
 use DOMDocument;
 use DOMXPath;
 use InvalidArgumentException;
@@ -37,6 +38,8 @@ final class ActionPlanTest extends TestCase
         self::assertFalse(ProtheusQueries::allows(ActionPlanQuery::SQL . '; DELETE FROM STJ010'));
         self::assertStringContainsString('CASE WHEN a.entry_count > 0 THEN a.first_entry', ActionPlanQuery::SQL);
         self::assertStringNotContainsString('EXISTS', ActionPlanQuery::SQL);
+        self::assertStringContainsString(ProtheusUnit::STJ_PREDICATE, ActionPlanQuery::SQL);
+        self::assertStringContainsString('CAST(:unidade AS varchar(10))', ActionPlanQuery::SQL);
         foreach ([['2026-02-30', '2026-03-01'], ['2026-10-20', '2026-01-01'], ['', '2026-01-01'],
             ['2026-1-01', '2026-01-01'], [[], '2026-01-01']] as [$start, $end]) {
             try {
@@ -151,12 +154,12 @@ final class ActionPlanTest extends TestCase
             $styleXpath = $this->xpath($outputStyles);
             $dxfs = $styleXpath->query('/s:styleSheet/s:dxfs')->item(0);
             $differentials = $styleXpath->query('s:dxf', $dxfs);
-            $originalCount = $differentials->length - 2;
-            foreach (['FFC00000', 'FF008000'] as $i => $color) {
+            $originalCount = $differentials->length - 3;
+            foreach (['FFC00000', 'FF008000', 'FFFFFFFF'] as $i => $color) {
                 $dxf = $differentials->item($originalCount + $i);
                 self::assertSame($color, $styleXpath->query('s:fill/s:patternFill/s:fgColor', $dxf)->item(0)->getAttribute('rgb'));
                 self::assertSame('solid', $styleXpath->query('s:fill/s:patternFill', $dxf)->item(0)->getAttribute('patternType'));
-                self::assertSame('FFFFFFFF', $styleXpath->query('s:font/s:color', $dxf)->item(0)->getAttribute('rgb'));
+                self::assertSame($i === 2 ? 'FF000000' : 'FFFFFFFF', $styleXpath->query('s:font/s:color', $dxf)->item(0)->getAttribute('rgb'));
                 self::assertSame(0, $styleXpath->query('s:border | s:alignment | s:font/s:name | s:font/s:sz', $dxf)->length);
                 $dxfs->removeChild($dxf);
             }
@@ -174,9 +177,17 @@ final class ActionPlanTest extends TestCase
                 self::assertSame(['"Aberta"', '"Finalizada"'][$i], $afterXpath->query('s:formula', $rule)->item(0)->textContent);
             }
             $newRules->parentNode->removeChild($newRules);
+            $numberRules = $afterXpath->query('/s:worksheet/s:conditionalFormatting')->item(0);
+            self::assertSame('K9:K10', $numberRules->getAttribute('sqref'));
+            $numberRule = $afterXpath->query('s:cfRule', $numberRules)->item(0);
+            self::assertSame('3', $numberRule->getAttribute('priority'));
+            self::assertSame('1', $numberRule->getAttribute('stopIfTrue'));
+            self::assertSame((string)($originalCount + 2), $numberRule->getAttribute('dxfId'));
+            self::assertSame('TRUE', $afterXpath->query('s:formula', $numberRule)->item(0)->textContent);
+            $numberRules->parentNode->removeChild($numberRules);
             foreach ($afterXpath->query('//s:cfRule') as $rule) {
-                self::assertGreaterThan(2, (int)$rule->getAttribute('priority'));
-                $rule->setAttribute('priority', (string)((int)$rule->getAttribute('priority') - 2));
+                self::assertGreaterThan(3, (int)$rule->getAttribute('priority'));
+                $rule->setAttribute('priority', (string)((int)$rule->getAttribute('priority') - 3));
             }
             // Headers, styles, merges, row/column dimensions, image anchors, print and conditional rules.
             foreach ([$before, $after] as $document) {
@@ -225,6 +236,49 @@ final class ActionPlanTest extends TestCase
             fclose($stream);
         }
         self::assertSame($hash, hash_file('sha256', $this->template()));
+    }
+
+    public function testReportedNumbersOverrideInheritedRedFontAndKeepStatusColors(): void
+    {
+        $numbers = ['003074', '003077', '003078', '003079', '003080', '003082', '003086'];
+        // Place the examples on the template rows whose base font is red.
+        $orders = array_fill(0, 1130, $this->order());
+        foreach ($numbers as $i => $number) {
+            $orders[] = array_replace($this->order(), ['number' => $number,
+                'status' => $i % 2 === 0 ? 'Aberta' : 'Finalizada']);
+        }
+        $stream = (new ActionPlanExcelReport($this->template()))->write($orders);
+        $book = IOFactory::load(stream_get_meta_data($stream)['uri']);
+        $template = IOFactory::load($this->template());
+        try {
+            $sheet = $book->getSheet(0);
+            $rules = $sheet->getConditionalStyles('K9:K1145');
+            self::assertCount(1, $rules);
+            $rule = $rules[0];
+            self::assertSame([true], $rule->getConditions());
+            self::assertTrue($rule->getStopIfTrue());
+            self::assertSame('FF000000', $rule->getStyle()->getFont()->getColor()->getARGB());
+            self::assertSame('FFFFFFFF', $rule->getStyle()->getFill()->getStartColor()->getARGB());
+            self::assertSame('solid', $rule->getStyle()->getFill()->getFillType());
+            foreach ($numbers as $i => $number) {
+                $address = 'K' . (1139 + $i);
+                self::assertSame('FFFF0000', $template->getSheet(0)->getStyle($address)->getFont()->getColor()->getARGB());
+                self::assertSame($number, (string)$sheet->getCell($address)->getValue());
+                self::assertSame('inlineStr', $sheet->getCell($address)->getDataType());
+                self::assertSame($template->getSheet(0)->getStyle($address)->getBorders()->exportArray(),
+                    $sheet->getStyle($address)->getBorders()->exportArray());
+                self::assertSame($orders[1130 + $i]['status'], (string)$sheet->getCell('L' . (1139 + $i))->getValue());
+            }
+            $statusRules = $sheet->getConditionalStyles('L9:L1145');
+            self::assertSame('FFC00000', $statusRules[0]->getStyle()->getFill()->getStartColor()->getARGB());
+            self::assertSame('FF008000', $statusRules[1]->getStyle()->getFill()->getStartColor()->getARGB());
+            self::assertTrue($statusRules[0]->getStopIfTrue());
+            self::assertTrue($statusRules[1]->getStopIfTrue());
+        } finally {
+            $book->disconnectWorksheets();
+            $template->disconnectWorksheets();
+            fclose($stream);
+        }
     }
 
     public function testExpansionAndEmptyPopulation(): void

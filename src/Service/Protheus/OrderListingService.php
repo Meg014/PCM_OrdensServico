@@ -17,15 +17,16 @@ final class OrderListingService
     {
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'nome_bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+        foreach (['os', 'filial', 'bem', 'nome_bem', 'equipment_q', 'bem_filial', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
             'situacao', 'termino', 'date_start', 'date_end', 'historico', 'safra', 'analitico', 'unidade',
             'card', 'card_status', 'backlog_age', 'q', 'status', 'service_name'] as $key) {
             $value = $query[$key] ?? '';
-            if (!is_string($value) || strlen($value) > 100) {
+            if (!is_string($value) || strlen($value) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100)) {
                 throw new InvalidArgumentException('Filtros inválidos.');
             }
             $filters[$key] = trim($value);
         }
+        $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
             throw new InvalidArgumentException('Filtro de centro de custo inválido.');
@@ -75,9 +76,11 @@ final class OrderListingService
             throw new InvalidArgumentException('Paginação inválida.');
         }
         try {
+            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 8, areaScope: $this->areaScope);
             if ($drilldown) {
-                $sector = (new ProtheusSectorService($this->repository))->load($filters['area'], [
-                    'filial' => $filters['filial'], 'equipment' => $filters['bem'],
+                if ($filters['nome_bem'] !== '') $repository = $repository->withEquipmentSubstring($filters['nome_bem']);
+                $sector = (new ProtheusSectorService($repository))->load($filters['area'], [
+                    'filial' => EquipmentFilter::branch($filters), 'equipment' => $filters['bem'],
                     'service' => $filters['servico'], 'service_name' => $filters['service_name'],
                     'cost_center' => $filters['centro'], 'maintenance_type' => $filters['tipo'],
                     'q' => $filters['q'], 'status' => $filters['status'],
@@ -97,20 +100,20 @@ final class OrderListingService
                     $label = ($filters['card'] === 'safra' ? 'Safra' : 'Entressafra') . ' · '
                         . ($state === 'open' ? 'Em aberto' : 'Fechadas');
                 }
-                return ['orders' => $sector['orders'], 'page' => $sector['page'], 'limit' => $sector['limit'],
+                return ['orders' => $repository->describeOrders($sector['orders']), 'page' => $sector['page'], 'limit' => $sector['limit'],
                     'has_more' => $sector['has_more'], 'filters' => $filters, 'available' => true,
                     'drilldown' => ['label' => $label, 'total' => $total]];
             }
-            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope);
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
-                $filters['filial'] === '' ? null : $filters['filial'],
+                EquipmentFilter::branch($filters) === '' ? null : EquipmentFilter::branch($filters),
                 $filters['bem'] === '' ? null : $filters['bem'], $page, $limit,
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
                 $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
                 $filters['historico'], $filters['unidade'], self::equipmentNamePattern($filters['nome_bem']),
                 $filters['analitico'], $filters['safra'],
             );
+            $result['orders'] = $repository->describeOrders($result['orders']);
 
             return $result + ['filters' => $filters, 'available' => true];
         } catch (Throwable) {
@@ -126,7 +129,7 @@ final class OrderListingService
             return '';
         }
 
-        return '%' . str_replace(['~', '%', '_'], ['~~', '~%', '~_'], mb_strtoupper($name)) . '%';
+        return '%' . str_replace(['~', '%', '_', '['], ['~~', '~%', '~_', '~['], mb_strtoupper($name)) . '%';
     }
 
     public function areas(): array

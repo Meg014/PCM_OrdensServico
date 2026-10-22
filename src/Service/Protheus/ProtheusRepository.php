@@ -24,6 +24,17 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private ?float $deadline;
 
     private string $sectorStage = 'connection';
+    private ?string $equipmentSubstring = null;
+
+    /** An isolated listing/export scope; existing dashboard repository instances stay unchanged. */
+    public function withEquipmentSubstring(string $term): self
+    {
+        if (strlen($term) > 100) throw new InvalidArgumentException('Pesquisa inválida.');
+        $copy = clone $this;
+        $copy->equipmentSubstring = OrderListingService::equipmentNamePattern($term);
+
+        return $copy;
+    }
 
     /** Technical stage only; used by the explicit CLI diagnostic, never web payloads. */
     public function sectorDiagnosticStage(): string
@@ -52,14 +63,54 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
     }
 
-    public function actionPlan(string $start, string $end): array
+    public function actionPlan(string $start, string $end, string $unit = ProtheusUnit::ALL): array
     {
-        return $this->read(ActionPlanQuery::SQL, ['date_start' => $start, 'date_end' => $end]);
+        return $this->read(ActionPlanQuery::SQL, [
+            'date_start' => $start, 'date_end' => $end, 'unidade' => ProtheusUnit::validate($unit),
+        ]);
     }
 
     public function findAreas(): array
     {
         return $this->read(ProtheusQueries::AREAS);
+    }
+
+    public function suggestEquipment(string $term): array
+    {
+        if (mb_strlen($term) < 2 || strlen($term) > 100 || preg_match('/[\x00-\x1F\x7F]/', $term)) {
+            throw new InvalidArgumentException('Digite entre 2 e 100 caracteres.');
+        }
+        $pattern = OrderListingService::equipmentNamePattern($term);
+
+        return $this->read(EquipmentLookupQueries::SEARCH, ['term' => $pattern, 'name_term' => $pattern]);
+    }
+
+    /** One additional read per visible/exported batch, never one read per O.S. */
+    public function describeOrders(array $orders): array
+    {
+        if ($orders === []) return [];
+        if (count($orders) > StreamingXlsxReport::BATCH_SIZE) throw new InvalidArgumentException('Lote de descrições excedido.');
+        $keys = [];
+        foreach ($orders as $order) {
+            $key = json_encode([(string)$order['TJ_FILIAL'], (string)$order['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            $keys[$key] = ['branch' => (string)$order['TJ_FILIAL'], 'number' => (string)$order['TJ_ORDEM']];
+        }
+        $sources = [];
+        foreach ($this->read(OrderDescriptionQueries::BATCH, ['identities' => json_encode(array_values($keys), JSON_THROW_ON_ERROR)]) as $row) {
+            $key = json_encode([(string)$row['TJ_FILIAL'], (string)$row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            $sources[$key]['original'] = $row['order_description'] ?? null;
+            $sources[$key]['entries'][] = $row['entry_description'] ?? null;
+            $sources[$key]['service'] = $row['service_description'] ?? null;
+        }
+        foreach ($orders as &$order) {
+            $key = json_encode([(string)$order['TJ_FILIAL'], (string)$order['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            $source = $sources[$key] ?? [];
+            $order['descricao'] = OrderDescriptions::best($source['original'] ?? ($order['descricao'] ?? null),
+                $source['entries'] ?? [], $source['service'] ?? null);
+        }
+        unset($order);
+
+        return $orders;
     }
 
     /** Returns distinct cost-center codes for the established open opportunity-stop universe. */
@@ -526,6 +577,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
             'outros_apontamentos' => [],
         ];
         $entries = $this->read(ProtheusQueries::ENTRIES, ['numero' => $numero, 'filial' => $order['TJ_FILIAL']]);
+        $result['description_sources'] = [];
+        $result['original_description'] = OrderDescriptions::text($description);
         $professionals = [];
         $products = [];
         foreach ($entries as $entry) {
@@ -552,6 +605,22 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 default:
                     $result['outros_apontamentos'][] = $entry;
             }
+            $text = OrderDescriptions::text($entry['pcm_entry_description'] ?? null);
+            if ($text !== null) {
+                $result['description_sources'][] = ['source' => 'Descrição do apontamento', 'text' => $text,
+                    'date' => $entry['TL_DTINICI'] ?? null,
+                    'professional' => $entry['TL_TIPOREG'] === 'M' ? ($professionals[$code]['T1_NOME'] ?? null) : null];
+            }
+        }
+        $serviceDescription = OrderDescriptions::text($result['servico']['pcm_service_description'] ?? null);
+        $result['descricao'] = OrderDescriptions::best($description, array_column($result['description_sources'], 'text'), $serviceDescription);
+        if ($result['original_description'] !== null) {
+            array_unshift($result['description_sources'], ['source' => 'Descrição original da O.S.',
+                'text' => $result['original_description'], 'date' => null, 'professional' => null]);
+        }
+        if ($serviceDescription !== null) {
+            $result['description_sources'][] = ['source' => 'Descrição detalhada do serviço',
+                'text' => $serviceDescription, 'date' => null, 'professional' => null];
         }
 
         return $result;
@@ -637,6 +706,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->equipmentSubstring !== null && $this->equipmentSubstring !== '') {
+            $filteredSql = EquipmentLookupQueries::withSubstring($sql);
+            if ($filteredSql !== $sql) {
+                $sql = $filteredSql;
+                $params['equipment_pattern'] = $this->equipmentSubstring;
+                $params['equipment_name_pattern'] = $this->equipmentSubstring;
+            }
+        }
         if ($this->areaScope !== null) {
             $scopedSql = ProtheusQueries::withAreaScope($sql);
             if ($scopedSql !== $sql) {

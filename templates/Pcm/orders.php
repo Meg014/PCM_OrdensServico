@@ -40,14 +40,21 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <?= $this->Form->hidden('centro_modo', ['value' => $filters['centro_modo']]) ?>
 <div class="col-md-4"><label class="form-label">Centro de custo</label><input class="form-control" value="Sem centro de custo" disabled></div>
 <?php endif; ?>
-<?php foreach (['os' => 'Número da OS (com zeros à esquerda)', 'centro' => 'Centro de custo', 'bem' => 'Código do equipamento'] as $key => $label): ?>
+<?php foreach (['os' => 'Número da OS (com zeros à esquerda)', 'centro' => 'Centro de custo'] as $key => $label): ?>
 <?php if ($key === 'centro' && in_array($filters['centro_modo'] ?? '', ['blank', 'null'], true)) continue; ?>
 <div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
 <input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
 <div class="w-100 d-none d-md-block"></div>
-<div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-nome-bem">Nome do equipamento</label>
-<input class="form-control" id="filter-nome-bem" name="nome_bem" maxlength="100" value="<?= h($filters['nome_bem'] ?? '') ?>" placeholder="Ex.: BOMBA"></div>
+<div class="col-12 col-md-6 position-relative" data-equipment-autocomplete data-lookup="<?= h($this->Url->build(['_name' => 'pcm-equipment-suggestions'])) ?>">
+<label class="form-label" for="filter-equipment">Bem / Equipamento</label>
+<input class="form-control" id="filter-equipment" name="equipment_q" maxlength="100" value="<?= h(($filters['equipment_q'] ?? '') ?: (($filters['bem'] ?? '') ?: ($filters['nome_bem'] ?? ''))) ?>"
+    placeholder="Digite o código ou nome do equipamento" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="equipment-options" aria-expanded="false" aria-describedby="equipment-message" data-search>
+<input type="hidden" name="bem" value="<?= h($filters['bem'] ?? '') ?>" data-selected>
+<input type="hidden" name="bem_filial" value="<?= h($filters['bem_filial'] ?? '') ?>" data-branch>
+<div id="equipment-options" role="listbox" aria-label="Equipamentos encontrados" class="list-group position-absolute bg-white shadow w-100" style="z-index:10;max-height:20rem;overflow:auto" hidden></div>
+<small id="equipment-message" class="text-body-secondary" role="status" aria-live="polite">Selecione uma sugestão para filtrar o equipamento exato; sem seleção, a busca usa trechos do código ou nome.</small>
+</div>
 <?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'safra', 'analitico', 'card', 'card_status',
     'backlog_age', 'q', 'status', 'service_name'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
@@ -63,7 +70,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div class="col-12 text-body-secondary" id="origin-date-help">Período pela Data de origem da OS.</div>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
-<span class="text-body-secondary ms-2">Códigos exatos; nome do equipamento por trecho.</span></div>
+<span class="text-body-secondary ms-2">O.S. e centro de custo por código exato.</span></div>
 <?= $this->Form->end() ?></section>
 <?php if (($filters['analitico'] ?? '') === '1'): ?><p class="alert alert-secondary">Escopo analítico: Data de origem a partir de 01/01/2025.</p><?php endif; ?>
 <?php if (!empty($listing['drilldown'])): ?><p class="alert alert-secondary pcm-active-drilldown"><strong>Filtro ativo: <?= h($areaName($filters['area'] ?? '')) ?> · <?= h($listing['drilldown']['label']) ?></strong>
@@ -94,3 +101,4 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <?php if ($listing['has_more']): ?><?= $this->Html->link('Ver mais', $pageUrl($listing['page'] + 1), ['class' => 'btn btn-outline-secondary']) ?><?php endif; ?>
 </nav></footer></div></section>
 <?php endif; ?>
+<?= $this->Html->script('pcm-equipment-autocomplete', ['block' => true]) ?>

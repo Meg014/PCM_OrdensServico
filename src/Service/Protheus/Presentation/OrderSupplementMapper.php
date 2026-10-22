@@ -22,6 +22,7 @@ final class OrderSupplementMapper
                 'end_time' => $this->time($row['apontamento']['TL_HOFIM'] ?? null),
                 'hours' => $this->text($row['apontamento']['TL_QUANTID'] ?? null),
                 'unit' => $this->text($row['apontamento']['TL_UNIDADE'] ?? null),
+                'description' => \App\Service\Protheus\OrderDescriptions::text($row['apontamento']['pcm_entry_description'] ?? null),
             ];
         }
         $materials = [];
@@ -69,7 +70,31 @@ final class OrderSupplementMapper
             labor: $labor,
             materials: $materials,
             maintenance: $maintenance,
+            descriptions: $this->descriptions($order['description_sources'] ?? []),
         );
+    }
+
+    private function descriptions(array $sources): array
+    {
+        $unique = [];
+        foreach ($sources as $source) {
+            $text = \App\Service\Protheus\OrderDescriptions::text($source['text'] ?? null);
+            if ($text === null) continue;
+            $key = str_replace(["\r\n", "\r"], "\n", $text);
+            $label = $this->text($source['source'] ?? null) ?? '';
+            $date = $this->date($source['date'] ?? null);
+            $professional = $this->text($source['professional'] ?? null);
+            $context = $label . ($date ? ' · ' . implode('/', array_reverse(explode('-', $date))) : '')
+                . ($professional ? ' · ' . $professional : '');
+            if (isset($unique[$key])) {
+                if (!in_array($context, $unique[$key]['contexts'], true)) $unique[$key]['contexts'][] = $context;
+            } else {
+                $unique[$key] = ['text' => $text, 'contexts' => [$context]];
+            }
+        }
+
+        return array_map(static fn(array $item): array => ['text' => $item['text'],
+            'source' => implode("\n", $item['contexts'])], array_values($unique));
     }
 
     private function text(mixed $value): ?string

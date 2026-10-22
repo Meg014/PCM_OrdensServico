@@ -244,6 +244,17 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-detail-card dl div { border-top: 1px solid #edf0f4; display: grid; gap: 1rem; grid-template-columns: minmax(130px, 38%) 1fr; padding: .65rem 0; }
 .pcm-detail-card dt { color: var(--pcm-muted); font-size: .8rem; }
 .pcm-detail-card dd { margin: 0; overflow-wrap: anywhere; }
+.pcm-labor-table { width: 100%; min-width: 70rem; table-layout: fixed; }
+.pcm-labor-table th, .pcm-labor-table td { vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
+.pcm-labor-table th:nth-child(1) { width: 17%; }
+.pcm-labor-table th:nth-child(2) { width: 7%; }
+.pcm-labor-table th:nth-child(3), .pcm-labor-table th:nth-child(5) { width: 8%; }
+.pcm-labor-table th:nth-child(4), .pcm-labor-table th:nth-child(6) { width: 6%; }
+.pcm-labor-table th:nth-child(7) { width: 18%; }
+.pcm-labor-table th:nth-child(8) { width: 30%; }
+.pcm-labor-table td:nth-child(3), .pcm-labor-table td:nth-child(4),
+.pcm-labor-table td:nth-child(5), .pcm-labor-table td:nth-child(6) { white-space: nowrap; }
+.pcm-labor-table td:last-child { white-space: pre-wrap; }
 .pcm-timeline { border-left: 2px solid #cad5e1; margin-left: .5rem; padding-left: 1.5rem; }
 .pcm-timeline article { margin-bottom: 1.5rem; position: relative; }
 .pcm-timeline article::before { background: #356796; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #356796; content: ''; height: 12px; left: -31px; position: absolute; top: .3rem; width: 12px; }

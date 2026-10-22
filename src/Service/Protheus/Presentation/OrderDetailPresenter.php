@@ -53,6 +53,7 @@ final class OrderDetailPresenter
                 },
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? $supplement->description : null,
+                'descriptions' => $available ? $this->project($supplement->descriptions, ['text', 'source']) : [],
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
                     'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center',
                     'planned_start_date', 'planned_start_time', 'planned_end_date', 'planned_end_time',
@@ -60,8 +61,8 @@ final class OrderDetailPresenter
                     'general_planned_start_date', 'general_planned_start_time', 'general_planned_end_date', 'general_planned_end_time',
                     'general_actual_start_date', 'general_actual_start_time', 'general_actual_end_date', 'general_actual_end_time',
                 ])[0] : [],
-                'labor' => $available ? $this->project($supplement->labor, [
-                    'professional', 'code', 'date', 'end_date', 'start_time', 'end_time', 'hours', 'unit',
+                'labor' => $available ? $this->project(array_map(static fn(array $row): array => $row + LaborDuration::present($row), $supplement->labor), [
+                    'professional', 'code', 'date', 'end_date', 'start_time', 'end_time', 'hours', 'unit', 'description', 'hours_display', 'hours_note',
                 ]) : [],
                 'materials' => $available ? $this->project($supplement->materials, [
                     'code', 'description', 'quantity', 'unit', 'used_date', 'used_time',

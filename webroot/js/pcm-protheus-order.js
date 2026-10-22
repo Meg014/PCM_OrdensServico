@@ -27,10 +27,10 @@
         return block;
     };
     const notice = (target, text = unavailable) => target.replaceChildren(node('p', text, 'text-body-secondary py-3'));
-    const table = (headers, rows, empty) => {
+    const table = (headers, rows, empty, className = '') => {
         if (!rows.length) return node('p', empty, 'text-body-secondary');
         const wrapper = node('div', undefined, 'pcm-panel table-responsive');
-        const grid = node('table', undefined, 'table align-middle mb-0');
+        const grid = node('table', undefined, `table align-middle mb-0 ${className}`.trim());
         const head = node('thead');
         const header = node('tr');
         headers.forEach(text => {
@@ -61,11 +61,11 @@
         const m = data.maintenance;
         const title = heading('Detalhes da manutenção', `PROTHEUS · OS ${value(data.number)}`);
         const card = node('section', undefined, 'pcm-detail-card');
-        card.append(node('h3', 'Descrição do serviço', 'h5'));
+        card.append(node('h3', 'Descrição da manutenção', 'h5'));
         const descriptionText = data.description == null ? '' : String(data.description)
             .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
             .replace(/(^|\s)□(?=\s|$)/g, '$1').trim();
-        const description = node('p', value(descriptionText));
+        const description = node('p', descriptionText || 'Não existe descrição detalhada disponível no TOTVS.');
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
         const list = node('dl');
@@ -101,14 +101,32 @@
             additional.append(node('p', `${label}: ${dateTime(m[key + '_date'], m[key + '_time'])}`, 'mb-1'));
         });
         card.append(additional);
-        target.replaceChildren(title, card, heading('Mão de obra', 'QUEM EXECUTOU · QUANTIDADE REGISTRADA'));
-        target.append(table(['Profissional', 'Código', 'Data início', 'Início', 'Data fim', 'Fim', 'Quantidade / horas', 'Unidade'],
+        target.replaceChildren(title, card, heading('Descrições e atividades registradas'));
+        const descriptions = data.descriptions || [];
+        if (!descriptions.length) target.append(node('p', 'Não existe descrição detalhada disponível no TOTVS.', 'text-body-secondary'));
+        descriptions.forEach(item => {
+            const section = node('section', undefined, 'pcm-detail-card mb-3');
+            const source = node('h3', item.source, 'h6');
+            source.style.whiteSpace = 'pre-wrap';
+            const text = node('p', item.text);
+            text.style.whiteSpace = 'pre-wrap';
+            section.append(source, text);
+            target.append(section);
+        });
+        target.append(heading('Mão de obra', 'QUEM EXECUTOU · QUANTIDADE REGISTRADA'));
+        target.append(table(['Profissional', 'Código', 'Data início', 'Início', 'Data fim', 'Fim', 'Quantidade / horas', 'Descrição do apontamento'],
             data.labor.map(row => [row.professional, row.code, date(row.date), row.start_time,
-                date(row.end_date), row.end_time, row.hours, row.unit]), 'Nenhum apontamento de mão de obra disponível.'));
+                date(row.end_date), row.end_time, laborQuantity(row), row.description || 'Sem descrição registrada']),
+            'Nenhum apontamento de mão de obra disponível.', 'pcm-labor-table'));
         target.append(heading('Materiais utilizados', 'MATERIAIS'), table(
             ['Código', 'Descrição', 'Quantidade', 'Unidade', 'Data / hora'],
             data.materials.map(row => [row.code, row.description, row.quantity, row.unit, dateTime(row.used_date, row.used_time)]),
             'Nenhum material disponível.'));
+    }
+    function laborQuantity(row) {
+        const block = node('div', value(row.hours_display ?? row.hours));
+        if (row.hours_note) block.append(node('small', row.hours_note, 'd-block text-body-secondary'));
+        return block;
     }
     async function request(target, params) {
         requests.get(target)?.abort();

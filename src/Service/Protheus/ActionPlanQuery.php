@@ -23,7 +23,7 @@ WITH orders AS (
     ) a
     WHERE j.TJ_SITUACA = 'L' AND j.TJ_TERMINO IN ('N', 'S')
 )
-SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
+SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
     CONVERT(varchar(10), j.reference_date, 23) reference_date,
     CONVERT(varchar(max), j.TJ_OBSERVA) description,
     c.name cost_center_name, c.matches cost_center_matches,
@@ -34,6 +34,7 @@ SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
     l.TL_TIPOREG, l.TL_CODIGO, CONVERT(varchar(max), l.TL_OBSERVA) entry_description,
     p.name professional_name, p.matches professional_matches
 FROM referenced j
+CROSS JOIN (SELECT CAST(:unidade AS varchar(10)) unidade) f
 OUTER APPLY (SELECT COUNT(*) matches, MAX(c.CTT_DESC01) name FROM dbo.CTT010 c
     WHERE c.CTT_FILIAL = j.TJ_FILIAL AND c.CTT_CUSTO = j.TJ_CCUSTO AND c.D_E_L_E_T_ <> '*') c
 OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b
@@ -51,6 +52,10 @@ OUTER APPLY (SELECT COUNT(*) matches, MAX(p.T1_NOME) name FROM dbo.ST1010 p
         AND p.T1_CODFUNC = l.TL_CODIGO AND p.D_E_L_E_T_ <> '*') p
 WHERE j.reference_date >= CONVERT(date, :date_start, 23)
     AND j.reference_date <= CONVERT(date, :date_end, 23)
+    AND
+SQL
+        . ProtheusUnit::STJ_PREDICATE . <<<'SQL'
+
 ORDER BY j.reference_date, j.TJ_FILIAL, j.TJ_ORDEM,
     CASE WHEN TRY_CONVERT(date, NULLIF(RTRIM(l.TL_DTINICI), ''), 112) IS NULL THEN 1 ELSE 0 END,
     l.TL_DTINICI, l.TL_HOINICI, l.R_E_C_N_O_

@@ -70,13 +70,14 @@ final class OrderEntryExportService
     public function loadGeneral(array $query, int $page = 1, int $limit = \App\Service\StreamingXlsxReport::BATCH_SIZE): array
     {
         $filters = [];
-        foreach (['os', 'filial', 'bem', 'nome_bem', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
+        foreach (['os', 'filial', 'bem', 'nome_bem', 'equipment_q', 'bem_filial', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
             'situacao', 'termino', 'date_start', 'date_end', 'historico', 'safra', 'analitico', 'unidade',
             'card', 'card_status', 'backlog_age', 'q', 'status', 'service_name', 'entry_type', 'professional'] as $key) {
             $value = $query[$key] ?? '';
-            if (!is_string($value) || strlen($value) > 100 || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
+            if (!is_string($value) || strlen($value) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100) || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
             $filters[$key] = trim($value);
         }
+        $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
             throw new InvalidArgumentException('Filtro de centro de custo inválido.');
@@ -101,8 +102,11 @@ final class OrderEntryExportService
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
         if ($filters['card'] !== '' || $filters['backlog_age'] !== '') {
             if ($filters['area'] === '') throw new InvalidArgumentException('Setor do drill-down inválido.');
-            return $this->load($filters['area'], [
-                'filial' => $filters['filial'], 'equipment' => $filters['bem'], 'service' => $filters['servico'],
+            $service = $filters['nome_bem'] === '' ? $this : new self(
+                ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withEquipmentSubstring($filters['nome_bem']),
+            );
+            $data = $service->load($filters['area'], [
+                'filial' => EquipmentFilter::branch($filters), 'equipment' => $filters['bem'], 'service' => $filters['servico'],
                 'service_name' => $filters['service_name'], 'cost_center' => $filters['centro'],
                 'maintenance_type' => $filters['tipo'], 'q' => $filters['q'], 'status' => $filters['status'],
                 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end'],
@@ -110,8 +114,10 @@ final class OrderEntryExportService
                 'backlog_age' => $filters['backlog_age'], 'unit' => $filters['unidade'],
                 'entry_type' => $filters['entry_type'], 'professional' => $filters['professional'],
             ], $page, $limit);
+            $data['filters'] = $filters;
+            return $data;
         }
-        $params = ['numero' => $filters['os'], 'filial' => $filters['filial'], 'bem' => $filters['bem'],
+        $params = ['numero' => $filters['os'], 'filial' => EquipmentFilter::branch($filters), 'bem' => $filters['bem'],
             'nome_bem' => OrderListingService::equipmentNamePattern($filters['nome_bem']),
             'centro' => $filters['centro'], 'centro_modo' => $filters['centro_modo'], 'area' => $filters['area'],
             'servico' => $filters['servico'], 'tipo' => $filters['tipo'], 'situacao' => $filters['situacao'],

@@ -62,11 +62,18 @@ final class PcmControllerTest extends TestCase
 
     public function testUnitButtonsApplyConfirmedFiltersAndKeepTheirState(): void
     {
+        $debug = \Cake\Core\Configure::read('debug');
+        \Cake\Core\Configure::write('debug', false);
         ConnectionManager::dropAlias('protheus');
         try {
             $this->get('/pcm/setor/ELETRI?unit=factory&equipment=RED%2080%20047&filial=01&date_start=2026-10-01&date_end=2026-10-29');
             $this->assertResponseOk();
             $html = (string)$this->_response->getBody();
+            foreach (['css/bootstrap.min.css', 'css/pcm.css', 'js/bootstrap.bundle.min.js',
+                'js/pcm-theme.js', 'js/pcm-sectors-menu.js', 'js/pcm-equipment-autocomplete.js',
+                'js/pcm-sector-unit-filter.js', 'js/pcm-protheus-sector.js'] as $asset) {
+                self::assertStringContainsString('/' . $asset . '?' . filemtime(WWW_ROOT . $asset), $html);
+            }
             self::assertLessThan(strpos($html, 'data-sector-filter-form'), strpos($html, 'data-sector-unit-filter'));
             $dom = new \DOMDocument();
             @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
@@ -98,6 +105,7 @@ final class PcmControllerTest extends TestCase
             }
         } finally {
             ConnectionManager::alias('test_protheus', 'protheus');
+            \Cake\Core\Configure::write('debug', $debug);
         }
     }
 

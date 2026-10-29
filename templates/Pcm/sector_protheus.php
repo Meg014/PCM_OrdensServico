@@ -1,8 +1,8 @@
 <?php
 $this->assign('title', $sector['name']);
-$this->Html->script('pcm-equipment-autocomplete', ['block' => true, 'defer' => true]);
-$this->Html->script('pcm-sector-unit-filter', ['block' => true, 'defer' => true]);
-$this->Html->script('pcm-protheus-sector', ['block' => true, 'defer' => true]);
+$this->Html->script('pcm-equipment-autocomplete', ['block' => true, 'defer' => true, 'timestamp' => 'force']);
+$this->Html->script('pcm-sector-unit-filter', ['block' => true, 'defer' => true, 'timestamp' => 'force']);
+$this->Html->script('pcm-protheus-sector', ['block' => true, 'defer' => true, 'timestamp' => 'force']);
 $sectorNavigationFilters = array_filter($sector['filters'], static fn ($value): bool => $value !== '');
 $equipmentScopeEmpty = $sector['available'] && !$sector['orders']
     && array_sum(array_intersect_key($sector['cards'], array_flip(['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed']))) === 0

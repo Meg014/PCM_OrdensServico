@@ -28,7 +28,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
             }
         })();
     </script>
-    <?= $this->Html->css(['bootstrap.min', 'pcm']) ?>
+    <?= $this->Html->css(['bootstrap.min', 'pcm'], ['timestamp' => 'force']) ?>
     <?= $this->fetch('meta') ?>
     <?= $this->fetch('css') ?>
 </head>
@@ -84,9 +84,9 @@ $title = trim($this->fetch('title')) ?: 'PCM';
             <?= $this->fetch('content') ?>
         </div>
     </main>
-    <?= $this->Html->script('bootstrap.bundle.min') ?>
-    <?= $this->Html->script('pcm-theme') ?>
-    <?= $this->Html->script('pcm-sectors-menu', ['defer' => true]) ?>
+    <?= $this->Html->script('bootstrap.bundle.min', ['timestamp' => 'force']) ?>
+    <?= $this->Html->script('pcm-theme', ['timestamp' => 'force']) ?>
+    <?= $this->Html->script('pcm-sectors-menu', ['defer' => true, 'timestamp' => 'force']) ?>
     <?= $this->fetch('script') ?>
 </body>
 </html>

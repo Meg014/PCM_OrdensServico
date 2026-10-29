@@ -48,6 +48,8 @@ final class OrderSupplementMapper
             'service_name' => $this->text($order['servico']['T4_NOME'] ?? null),
             'area' => $this->text($main['TJ_CODAREA'] ?? null),
             'cost_center' => $this->text($main['TJ_CCUSTO'] ?? null),
+            'unit_name' => \App\Service\Protheus\ProtheusUnit::label($this->text($main['TJ_CCUSTO'] ?? null)),
+            'cost_center_source_unit' => \App\Service\Protheus\ProtheusUnit::sourceGroup($this->text($main['TJ_CCUSTO'] ?? null)),
         ];
         foreach (['planned_start' => ['TJ_DTMPINI', 'TJ_HOMPINI'],
             'planned_end' => ['TJ_DTMPFIM', 'TJ_HOMPFIM'],
@@ -65,12 +67,15 @@ final class OrderSupplementMapper
         return new OrderSupplement(
             number: $this->text($order['numero'] ?? null) ?? '',
             branch: isset($main['TJ_FILIAL']) ? rtrim((string)$main['TJ_FILIAL'], ' ') : null,
-            description: $this->text($order['descricao'] ?? null),
+            description: $this->text(array_key_exists('original_description', $order) ? $order['original_description'] : ($order['descricao'] ?? null)),
             originDate: $this->date($main['TJ_DTORIGI'] ?? null),
             labor: $labor,
             materials: $materials,
             maintenance: $maintenance,
             descriptions: $this->descriptions($order['description_sources'] ?? []),
+            taskActivities: OrderTaskActivities::present($order['task_activity_rows'] ?? [],
+                rtrim((string)($main['TJ_FILIAL'] ?? '')), rtrim((string)($order['numero'] ?? '')),
+                ($order['task_activities_available'] ?? false) === true),
         );
     }
 

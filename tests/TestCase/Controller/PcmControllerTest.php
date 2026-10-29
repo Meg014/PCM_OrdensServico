@@ -32,61 +32,70 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseOk();
         $sector = (string)$this->_response->getBody();
 
-        $offseason = $this->hrefContaining($sector, 'card=offseason');
-        self::assertStringStartsWith('/pcm/ordens?', $offseason);
-        self::assertStringContainsString('area=ELETRI', $offseason);
-        self::assertStringContainsString('analitico=1', $offseason);
-        self::assertStringContainsString('card_status=EM+ABERTO', $offseason);
-        $this->assertNoEmptyDrilldownState($offseason);
-        $this->get($offseason);
-        $this->assertResponseOk();
-        $offseasonPage = (string)$this->_response->getBody();
-        self::assertStringContainsString('57 O.S. encontradas', $offseasonPage);
-        self::assertStringContainsString('2425EL', $offseasonPage);
-        self::assertStringNotContainsString('CORELE', $offseasonPage);
-        self::assertStringNotContainsString('005503', $offseasonPage);
-        self::assertStringNotContainsString('>Fechada<', $offseasonPage);
-        self::assertStringContainsString('name="card" value="offseason"', $offseasonPage);
-        self::assertStringContainsString('name="card_status" value="EM ABERTO"', $offseasonPage);
-        $offseasonPageTwo = $this->hrefContaining($offseasonPage, 'page=2');
-        self::assertStringContainsString('card=offseason', $offseasonPageTwo);
-        $this->get($offseasonPageTwo);
-        $this->assertResponseOk();
-        $offseasonSecondPage = (string)$this->_response->getBody();
-        self::assertStringContainsString('Filtro ativo: Elétrica · Entressafra · Em aberto', $offseasonSecondPage);
-        self::assertStringContainsString('2425EL', $offseasonSecondPage);
-        self::assertStringNotContainsString('CORELE', $offseasonSecondPage);
-        self::assertStringNotContainsString('005503', $offseasonSecondPage);
-        self::assertStringNotContainsString('>Fechada<', $offseasonSecondPage);
-        $offseasonExport = $this->hrefContaining($offseasonPage, '/pcm/ordens/excel');
-        self::assertStringContainsString('card=offseason', $offseasonExport);
-        self::assertStringContainsString('card_status=EM+ABERTO', $offseasonExport);
+        self::assertStringContainsString('Elétrica e Instrumentação', $sector);
+        foreach (['card=offseason', 'backlog_age=over_60'] as $selection) {
+            $url = $this->hrefContaining($sector, $selection);
+            self::assertStringStartsWith('/pcm/setor/ELETRI?', $url);
+            $this->get($url);
+            $this->assertResponseOk();
+            $page = (string)$this->_response->getBody();
+            self::assertStringContainsString('Limpar filtro do card', $page);
+            self::assertStringContainsString($selection, $this->hrefContaining($page, '/pcm/setor/ELETRI/excel'));
+            self::assertStringNotContainsString('&amp;amp;', $page);
+            preg_match_all('~href="([^"]+)"~', $page, $links);
+            foreach ($links[1] as $href) {
+                $href = html_entity_decode($href, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (!str_starts_with($href, '/pcm/setor/ELETRI?') || !str_contains($href, 'page=2')) continue;
+                self::assertStringContainsString($selection, $href);
+                $this->get(explode('#', $href)[0]);
+                $this->assertResponseOk();
+                self::assertStringContainsString('Limpar filtro do card', (string)$this->_response->getBody());
+                break;
+            }
+        }
+        $this->get('/pcm/setor/INSTRU?unit=factory&date_start=2026-10-01&date_end=2026-10-29');
+        $this->assertRedirect('/pcm/setor/ELETRI?unit=factory&date_start=2026-10-01&date_end=2026-10-29');
+        } finally {
+            ConnectionManager::alias('test_protheus', 'protheus');
+        }
+    }
 
-        $refinedOffseason = $offseason . '&bem=FAB%2080%20398';
-        $this->get($refinedOffseason);
-        $this->assertResponseOk();
-        $refinedPage = (string)$this->_response->getBody();
-        self::assertStringContainsString('name="card" value="offseason"', $refinedPage);
-        self::assertStringContainsString('name="card_status" value="EM ABERTO"', $refinedPage);
-        self::assertStringNotContainsString('CORELE', $refinedPage);
-        self::assertStringNotContainsString('005503', $refinedPage);
-
-        $backlog = $this->hrefContaining($sector, 'backlog_age=over_60');
-        self::assertStringStartsWith('/pcm/ordens?', $backlog);
-        self::assertStringContainsString('area=ELETRI', $backlog);
-        self::assertStringContainsString('analitico=1', $backlog);
-        self::assertStringContainsString('safra=1', $backlog);
-        $this->assertNoEmptyDrilldownState($backlog);
-        $this->get($backlog);
-        $this->assertResponseOk();
-        $backlogPage = (string)$this->_response->getBody();
-        self::assertStringContainsString('17 O.S. encontradas', $backlogPage);
-        self::assertStringNotContainsString('005503', $backlogPage);
-        self::assertStringNotContainsString('2425EL', $backlogPage);
-        self::assertStringNotContainsString('>Fechada<', $backlogPage);
-        self::assertStringContainsString('name="backlog_age" value="over_60"', $backlogPage);
-        self::assertStringContainsString('name="safra" value="1"', $backlogPage);
-        self::assertStringContainsString('backlog_age=over_60', $this->hrefContaining($backlogPage, '/pcm/ordens/excel'));
+    public function testUnitButtonsApplyConfirmedFiltersAndKeepTheirState(): void
+    {
+        ConnectionManager::dropAlias('protheus');
+        try {
+            $this->get('/pcm/setor/ELETRI?unit=factory&equipment=RED%2080%20047&filial=01&date_start=2026-10-01&date_end=2026-10-29');
+            $this->assertResponseOk();
+            $html = (string)$this->_response->getBody();
+            self::assertLessThan(strpos($html, 'data-sector-filter-form'), strpos($html, 'data-sector-unit-filter'));
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $links = $xpath->query('//a[@data-unit-choice]');
+            self::assertSame(6, $links->length);
+            self::assertSame(['', 'factory', 'mill', 'admin', 'external', 'sectors'], array_map(
+                static fn ($link) => $link->getAttribute('data-unit-choice'), iterator_to_array($links),
+            ));
+            foreach ($links as $link) {
+                $url = $link->getAttribute('href');
+                parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+                $unit = $link->getAttribute('data-unit-choice');
+                self::assertSame($unit, $query['unit']);
+                self::assertSame('RED 80 047', $query['equipment']);
+                self::assertSame('01', $query['filial']);
+                self::assertSame('2026-10-01', $query['date_start']);
+                self::assertSame('2026-10-29', $query['date_end']);
+                self::assertSame('1', $query['page']);
+                if ($unit === 'factory') self::assertSame('true', $link->getAttribute('aria-current'));
+                if (!in_array($unit, ['admin', 'external', 'sectors'], true)) continue;
+                $this->get($url);
+                $this->assertResponseOk();
+                $page = (string)$this->_response->getBody();
+                self::assertStringContainsString('name="unit" value="' . $unit . '"', $page);
+                self::assertStringContainsString('Remover filtro de equipamento', $page);
+                self::assertStringContainsString('unit=' . $unit, $this->hrefContaining($page, '/pcm/setor/ELETRI/excel'));
+                self::assertStringNotContainsString('&amp;amp;', $page);
+            }
         } finally {
             ConnectionManager::alias('test_protheus', 'protheus');
         }
@@ -97,7 +106,7 @@ final class PcmControllerTest extends TestCase
         preg_match_all('~href="([^"]+)"~', $html, $matches);
         foreach ($matches[1] as $href) {
             $decoded = html_entity_decode($href, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            if (str_contains($decoded, $needle)) return $decoded;
+            if (str_contains($decoded, $needle)) return explode('#', $decoded)[0];
         }
         $visible = preg_replace('~<(script|style)\b[^>]*>.*?</\1>~is', '', $html);
         self::fail('Link não encontrado: ' . $needle . ' | HTML: ' . substr(preg_replace('~\s+~', ' ', strip_tags((string)$visible)), 0, 1500));

@@ -15,6 +15,7 @@ final readonly class OrderSupplement
      * @param list<array{code: ?string, description: ?string, quantity: ?string,
      *   unit: ?string, used_date: ?string, used_time: ?string}> $materials
      * @param array<string, ?string> $maintenance
+     * @param array{planning_state: string, recorded_state: string, tasks: array} $taskActivities
      */
     public function __construct(
         public string $number,
@@ -25,6 +26,7 @@ final readonly class OrderSupplement
         public array $materials = [],
         public array $maintenance = [],
         public array $descriptions = [],
+        public array $taskActivities = ['planning_state' => 'unavailable', 'recorded_state' => 'unavailable', 'tasks' => []],
     ) {
     }
 }

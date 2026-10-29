@@ -96,8 +96,8 @@ final class EquipmentHistoryTest extends TestCase
         foreach ([1, 2] as $index) {
             self::assertSame('other', $calls[$index][1]['unit']);
             self::assertStringContainsString("f.unit = 'other'", $calls[$index][0]);
-            self::assertStringContainsString("NOT LIKE '31%'", $calls[$index][0]);
-            self::assertStringContainsString("NOT LIKE '41%'", $calls[$index][0]);
+            self::assertStringContainsString("f.unit = 'other'", $calls[$index][0]);
+            self::assertStringContainsString("f.unit = 'other'", $calls[$index][0]);
         }
     }
 

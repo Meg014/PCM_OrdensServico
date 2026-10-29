@@ -25,6 +25,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     private string $sectorStage = 'connection';
     private ?string $equipmentSubstring = null;
+    private ?array $sectorPeriod = null;
 
     /** An isolated listing/export scope; existing dashboard repository instances stay unchanged. */
     public function withEquipmentSubstring(string $term): self
@@ -65,7 +66,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     public function actionPlan(string $start, string $end, string $unit = ProtheusUnit::ALL): array
     {
-        return $this->read(ActionPlanQuery::SQL, [
+        return $this->read(ActionPlanQuery::sql(), [
             'date_start' => $start, 'date_end' => $end, 'unidade' => ProtheusUnit::validate($unit),
         ]);
     }
@@ -159,6 +160,16 @@ final class ProtheusRepository implements ProtheusReaderInterface
 
     /** Two aggregate reads and one bounded page, never hydration of resources or snapshots. */
     public function sector(array $params, int $page, int $limit, string $start, string $end, array $selection = [], bool $export = false): array
+    {
+        $this->sectorPeriod = [$start, $end];
+        try {
+            return $this->sectorScoped($params, $page, $limit, $start, $end, $selection, $export);
+        } finally {
+            $this->sectorPeriod = null;
+        }
+    }
+
+    private function sectorScoped(array $params, int $page, int $limit, string $start, string $end, array $selection, bool $export): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -280,6 +291,16 @@ final class ProtheusRepository implements ProtheusReaderInterface
     /** Bounded batch export: one SQL row per STL010 entry, never per-order hydration. */
     public function sectorEntries(array $params, string $start, string $end, array $selection, int $page, int $limit): array
     {
+        $this->sectorPeriod = [$start, $end];
+        try {
+            return $this->sectorEntriesScoped($params, $start, $end, $selection, $page, $limit);
+        } finally {
+            $this->sectorPeriod = null;
+        }
+    }
+
+    private function sectorEntriesScoped(array $params, string $start, string $end, array $selection, int $page, int $limit): array
+    {
         if (
             $page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit)
             || $limit > StreamingXlsxReport::BATCH_SIZE
@@ -383,10 +404,10 @@ final class ProtheusRepository implements ProtheusReaderInterface
         }
         if (!$management || $unitFilter) {
             $unit = $filters['unidade'] ?? '';
-            if (!is_string($unit) || (!$management && !in_array($unit, ['', 'factory', 'mill'], true))) {
+            if (!is_string($unit)) {
                 throw new InvalidArgumentException('Unidade invÃ¡lida.');
             }
-            $params['unidade'] = $management ? ProtheusUnit::validate($unit) : $unit;
+            $params['unidade'] = ProtheusUnit::validate($unit);
         }
         if (!$management) {
             $params['offseason_services'] = $this->historicalOffseasonServices();
@@ -523,7 +544,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if ($this->historicalOffseasonServices !== null) {
             return $this->historicalOffseasonServices;
         }
-        $rows = $this->read(ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS);
+        $rows = $this->read(ProtheusQueries::historicalServiceDefinitions());
         if (count($rows) > 2000) {
             throw new RuntimeException('DefiniÃ§Ãµes de serviÃ§o incompletas.');
         }
@@ -622,7 +643,19 @@ final class ProtheusRepository implements ProtheusReaderInterface
             $result['description_sources'][] = ['source' => 'Descrição detalhada do serviço',
                 'text' => $serviceDescription, 'date' => null, 'professional' => null];
         }
-
+        // Optional catalog failures never hide the order, labor, materials or original text.
+        $result['task_activity_rows'] = [];
+        $result['task_activities_available'] = false;
+        try {
+            $permissions = $this->read(OrderDescriptionQueries::PERMISSIONS)[0] ?? [];
+            $result['task_activity_rows'] = $this->read(OrderTaskQueries::recorded(
+                (int)($permissions['task_catalog_select'] ?? 0) === 1,
+                (int)($permissions['stage_catalog_select'] ?? 0) === 1,
+            ), ['numero' => $numero, 'filial' => $order['TJ_FILIAL']]);
+            $result['task_activities_available'] = true;
+        } catch (\Throwable) {
+            // The separate activity section reports this source as unavailable.
+        }
         return $result;
     }
 
@@ -706,6 +739,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->sectorPeriod !== null && $this->sectorPeriod !== ['', '']) {
+            $scoped = SectorPresentationScope::period($sql);
+            if ($scoped !== $sql) {
+                $sql = $scoped;
+                $params += ['sector_start' => $this->sectorPeriod[0], 'sector_start_value' => $this->sectorPeriod[0],
+                    'sector_end' => $this->sectorPeriod[1], 'sector_end_value' => $this->sectorPeriod[1]];
+            }
+        }
         if ($this->equipmentSubstring !== null && $this->equipmentSubstring !== '') {
             $filteredSql = EquipmentLookupQueries::withSubstring($sql);
             if ($filteredSql !== $sql) {
@@ -721,6 +762,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $params['scope_area'] = $this->areaScope;
             }
         }
+        if (in_array($params['area'] ?? $params['scope_area'] ?? $this->areaScope, ['ELETRI', 'INSTRU'], true)) $sql = SectorPresentationScope::areas($sql);
         if ($this->deadline !== null && microtime(true) >= $this->deadline) {
             throw new RuntimeException('Tempo de consulta complementar excedido.');
         }

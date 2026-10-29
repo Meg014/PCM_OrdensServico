@@ -190,17 +190,17 @@ final class ProtheusDashboardTest extends TestCase
         self::assertTrue($result['available']);
         self::assertSame('', $calls[0][1]['centro']);
         self::assertSame('factory', $calls[0][1]['unidade']);
-        self::assertStringContainsString("f.unidade = 'factory'", $calls[0][0]);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unidade", $calls[0][0]);
         self::assertSame('factory', $calls[1][1]['unidade']);
         self::assertSame([['branch' => '01', 'code' => '2425ME'], ['branch' => '01', 'code' => 'ESMECA']],
             json_decode($calls[1][1]['offseason_services'], true));
         self::assertStringContainsString('OPENJSON(f.offseason_services)', $calls[1][0]);
         self::assertStringContainsString("'generic' AS dimension", $calls[1][0]);
         self::assertStringContainsString("CONVERT(date, '20250101', 112)", $calls[1][0]);
-        self::assertStringContainsString("f.unidade = 'factory'", $calls[1][0]);
-        self::assertStringContainsString("LIKE '31%'", $calls[1][0]);
-        self::assertStringContainsString("f.unidade = 'mill'", $calls[1][0]);
-        self::assertStringContainsString("LIKE '41%'", $calls[1][0]);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unidade", $calls[1][0]);
+        self::assertStringContainsString("3.1.0.1.0.0.4", $calls[1][0]);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unidade", $calls[1][0]);
+        self::assertStringContainsString("4.1.0.1.0.0.2", $calls[1][0]);
         self::assertStringContainsString("TJ_SITUACA IS NULL OR TJ_SITUACA <> 'C'", $calls[1][0]);
         self::assertStringNotContainsString('FAB 80 020', $calls[0][0]);
     }
@@ -274,7 +274,7 @@ final class ProtheusDashboardTest extends TestCase
         );
         self::assertSame(
             [
-                'PCM - VISÃO GERAL', 'PCM - ELÉTRICA', 'PCM - MECÂNICA', 'PCM - CALDEIRARIA',
+                'PCM - VISÃO GERAL', 'PCM - ELÉTRICA E INSTRUMENTAÇÃO', 'PCM - MECÂNICA', 'PCM - CALDEIRARIA',
                 'PCM - USINAGEM', 'PCM - INSTRUMENTAÇÃO', 'PCM - DESTILARIA', 'PCM - OUTRA',
             ],
             array_column($result['screens'], 'title'),
@@ -319,7 +319,7 @@ final class ProtheusDashboardTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, $analysisRows, $definitions, &$calls) {
-            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+            if ($sql === ProtheusQueries::historicalServiceDefinitions()) {
                 $statement = $this->createMock(StatementInterface::class);
                 $statement->method('fetchAll')->willReturn($definitions);
                 $statement->expects(self::once())->method('closeCursor');
@@ -328,7 +328,7 @@ final class ProtheusDashboardTest extends TestCase
             $calls[] = [$sql, $params, $types];
             if ($rows === null) throw new RuntimeException('SQLSTATE host user password');
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($sql === ProtheusQueries::DASHBOARD ? $analysisRows : $rows);
+            $statement->method('fetchAll')->willReturn($sql === ProtheusQueries::dashboardAnalysis() ? $analysisRows : $rows);
             $statement->expects(self::once())->method('closeCursor');
             return $statement;
         });

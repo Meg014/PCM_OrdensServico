@@ -11,7 +11,7 @@ use Throwable;
 final class OpportunityStopService
 {
     public const WORKSHOPS = ['MECANI' => 'MECÂNICA', 'ELETRI' => 'ELÉTRICA'];
-    public const UNITS = ['factory' => 'FÁBRICA', 'mill' => 'USINA', 'other' => 'OUTROS'];
+    public const UNITS = ProtheusUnit::LABELS;
 
     /** Accepts the shared sector service for deterministic tests. */
     public function __construct(
@@ -55,7 +55,7 @@ final class OpportunityStopService
 
     public function units(array $costCenters): array
     {
-        $units = array_intersect_key(self::UNITS, array_flip(['factory', 'mill']));
+        $units = array_diff_key(self::UNITS, ['other' => true]);
         foreach (array_keys($costCenters) as $code) {
             if (self::unitForCostCenter((string)$code) === 'other') {
                 $units['other'] = self::UNITS['other'];

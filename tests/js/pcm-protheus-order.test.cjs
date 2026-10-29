@@ -93,7 +93,7 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.doesNotMatch(h.targets.detail.textContent, /O que foi feito|□|\u0000/);
     assert.equal(all(h.targets.detail).some(el => el.tag === 'script'), false);
     assert.match(h.targets.history.textContent, /18\/08\/2026/);
-    assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 4);
+    assert.equal(all(h.targets.detail).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 5);
     assert.equal(all(h.targets.history).filter(el => el.tag === 'span' && el.textContent === 'Fonte: Protheus').length, 1);
     all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Ver mais').listeners.click();
     await tick();
@@ -141,4 +141,46 @@ test('browser timeout aborts the optional request and retains the PCM page', asy
     await tick();
     assert.equal(h.calls[0].options.signal.aborted, true);
     assert.equal(h.targets.detail.textContent, 'Detalhes do Protheus temporariamente indisponíveis.');
+});
+
+test('groups all recorded stages under their task and separates unavailable planning', async () => {
+    const long = 'Texto longo <script>literal</script>\n'.repeat(100);
+    const task = {code: '000117', description: 'CHECKLIST', plan: '000005',
+        contexts: [{related_sequence: '001', maintenance_sequence: '0', task_sequence: '1'}],
+        stages: Array.from({length: 120}, (_, i) => ({code: String(i).padStart(6, '0'), description: long}))};
+    const payload = {...detail, task_activities: {planning_state: 'unavailable', recorded_state: 'available',
+        tasks: [task, {...task, code: '000111', description: 'MANUTENCAO CORRETIVA', stages: []}]}};
+    const h = harness(() => ok({detail: payload, history}));
+    await tick();
+    assert.match(h.targets.detail.textContent, /Tarefas e Etapas da Manutenção/);
+    assert.match(h.targets.detail.textContent, /Planejamento completo não verificado/);
+    assert.match(h.targets.detail.textContent, /Origem: atividades registradas nos apontamentos/);
+    assert.match(h.targets.detail.textContent, /permissões atuais do TOTVS/);
+    const taskHeadings = all(h.targets.detail).filter(el => el.tag === 'h4');
+    assert.equal(taskHeadings.length, 2);
+    const first = all(h.targets.detail).find(el => el.tag === 'section' && el.textContent.includes('Tarefa 000117'));
+    const rows = all(first).filter(el => el.tag === 'tbody')[0].children;
+    assert.equal(rows.length, 120);
+    assert.equal(rows[119].children[1].textContent, long);
+    assert.equal(rows[119].children[1].style.whiteSpace, 'pre-wrap');
+    assert.equal(rows[119].children[1].style.overflowWrap, 'anywhere');
+    assert.equal(all(first).some(el => el.tag === 'script'), false);
+    assert.match(h.targets.detail.textContent, /Etapa não informada nos apontamentos desta tarefa/);
+    assert.match(h.targets.detail.textContent, /DAMIAO GONCALVES/);
+    assert.match(h.targets.detail.textContent, /ROLAMENTO 6203/);
+});
+
+test('distinguishes empty recorded activities from unavailable sources without claiming no planned stages', async () => {
+    for (const state of ['available', 'unavailable']) {
+        const h = harness(() => ok({detail: {...detail, task_activities: {
+            planning_state: 'unavailable', recorded_state: state, tasks: []}}, history}));
+        await tick();
+        assert.match(h.targets.detail.textContent, /Planejamento completo não verificado/);
+        assert.equal((h.targets.detail.textContent.match(/Planejamento completo não verificado/g) || []).length, 1);
+        assert.match(h.targets.detail.textContent, state === 'available'
+            ? /Nenhuma tarefa ou etapa identificada para esta O.S./
+            : /Não foi possível consultar as atividades desta O.S./);
+        assert.doesNotMatch(h.targets.detail.textContent, /O.S. não possui etapas/);
+        assert.match(h.targets.detail.textContent, /Descrição da manutenção/);
+    }
 });

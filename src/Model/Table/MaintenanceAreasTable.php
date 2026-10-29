@@ -10,7 +10,10 @@ class MaintenanceAreasTable extends Table
 {
     /** Canonical user-facing names for known TOTVS maintenance area codes. */
     public const FRIENDLY_NAMES = [
-        'ELETRI' => 'Elétrica',
+        'ELETRI' => 'Elétrica e Instrumentação',
+        'CALD' => 'Caldeira',
+        'FAB' => 'Fábrica',
+        'TRATA' => 'Tratamento de Caldo',
         'MECANI' => 'Mecânica',
         'CALDEI' => 'Caldeiraria',
         'USINAG' => 'Usinagem',
@@ -18,6 +21,8 @@ class MaintenanceAreasTable extends Table
         'DESTIL' => 'Destilaria',
         'OPERAC' => 'Operação',
         'TERCEI' => 'Terceiros',
+        'LABORA' => 'Laboratório',
+        'MOEND' => 'Moenda',
     ];
 
     /** Configures the maintenance areas repository. */

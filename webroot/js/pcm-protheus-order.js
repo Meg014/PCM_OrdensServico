@@ -44,6 +44,8 @@
             const row = node('tr');
             cells.forEach(cell => {
                 const td = node('td');
+                td.style.whiteSpace = 'pre-wrap';
+                td.style.overflowWrap = 'anywhere';
                 td.append(cell instanceof Node ? cell : document.createTextNode(value(cell)));
                 row.append(td);
             });
@@ -68,12 +70,23 @@
         const description = node('p', descriptionText || 'Não existe descrição detalhada disponível no TOTVS.');
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
+        if (data.original_description) {
+            const original = node('details', undefined, 'mb-3');
+            original.append(node('summary', 'Conteúdo bruto/original do TOTVS — descrição da O.S.'));
+            const text = node('p', data.original_description);
+            text.style.whiteSpace = 'pre-wrap';
+            text.style.overflowWrap = 'anywhere';
+            original.append(text);
+            card.append(original);
+        }
         const list = node('dl');
         const fields = [
             ['Data de origem', date(data.origin_date)],
             ['Equipamento', codeName(m.equipment_code, m.equipment_name)],
             ['Serviço', codeName(m.service_code, m.service_name)],
-            ['Área', value(m.area)], ['Centro de custo', value(m.cost_center)],
+            ['Área', value(m.area_name ?? m.area)], ['Centro de custo', value(m.cost_center)],
+            ['Unidade', value(m.unit_name)],
+            ['Classificação do centro de custo', value(m.cost_center_source_unit)],
             ['Manutenção planejada — início', dateTime(m.planned_start_date, m.planned_start_time)],
             ['Manutenção planejada — fim', dateTime(m.planned_end_date, m.planned_end_time)],
             ['Manutenção real — início', dateTime(m.actual_start_date, m.actual_start_time)],
@@ -113,6 +126,7 @@
             section.append(source, text);
             target.append(section);
         });
+        renderTaskActivities(target, data.task_activities);
         target.append(heading('Mão de obra', 'QUEM EXECUTOU · QUANTIDADE REGISTRADA'));
         target.append(table(['Profissional', 'Código', 'Data início', 'Início', 'Data fim', 'Fim', 'Quantidade / horas', 'Descrição do apontamento'],
             data.labor.map(row => [row.professional, row.code, date(row.date), row.start_time,
@@ -122,6 +136,39 @@
             ['Código', 'Descrição', 'Quantidade', 'Unidade', 'Data / hora'],
             data.materials.map(row => [row.code, row.description, row.quantity, row.unit, dateTime(row.used_date, row.used_time)]),
             'Nenhum material disponível.'));
+    }
+    function renderTaskActivities(target, activities) {
+        target.append(heading('Tarefas e Etapas da Manutenção'));
+        const planningNotice = () => target.append(node('p', 'Planejamento completo não verificado com as permissões atuais do TOTVS.', 'text-body-secondary small'));
+        if (activities?.recorded_state !== 'available') {
+            target.append(node('p', 'Não foi possível consultar as atividades desta O.S.', 'text-body-secondary'));
+            planningNotice();
+            return;
+        }
+        if (!activities.tasks.length) {
+            target.append(node('p', 'Nenhuma tarefa ou etapa identificada para esta O.S.', 'fw-semibold mb-1'));
+            planningNotice();
+            return;
+        }
+        target.append(node('p', 'Origem: atividades registradas nos apontamentos (STL010), com descrições de TT9010 e TPA010.', 'text-body-secondary small'));
+        activities.tasks.forEach(task => {
+            const section = node('section', undefined, 'pcm-detail-card mb-3');
+            const label = task.code ? `Tarefa ${task.code}` : 'Tarefa não informada no apontamento';
+            const title = node('h4', `${label} — ${task.description || 'Descrição não disponível no cadastro acessível'}`, 'h5');
+            title.style.whiteSpace = 'pre-wrap';
+            title.style.overflowWrap = 'anywhere';
+            section.append(title);
+            section.append(node('p', `Plano: ${value(task.plan)}`, 'text-body-secondary small'));
+            const context = node('details', undefined, 'mb-2');
+            context.append(node('summary', 'Vínculos dos apontamentos'));
+            task.contexts.forEach(item => context.append(node('p', `Sequência relacionada: ${value(item.related_sequence)} · Manutenção: ${value(item.maintenance_sequence)} · Tarefa: ${value(item.task_sequence)}`, 'small mb-1')));
+            section.append(context);
+            section.append(table(['Código da etapa', 'Descrição'], task.stages.map(stage => [stage.code,
+                stage.description || 'Descrição não disponível no cadastro acessível']),
+            'Etapa não informada nos apontamentos desta tarefa.'));
+            target.append(section);
+        });
+        planningNotice();
     }
     function laborQuantity(row) {
         const block = node('div', value(row.hours_display ?? row.hours));
@@ -175,7 +222,7 @@
                     request(selected, {part: 'detail', os: row.TJ_ORDEM});
                 });
                 return [row.TJ_ORDEM, date(row.reference_date), codeName(row.TJ_SERVICO, row.service_name),
-                    row.TJ_CODAREA, `Situação: ${value(row.TJ_SITUACA)} · Término: ${value(row.TJ_TERMINO)}`, button];
+                    row.area_name ?? row.TJ_CODAREA, `Situação: ${value(row.TJ_SITUACA)} · Término: ${value(row.TJ_TERMINO)}`, button];
             }), 'Nenhuma OS disponível nesta página.'));
         const nav = node('nav', undefined, 'd-flex align-items-center gap-3 mt-3');
         nav.setAttribute('aria-label', 'Páginas do histórico do equipamento');

@@ -34,7 +34,8 @@ final class OrderEntryExcelReportTest extends TestCase
         self::assertSame(2, $sheet->getCell('C5')->getValue());
         self::assertSame('Filtros: Equipamento: 000045', $sheet->getCell('A6')->getValue());
         self::assertSame('A8', $sheet->getFreezePane());
-        self::assertSame('A7:X11', $sheet->getAutoFilter()->getRange());
+        self::assertSame('A7:Z11', $sheet->getAutoFilter()->getRange());
+        self::assertSame('Não classificados', $sheet->getCell('Y8')->getValue());
         self::assertSame(['005472', '005472', '005472', '005473'], array_map(
             static fn (int $row): string => (string)$sheet->getCell('A' . $row)->getValue(), range(8, 11)));
         self::assertSame('DESCRIÇÃO X', $sheet->getCell('E8')->getValue());

@@ -85,6 +85,7 @@ final class OrderProtheusService
                         $item[$key] = isset($row[$key]) && is_scalar($row[$key]) ? rtrim((string)$row[$key], ' ') : null;
                     }
                     $item['reference_date'] = $mapper->date($row['reference_date'] ?? null);
+                    $item['area_name'] = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$item['TJ_CODAREA'] ?? ''] ?? $item['TJ_CODAREA'];
                     $items[] = $item;
                 }
                 $result['history'] = [

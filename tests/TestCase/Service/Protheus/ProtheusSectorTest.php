@@ -33,7 +33,7 @@ final class ProtheusSectorTest extends TestCase
             self::assertStringContainsString('DATEDIFF(day, origin_date, CONVERT(date, :as_of, 23))', $calls[$index][0]);
             self::assertStringContainsString('TRY_CONVERT(date, j.TJ_DTORIGI, 112)', $calls[$index][0]);
             self::assertStringNotContainsString('STL010', $calls[$index][0]);
-            self::assertTrue(ProtheusQueries::allows(ProtheusQueries::withAreaScope($calls[$index][0])));
+            self::assertTrue(ProtheusQueries::allows(ProtheusQueries::withAreaScope(\App\Service\Protheus\SectorPresentationScope::withoutAreas($calls[$index][0]))));
             self::assertFalse(ProtheusQueries::allows($calls[$index][0] . '; DELETE FROM STJ010'));
         }
         self::assertSame($calls[4][1]['as_of'], $calls[5][1]['as_of']);
@@ -67,19 +67,21 @@ final class ProtheusSectorTest extends TestCase
     {
         $calls = [];
         $sector = (new ProtheusSectorService($this->repository($calls)))->load('MECANI', [
-            'unit' => 'factory', 'equipment' => 'BEM01', 'date_start' => '2026-01-01',
+            'unit' => 'factory', 'equipment' => 'BEM01', 'date_start' => '01/01/2026',
         ]);
 
         self::assertTrue($sector['available']);
         self::assertSame('factory', $sector['filters']['unit']);
         self::assertCount(6, $calls);
         foreach ($calls as [$sql, $params]) {
+            self::assertSame('2026-01-01', $params['sector_start']);
+            self::assertStringContainsString('n.planned_date >= TRY_CONVERT', $sql);
             self::assertSame('factory', $params['unit']);
             self::assertSame('BEM01', $params['equipment']);
-            self::assertStringContainsString("f.unit = 'factory'", $sql);
-            self::assertStringContainsString("LIKE '31%'", $sql);
+            self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unit", $sql);
+            self::assertStringContainsString("3.1.0.1.0.0.4", $sql);
             self::assertStringContainsString("f.unit = 'other'", $sql);
-            self::assertStringContainsString("NOT LIKE '41%'", $sql);
+            self::assertStringContainsString("f.unit = 'other'", $sql);
         }
         self::assertSame('2026-01-01', $calls[5][1]['date_start']);
     }
@@ -140,12 +142,13 @@ final class ProtheusSectorTest extends TestCase
         self::assertSame(4, substr_count($html, 'pcm-season-card'));
         self::assertStringContainsString('card=offseason', $html);
         self::assertStringContainsString('card_status=EM+ABERTO', $html);
-        self::assertMatchesRegularExpression('~href="/pcm/ordens\?[^\"]*card=offseason[^\"]*"~', $html);
-        self::assertDoesNotMatchRegularExpression('~href="/pcm/setor/ELETRI\?[^\"]*card=offseason~', $html);
-        self::assertMatchesRegularExpression('~href="/pcm/ordens\?[^\"]*backlog_age=over_60[^\"]*"~', $html);
+        self::assertMatchesRegularExpression('~href="/pcm/setor/ELETRI\?[^\"]*card=offseason[^\"]*"~', $html);
+        self::assertStringContainsString('return_sector=ELETRI', $html);
+        self::assertMatchesRegularExpression('~href="/pcm/setor/ELETRI\?[^\"]*backlog_age=over_60[^\"]*"~', $html);
         self::assertDoesNotMatchRegularExpression('~href="/pcm/ordens[^\"]*#orders~', $html);
         self::assertStringContainsString('backlog_age=over_60', $html);
-        self::assertStringNotContainsString('card=', $this->hrefFor($html, 'backlog_age=over_60'));
+        self::assertStringContainsString('date_start=2026-01-01', $this->hrefFor($html, 'backlog_age=over_60'));
+        self::assertStringNotContainsString('&amp;amp;', $html);
         $activeSector = $sector;
         $activeSector['filters']['card'] = 'offseason';
         $activeSector['filters']['card_status'] = 'EM ABERTO';
@@ -354,12 +357,33 @@ final class ProtheusSectorTest extends TestCase
         self::assertFalse((new ProtheusSectorService($this->repository($calls, true)))->load('ELETRI', [], true)['available']);
     }
 
+    public function testAutocompleteSelectionUsesIdentityInsteadOfItsLabel(): void
+    {
+        $calls = [];
+        $sector = (new ProtheusSectorService($this->repository($calls)))->load('INSTRU', [
+            'bem' => 'BEM01', 'bem_filial' => '02', 'equipment_q' => 'BEM01 — ' . str_repeat('Nome do equipamento ', 6),
+        ]);
+        self::assertTrue($sector['available']);
+        self::assertSame('ELETRI', $sector['code']);
+        self::assertSame('BEM01', $sector['filters']['equipment']);
+        self::assertSame('02', $sector['filters']['filial']);
+        self::assertSame('', $sector['filters']['equipment_q']);
+        foreach ($calls as [$sql, $params]) {
+            self::assertSame('BEM01', $params['equipment']);
+            self::assertSame('02', $params['filial']);
+        }
+    }
+
     private function repository(array &$calls, bool $fail = false, ?array $aggregate = null, ?array $backlog = null): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $fail, $aggregate, $backlog) {
             $calls[] = [$sql, $params, $types];
+            self::assertTrue(ProtheusQueries::allows($sql));
+            $sql = \App\Service\Protheus\SectorPresentationScope::withoutAreas(
+                \App\Service\Protheus\SectorPresentationScope::withoutPeriod($sql),
+            );
             self::assertTrue(ProtheusQueries::allows($sql));
             if ($fail && $sql === ProtheusSectorQueries::backlog()) throw new \RuntimeException('SQLSTATE private server');
             $base = ['identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1, 'quantity' => 1, 'missing_start' => 0];

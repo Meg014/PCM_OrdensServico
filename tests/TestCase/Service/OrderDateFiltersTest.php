@@ -102,8 +102,9 @@ class OrderDateFiltersTest extends TestCase
     public function testFriendlyNamesPreserveCodesAndCustomNames(): void
     {
         foreach (
-            ['MECANI' => 'Mecânica', 'ELETRI' => 'Elétrica', 'CALDEI' => 'Caldeiraria',
-            'INSTRU' => 'Instrumentação', 'OPERAC' => 'Operação', 'TERCEI' => 'Terceiros', 'USINAG' => 'Usinagem'] as $code => $name
+            ['MECANI' => 'Mecânica', 'ELETRI' => 'Elétrica e Instrumentação', 'CALDEI' => 'Caldeiraria',
+            'INSTRU' => 'Instrumentação', 'OPERAC' => 'Operação', 'TERCEI' => 'Terceiros', 'USINAG' => 'Usinagem',
+            'LABORA' => 'Laboratório', 'MOEND' => 'Moenda'] as $code => $name
         ) {
             $area = new MaintenanceArea(['source_code' => $code, 'display_name' => $code]);
             $this->assertSame($name, $area->display_name);

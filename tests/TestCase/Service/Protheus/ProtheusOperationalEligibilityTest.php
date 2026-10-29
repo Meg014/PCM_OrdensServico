@@ -45,7 +45,7 @@ final class ProtheusOperationalEligibilityTest extends TestCase
 
     public function testEveryNonOperationalOrderReadUsesTheCentralCancellationPredicate(): void
     {
-        $queries = [ProtheusQueries::AREAS, ProtheusQueries::DASHBOARD, ProtheusQueries::MANAGEMENT,
+        $queries = [ProtheusQueries::AREAS, ProtheusQueries::dashboardAnalysis(), ProtheusQueries::MANAGEMENT,
             ProtheusQueries::orders(false, false, false), ProtheusQueries::orders(true, true, true, true),
             ProtheusQueries::generalEntries(), ProtheusQueries::equipmentHistory(false),
             ProtheusQueries::equipmentPortfolioPage(), ProtheusQueries::ORDER,

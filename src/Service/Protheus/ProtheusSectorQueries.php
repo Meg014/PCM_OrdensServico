@@ -113,6 +113,9 @@ SQL;
 ), ranked AS (
     SELECT g.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC, TJ_FILIAL,
         status, TJ_TIPO, TJ_CODBEM, TJ_SERVICO, TJ_CCUSTO) AS position FROM grouped g
+    UNION ALL
+    SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, CAST(0 AS BIGINT), 0, 0, 0, 0, 1
+    WHERE NOT EXISTS (SELECT 1 FROM grouped)
 )
 SELECT dimension, TJ_FILIAL, status, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
     TJ_CCUSTO, quantity, identity_count, equipment_matches, service_matches, missing_start

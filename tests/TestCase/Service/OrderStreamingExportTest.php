@@ -20,9 +20,17 @@ final class OrderStreamingExportTest extends TestCase
             'TJ_ORDEM', 'descricao', 'TJ_CODBEM', 'equipment_name', 'TJ_SERVICO', 'service_name',
             'TJ_TIPO', 'TJ_CODAREA', 'TJ_CCUSTO', 'situation_label', 'finished_label',
             'TJ_DTORIGI', 'actual_start', 'actual_end',
+            'cost_center_unit_name', 'cost_center_source_unit',
         ], array_keys($columns));
         self::assertArrayNotHasKey('TJ_FILIAL', $columns);
+        foreach (['LABORA' => 'Laboratório', 'MOEND' => 'Moenda'] as $code => $name) {
+            $row = ['TJ_CODAREA' => $code];
+            self::assertSame($name, $columns['TJ_CODAREA'][3]($row));
+            self::assertSame($code, $row['TJ_CODAREA']);
+        }
         self::assertSame('Descrição/Nome do serviço', $columns['service_name'][0]);
+        self::assertSame('Externo', $columns['cost_center_unit_name'][3](['TJ_CCUSTO' => '4101035']));
+        self::assertSame('Não classificados', $columns['cost_center_unit_name'][3](['TJ_CCUSTO' => '']));
         self::assertSame('LIBERADA', $columns['situation_label'][3](['TJ_SITUACA' => 'L ']));
         self::assertSame('CANCELADA', $columns['situation_label'][3](['TJ_SITUACA' => 'C']));
         self::assertSame('PENDENTE', $columns['situation_label'][3](['TJ_SITUACA' => 'P']));

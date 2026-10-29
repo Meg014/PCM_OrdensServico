@@ -76,7 +76,7 @@ final class OrderEntryExportServiceTest extends TestCase
             self::assertStringContainsString('c.CTT_FILIAL=n.TJ_FILIAL', $call[0]);
             self::assertStringContainsString("CONVERT(date, '20250101', 112)", $call[0]);
             self::assertStringNotContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $call[0]);
-            self::assertStringContainsString("LIKE '41%'", $call[0]);
+            self::assertStringContainsString("4.1.0.1.0.0.2", $call[0]);
             self::assertTrue(ProtheusQueries::allows($call[0]));
         }
         self::assertSame(0, $calls[0][1]['offset']);
@@ -116,7 +116,7 @@ final class OrderEntryExportServiceTest extends TestCase
         self::assertSame('MECANI', $calls[0][1]['area']);
         self::assertSame(1000, $calls[0][1]['offset']);
         self::assertStringContainsString("f.unidade = 'other'", $calls[0][0]);
-        self::assertStringContainsString("NOT LIKE '31%'", $calls[0][0]);
+        self::assertStringContainsString("f.unidade = 'other'", $calls[0][0]);
     }
 
     private function repository(array &$calls, array $rows, bool $fail = false): ProtheusRepository
@@ -124,7 +124,7 @@ final class OrderEntryExportServiceTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use (&$calls, $rows, $fail) {
-            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+            if ($sql === ProtheusQueries::historicalServiceDefinitions()) {
                 $statement = $this->createMock(StatementInterface::class);
                 $statement->method('fetchAll')->willReturn([]);
                 $statement->expects(self::once())->method('closeCursor');

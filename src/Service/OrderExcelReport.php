@@ -61,6 +61,7 @@ final class OrderExcelReport
                 }
             }
         }
+        $columns += ['cost_center_unit_name' => ['Unidade da O.S.', 'text'], 'cost_center_source_unit' => ['Classificação do centro de custo', 'text']];
         $textBytes = 0;
         foreach ($data['orders'] as $order) {
             foreach ($columns as $key => $_definition) {
@@ -114,10 +115,13 @@ final class OrderExcelReport
         $mapper = new OrderSupplementMapper();
         foreach ($data['orders'] as $order) {
             ++$row;
+            $order['cost_center_unit_name'] = \App\Service\Protheus\ProtheusUnit::label($order['TJ_CCUSTO'] ?? null);
+            $order['cost_center_source_unit'] = \App\Service\Protheus\ProtheusUnit::sourceGroup($order['TJ_CCUSTO'] ?? null);
             $index = 1;
             foreach ($columns as $key => [$label, $type]) {
                 $cell = Coordinate::stringFromColumnIndex($index++) . $row;
                 $value = $order[$key] ?? null;
+                if ($key === 'TJ_CODAREA') $value = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)$value)] ?? $value;
                 if ($type === 'date') {
                     $iso = $mapper->date($value);
                     if ($iso !== null) {

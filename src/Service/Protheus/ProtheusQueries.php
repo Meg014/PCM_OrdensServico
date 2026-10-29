@@ -9,7 +9,9 @@ final class ProtheusQueries
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
     /** Fixed aggregate-only audit used to verify the analytical boundary against Protheus. */
-    public const ANALYTICAL_AUDIT = <<<'SQL'
+    public static function analyticalAudit(): string
+    {
+        return str_replace('{{UNIT_EXPRESSION}}', ProtheusUnit::expression('cost_center'), <<<'SQL'
 WITH source AS (
     SELECT RTRIM(j.TJ_FILIAL) AS branch, RTRIM(j.TJ_CODBEM) AS equipment, RTRIM(j.TJ_SERVICO) AS service,
         RTRIM(j.TJ_CODAREA) AS area, LTRIM(RTRIM(COALESCE(j.TJ_CCUSTO, ''))) AS cost_center,
@@ -17,8 +19,7 @@ WITH source AS (
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*' AND (j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C')
 ), classified AS (
-    SELECT *, CASE WHEN cost_center LIKE '31%' THEN 'factory'
-        WHEN cost_center LIKE '41%' THEN 'mill' ELSE 'other' END AS unit_name,
+    SELECT *, {{UNIT_EXPRESSION}} AS unit_name,
         CASE WHEN branch = '01' AND equipment IN ('FAB 80 020', 'SET 50 002', 'SET 50 001', 'SET 80 004')
             THEN 1 ELSE 0 END AS is_generic
     FROM source
@@ -38,16 +39,19 @@ WHERE unit_name IN ('factory', 'mill')
   AND NOT (branch = '01' AND service IN ('2425CA', '2425CI', '2425EL', '2425ME', '2425US',
       'ESCALD', 'ESDEST', 'ESMECA'))
 ORDER BY metric
-SQL;
+SQL);
+    }
 
-    public const HISTORICAL_SERVICE_DEFINITIONS = <<<'SQL'
+    public static function historicalServiceDefinitions(): string
+    {
+        return <<<'SQL'
 WITH grouped AS (
     SELECT j.TJ_FILIAL, j.TJ_SERVICO
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*' AND (j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C')
       AND
 SQL
-        . ProtheusUnit::STJ_FACTORY_OR_MILL . <<<'SQL'
+        . ProtheusUnit::classified() . <<<'SQL'
 
       AND
 SQL
@@ -65,6 +69,7 @@ OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 
     WHERE s.T4_SERVICO = g.TJ_SERVICO AND s.T4_FILIAL = '' AND s.D_E_L_E_T_ <> '*') shared_service
 ORDER BY g.TJ_FILIAL, g.TJ_SERVICO
 SQL;
+    }
 
     public const AREAS = <<<'SQL'
 SELECT DISTINCT RTRIM(j.TJ_CODAREA) AS code
@@ -144,13 +149,15 @@ SQL;
 
         return str_replace(
             "AND (f.termino = '' OR j.TJ_TERMINO = f.termino)",
-            "AND (f.termino = '' OR j.TJ_TERMINO = f.termino)\n      AND " . ProtheusUnit::STJ_PREDICATE,
+            "AND (f.termino = '' OR j.TJ_TERMINO = f.termino)\n      AND " . ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade'),
             $sql,
         );
     }
 
     /** One bounded aggregate result; all filtering precedes aggregation on SQL Server. */
-    public const DASHBOARD = <<<'SQL'
+    private static function dashboardBase(): string
+    {
+        return <<<'SQL'
 WITH base AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_CODBEM, j.TJ_SERVICO,
            j.TJ_CCUSTO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
@@ -191,11 +198,11 @@ SQL
       )
       AND
 SQL
-        . ProtheusUnit::STJ_FACTORY_OR_MILL . <<<'SQL'
+        . ProtheusUnit::classified() . <<<'SQL'
 
       AND
 SQL
-        . ProtheusUnit::STJ_PREDICATE . <<<'SQL'
+        . ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade') . <<<'SQL'
 
 ), grouped AS (
     SELECT CASE
@@ -273,10 +280,11 @@ WHERE r.dimension NOT IN ('equipment', 'service', 'cost_center') OR r.position <
 ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
+    }
 
     public static function dashboardAnalysis(): string
     {
-        return self::DASHBOARD;
+        return self::dashboardBase();
     }
 
     /** Optional columns are probed without executing arbitrary SQL or scanning STJ010. */
@@ -339,7 +347,7 @@ SQL;
             if ($historical || $safra) {
                 $where .= " AND NOT EXISTS (SELECT 1 FROM OPENJSON(f.offseason_services) WITH (branch VARCHAR(100) '$.branch', code VARCHAR(100) '$.code') offseason WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO)"
                     . ' AND ' . ProtheusAnalyticalScope::STJ_PREDICATE;
-                if ($historical) $where .= ' AND ' . ProtheusUnit::STJ_FACTORY_OR_MILL;
+                if ($historical) $where .= ' AND ' . ProtheusUnit::classified();
             }
         }
 
@@ -353,7 +361,7 @@ SQL;
         $date = self::ORIGIN_DATE;
         $notCanceled = ProtheusOperationalEligibility::notCanceled('j');
         $unitScope = ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade');
-        $factoryOrMill = ProtheusUnit::STJ_FACTORY_OR_MILL;
+        $factoryOrMill = ProtheusUnit::classified();
         $analyticalScope = ProtheusAnalyticalScope::STJ_PREDICATE;
         return <<<SQL
 WITH filtered AS (
@@ -497,7 +505,7 @@ SQL;
 
     public const ORDER = <<<'SQL'
 SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.TJ_CCUSTO,
-    j.TJ_DTORIGI,
+    j.TJ_DTORIGI, j.TJ_PLANO, j.TJ_SEQRELA,
     j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
     j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
     j.TJ_DTPPINI, j.TJ_HOPPINI, j.TJ_DTPPFIM, j.TJ_HOPPFIM,
@@ -566,13 +574,24 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if (in_array($sql, [CostCenterUnitQueries::AUDIT, CostCenterUnitQueries::CENTERS], true)) return true;
+        if (in_array($sql, [OrderTaskQueries::ORDER_AUDIT, OrderTaskQueries::CATALOG_AUDIT], true)) return true;
+        foreach ([false, true] as $tasks) {
+            foreach ([false, true] as $stages) {
+                if ($sql === OrderTaskQueries::recorded($tasks, $stages)) return true;
+            }
+        }
+        $withoutAreas = SectorPresentationScope::withoutAreas($sql);
+        if ($withoutAreas !== $sql) return SectorPresentationScope::areas($withoutAreas) === $sql && self::allows($withoutAreas);
         $withoutEquipment = EquipmentLookupQueries::withoutSubstring($sql);
         if ($withoutEquipment !== $sql) {
             return EquipmentLookupQueries::withSubstring($withoutEquipment) === $sql && self::allows($withoutEquipment);
         }
+        $withoutPeriod = SectorPresentationScope::withoutPeriod($sql);
+        if ($withoutPeriod !== $sql) return SectorPresentationScope::period($withoutPeriod) === $sql && self::allows($withoutPeriod);
         if ($sql === EquipmentLookupQueries::SEARCH) return true;
         if (in_array($sql, [OrderDescriptionQueries::METADATA, OrderDescriptionQueries::PERMISSIONS, OrderDescriptionQueries::BATCH], true)) return true;
-        if ($sql === ActionPlanQuery::SQL) {
+        if ($sql === ActionPlanQuery::sql()) {
             return true;
         }
         if (self::allowsBase($sql)) return true;
@@ -638,10 +657,10 @@ SQL;
             }
         }
         return in_array($sql, [
-            self::dashboardAnalysis(), self::management(), self::management(true), self::AREAS, self::HISTORICAL_SERVICE_DEFINITIONS,
+            self::dashboardAnalysis(), self::management(), self::management(true), self::AREAS, self::historicalServiceDefinitions(),
             self::ORDER_IDENTITY, self::EQUIPMENT_BRANCH, self::SERVICE_BRANCH,
             self::PROFESSIONAL_BRANCH, self::PRODUCT_BRANCH,
-            self::HISTORY_USER_COLUMNS, self::ANALYTICAL_AUDIT,
+            self::HISTORY_USER_COLUMNS, self::analyticalAudit(),
             self::HEALTH, self::ORDER, self::ORDER_BRANCH, self::EQUIPMENT,
             self::SERVICE, self::ENTRIES, self::PROFESSIONAL, self::PRODUCT,
         ], true);

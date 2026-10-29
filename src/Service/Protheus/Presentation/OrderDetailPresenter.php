@@ -52,10 +52,12 @@ final class OrderDetailPresenter
                     Availability::Available => null,
                 },
                 'origin_date' => $available ? $supplement->originDate : null,
-                'description' => $available ? $supplement->description : null,
+                'description' => $available ? \App\Service\Protheus\OrderDescriptions::maintenance($supplement->description) : null,
+                'original_description' => $available ? $supplement->description : null,
                 'descriptions' => $available ? $this->project($supplement->descriptions, ['text', 'source']) : [],
+                'task_activities' => $available ? $supplement->taskActivities : OrderTaskActivities::present([], '', '', false),
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
-                    'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center',
+                    'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center', 'unit_name', 'cost_center_source_unit',
                     'planned_start_date', 'planned_start_time', 'planned_end_date', 'planned_end_time',
                     'actual_start_date', 'actual_start_time', 'actual_end_date', 'actual_end_time',
                     'general_planned_start_date', 'general_planned_start_time', 'general_planned_end_date', 'general_planned_end_time',
@@ -78,6 +80,9 @@ final class OrderDetailPresenter
             $item = [];
             foreach ($fields as $field) {
                 $item[$field] = isset($row[$field]) && is_string($row[$field]) ? $row[$field] : null;
+            }
+            if (in_array('area', $fields, true)) {
+                $item['area_name'] = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$item['area'] ?? ''] ?? $item['area'];
             }
             $result[] = $item;
         }

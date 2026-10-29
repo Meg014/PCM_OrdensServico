@@ -87,6 +87,44 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
 .pcm-primary-action { background: #244f7b; border-color: #244f7b; font-weight: 600; }
 .pcm-primary-action:hover, .pcm-primary-action:focus { background: #193b60; border-color: #193b60; }
 .pcm-panel { padding: 0; overflow: hidden; }
+
+/* Sector filters: keep the input row stable while suggestions overlay the content. */
+.pcm-sector-filter-panel { overflow: visible; position: relative; z-index: 2; }
+.pcm-sector-filter-fields {
+    display: grid; grid-template-columns: minmax(0, 1fr) repeat(2, 9.5rem) auto;
+    align-items: end; gap: 1rem; padding-bottom: 3.5rem;
+}
+.pcm-sector-filter-fields > div { min-width: 0; }
+.pcm-sector-filter-fields label { display: block; margin-bottom: .5rem; }
+.pcm-sector-filter-fields .form-control, .pcm-sector-filter-actions .btn { height: 2.8rem; }
+.pcm-sector-filter-actions { display: flex; gap: 1rem; }
+.pcm-sector-filter-actions .btn { display: inline-flex; align-items: center; justify-content: center; }
+.pcm-sector-equipment { position: relative; }
+.pcm-sector-equipment > [role="status"] {
+    position: absolute; top: 100%; inset-inline: 0; margin-top: .35rem;
+    max-height: 3rem; overflow: auto; overflow-wrap: anywhere;
+}
+.pcm-sector-equipment-anchor { position: relative; }
+.pcm-sector-equipment-options {
+    position: absolute; top: 100%; inset-inline: 0; width: 100%; z-index: 1000;
+    max-height: 20rem; overflow-y: auto; overflow-x: hidden;
+    background: var(--bg-surface); border: 1px solid var(--border-secondary); border-radius: .375rem;
+}
+.pcm-sector-equipment-options .list-group-item {
+    white-space: normal; overflow-wrap: anywhere; text-align: left;
+    background: var(--bg-surface); color: var(--text-body); border-color: var(--border-secondary);
+}
+.pcm-sector-equipment-options .list-group-item:hover,
+.pcm-sector-equipment-options .list-group-item.active { background: var(--bg-hover); color: var(--text-title); }
+@media (max-width: 991.98px) {
+    .pcm-sector-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 0; }
+    .pcm-sector-equipment { grid-column: 1 / -1; margin-bottom: 3.5rem; }
+    .pcm-sector-filter-actions { grid-column: 1 / -1; }
+}
+@media (max-width: 575.98px) {
+    .pcm-sector-filter-fields { grid-template-columns: minmax(0, 1fr); }
+    .pcm-sector-filter-actions .btn { flex: 1; }
+}
 .pcm-sector-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .pcm-sector-table-scroll > table { min-width: 100%; width: max-content; }
 .pcm-equipment-history, .pcm-equipment-history > .pcm-panel { min-width: 0; max-width: 100%; }

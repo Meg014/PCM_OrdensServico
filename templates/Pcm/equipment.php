@@ -1,7 +1,9 @@
+<?= $this->element('sector_return_link') ?>
 <?php
 $f = $equipment['filters'];
+$returnContext = array_intersect_key($this->getRequest()->getQueryParams(), array_flip(['return_sector', 'return_filters']));
 $this->assign('title', 'Histórico do equipamento — ' . $f['bem']);
-$url = fn (int $page) => ['_name' => 'pcm-equipment', '?' => $f + ['page' => $page, 'limit' => $equipment['limit']]];
+$url = fn (int $page) => ['_name' => 'pcm-equipment', '?' => $f + $returnContext + ['page' => $page, 'limit' => $equipment['limit']]];
 $date = static function ($raw): string {
     $iso = (new \App\Service\Protheus\Presentation\OrderSupplementMapper())->date($raw);
     return $iso ? implode('/', array_reverse(explode('-', $iso))) : '—';
@@ -29,6 +31,10 @@ $status = static function (array $row): string {
 <small class="text-body-secondary">Área e centro de custo são os registros históricos das O.S., não uma atribuição cadastral atual do bem.</small></section>
 <section class="pcm-panel p-4"><h2>Filtros do histórico</h2>
 <?= $this->Form->create(null, ['type' => 'get']) ?>
+<?php if (is_string($returnContext['return_sector'] ?? null)): ?><?= $this->Form->hidden('return_sector', ['value' => $returnContext['return_sector']]) ?><?php endif; ?>
+<?php foreach ((array)($returnContext['return_filters'] ?? []) as $key => $value): ?>
+<?php if (in_array($key, [...\App\Service\Protheus\ProtheusSectorService::FILTERS, 'page', 'limit'], true) && is_string($value)): ?><?= $this->Form->hidden('return_filters.' . $key, ['value' => $value]) ?><?php endif; ?>
+<?php endforeach; ?>
 <?= $this->Form->hidden('bem', ['value' => $f['bem']]) ?><?= $this->Form->hidden('filial', ['value' => $f['filial']]) ?>
 <?php if ($f['setor'] !== ''): ?><?= $this->Form->hidden('setor', ['value' => $f['setor']]) ?><?php endif; ?>
 <div class="row g-3">
@@ -40,7 +46,7 @@ $status = static function (array $row): string {
 <div class="col-md-3"><?= $this->Form->control('type', ['label' => 'Tipo de manutenção', 'empty' => 'Todos', 'options' => ['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'], 'value' => $f['type'], 'class' => 'form-select']) ?></div>
 <div class="col-md-3"><?= $this->Form->control('status', ['label' => 'Situação operacional', 'empty' => 'Todas', 'options' => ['open' => 'Aberta', 'closed' => 'Fechada'], 'value' => $f['status'], 'class' => 'form-select']) ?></div>
 </div><p class="text-body-secondary mt-3">Período pela Data de origem da OS. Os filtros afetam tabela, resumo e reincidência.</p>
-<button class="btn pcm-primary-action">Aplicar</button> <?= $this->Html->link('Limpar', ['_name' => 'pcm-equipment', '?' => array_intersect_key($f, array_flip(['bem', 'filial', 'setor']))], ['class' => 'btn pcm-secondary-action']) ?>
+<button class="btn pcm-primary-action">Aplicar</button> <?= $this->Html->link('Limpar', ['_name' => 'pcm-equipment', '?' => array_intersect_key($f, array_flip(['bem', 'filial', 'setor'])) + $returnContext], ['class' => 'btn pcm-secondary-action']) ?>
 <?= $this->Form->end() ?></section>
 <section class="pcm-dashboard-section"><h2 class="mb-4">Resumo do histórico</h2><div class="row g-3">
 <?php foreach (['total' => 'Total de O.S.', 'open_count' => 'Abertas', 'closed_count' => 'Fechadas', 'corrective' => 'Corretivas', 'preventive' => 'Preventivas', 'improvement' => 'Melhorias'] as $key => $label): ?>
@@ -53,11 +59,11 @@ Pendentes: <?= h($s['pending_count']) ?>.</p></section>
 <section class="pcm-dashboard-section pcm-equipment-history"><h2 class="mb-4">Histórico de O.S.</h2><div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Histórico do equipamento — rolagem horizontal" tabindex="0">
 <table class="table pcm-orders-table align-middle"><thead><tr><?php foreach (['O.S.', 'Data de referência', 'Tipo', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($equipment['orders'] as $row): ?><tr>
-<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $f['unit']]]) ?></td>
+<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $f['unit']] + $returnContext]) ?></td>
 <td><?= h($date($row['reference_date'])) ?></td><td><?= h(['COR' => 'Corretiva', 'PRE' => 'Preventiva', 'MEL' => 'Melhoria'][$row['TJ_TIPO']] ?? $row['TJ_TIPO']) ?></td>
 <td><?= h($row['TJ_SERVICO']) ?><br><?= h($row['service_name'] ?? '—') ?></td>
 <td><?= h($status($row)) ?></td>
-<td><?= h($row['TJ_CCUSTO'] ?: '—') ?></td><td><?= h($area($row['TJ_CODAREA'])) ?></td></tr><?php endforeach; ?>
+<td><?= h($row['TJ_CCUSTO'] ?: '—') ?><?= $this->element('protheus_unit_label', ['costCenter' => $row['TJ_CCUSTO'] ?? null]) ?></td><td><?= h($area($row['TJ_CODAREA'])) ?></td></tr><?php endforeach; ?>
 <?php if (!$equipment['orders']): ?><tr><td colspan="7">Nenhuma O.S. encontrada para os filtros aplicados.</td></tr><?php endif; ?>
 </tbody></table></div><footer class="pcm-pagination"><span>Página <?= h($equipment['page']) ?></span>
 <?php if ($equipment['page'] > 1): ?><?= $this->Html->link('Anterior', $url($equipment['page'] - 1), ['class' => 'btn btn-outline-secondary']) ?><?php endif; ?>

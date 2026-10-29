@@ -22,7 +22,7 @@ final class ProtheusScopeTest extends TestCase
             if ($sql === Q::HISTORY_USER_COLUMNS) {
                 $rows = [['inicio' => null, 'fim' => null]];
             } else {
-                self::assertStringContainsString('j.TJ_CODAREA = CAST(:scope_area AS VARCHAR(100))', $sql);
+                self::assertStringContainsString('j.TJ_CODAREA = CAST(:scope_area AS VARCHAR(100))', \App\Service\Protheus\SectorPresentationScope::withoutAreas($sql));
                 self::assertSame('ELETRI', $params['scope_area']);
                 self::assertSame('string', $types['scope_area']);
                 $calls[] = $sql;

@@ -18,13 +18,23 @@ final class ProtheusSectorService
     public const SERVICES = ['emergency' => ['COREME'], 'scheduled' => ['CORPRO'], 'opportunity' => ['MECOPO', 'ELECOP']];
     public const BACKLOG_AGES = ['0_7' => '0–7 dias', '8_15' => '8–15 dias', '16_30' => '16–30 dias',
         '31_60' => '31–60 dias', 'over_60' => '+60 dias', 'unknown' => 'Sem data válida', 'future' => 'Data futura'];
-    public const FILTERS = ['filial', 'status', 'equipment', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'unit'];
+    public const FILTERS = ['filial', 'status', 'equipment', 'equipment_q', 'service', 'service_name', 'cost_center', 'maintenance_type', 'q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'unit'];
     public function __construct(private ?ProtheusRepository $repository = null, private readonly ?\Closure $diagnostic = null)
     {
     }
 
     public function load(string $area, array $query, bool $export = false, ?int $exportPage = null): array
     {
+        if ($area === 'INSTRU') $area = 'ELETRI';
+        foreach (['equipment_q', 'bem', 'bem_filial'] as $key) {
+            if (isset($query[$key]) && (!is_string($query[$key]) || strlen($query[$key]) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100))) throw new InvalidArgumentException('Equipamento inválido.');
+        }
+        if (array_key_exists('bem', $query)) {
+            $query['equipment'] = trim($query['bem']);
+            $query['filial'] = $query['equipment'] !== '' ? ($query['bem_filial'] ?? '') : '';
+            $query['q'] = '';
+            if ($query['equipment'] !== '') $query['equipment_q'] = '';
+        }
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limit' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         if ($area !== '' && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $area)) throw new InvalidArgumentException('Área inválida.');
         if (!array_key_exists('unit', $query) && array_key_exists('opportunity_unit', $query)) {
@@ -33,7 +43,7 @@ final class ProtheusSectorService
         $filters = [];
         foreach (self::FILTERS as $key) {
             $value = $query[$key] ?? '';
-            if (!is_string($value) || strlen($value) > ($key === 'service_name' ? 255 : 100)) throw new InvalidArgumentException('Filtro inválido.');
+            if (!is_string($value) || strlen($value) > ($key === 'service_name' ? 255 : 100) || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
             $filters[$key] = trim($value);
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
@@ -43,6 +53,9 @@ final class ProtheusSectorService
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
         foreach (['date_start', 'date_end'] as $key) {
             if ($filters[$key] !== '') {
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/D', $filters[$key])) {
+                    $filters[$key] = implode('-', array_reverse(explode('/', $filters[$key])));
+                }
                 $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters[$key]);
                 if (!$date || $date->format('Y-m-d') !== $filters[$key]) throw new InvalidArgumentException('Data inválida.');
             }
@@ -55,7 +68,7 @@ final class ProtheusSectorService
         $result = ['available' => false, 'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area,
             'filters' => $filters, 'queried_at' => null, 'orders' => [], 'cards' => [], 'rankings' => [],
             'top_equipment' => [], 'generic_equipment' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false, 'missing_start' => null];
-        $params = array_diff_key($filters, array_flip(['date_start', 'date_end', 'card', 'card_status', 'backlog_age']));
+        $params = array_diff_key($filters, array_flip(['equipment_q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age']));
         if ($area !== '') $params['area'] = $area;
         $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
         if ($params['q'] !== '') $params['q'] = '%' . strtr($params['q'], ['~' => '~~', '%' => '~%', '_' => '~_', '[' => '~[']) . '%';
@@ -67,6 +80,9 @@ final class ProtheusSectorService
                 'services' => self::SERVICES[$filters['card']] ?? [],
                 'season' => in_array($filters['card'], ['safra', 'offseason'], true) ? $filters['card'] : ''];
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 10);
+            if ($filters['equipment'] === '' && $filters['equipment_q'] !== '') {
+                $repository = $repository->withEquipmentSubstring($filters['equipment_q']);
+            }
             $stage = 'repository';
             $data = $repository->sector($params, $page, $limit, $filters['date_start'], $filters['date_end'], $selection, $export);
             $stage = 'validation: aggregates / cards and classifications';

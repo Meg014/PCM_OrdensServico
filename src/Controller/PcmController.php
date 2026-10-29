@@ -381,6 +381,10 @@ final class PcmController extends AppController
     /** Validates reusable indicator filtering for one maintenance area. */
     public function sector(string $code): void
     {
+        if (strtoupper(trim($code)) === 'INSTRU') {
+            $this->redirect(['_name' => 'pcm-sector', 'code' => 'ELETRI', '?' => $this->request->getQueryParams()]);
+            return;
+        }
         $result = $this->sectorPayload($code);
         $this->set(['sector' => $result, 'navigationAreas' => array_map(static fn ($code, $name) =>
             (object)['source_code' => $code, 'display_name' => $name],
@@ -413,9 +417,13 @@ final class PcmController extends AppController
         try {
             $areas = (new \App\Service\Protheus\ProtheusRepository(budgetSeconds: 5))->findAreas();
             $items = [];
+            $seen = [];
             foreach ($areas as $area) {
                 $code = $area['code'];
                 if (!is_string($code) || !preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $code)) continue;
+                if ($code === 'INSTRU') $code = 'ELETRI';
+                if (isset($seen[$code])) continue;
+                $seen[$code] = true;
                 $items[] = ['code' => $code,
                     'name' => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$code] ?? $code,
                     'url' => \Cake\Routing\Router::url(['_name' => 'pcm-sector', 'code' => $code])];

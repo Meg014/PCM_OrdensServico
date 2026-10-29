@@ -34,12 +34,12 @@ final class ActionPlanTest extends TestCase
     {
         self::assertSame(['date_start' => '2024-02-29', 'date_end' => '2026-10-20'],
             ActionPlanService::period(['date_start' => '2024-02-29', 'date_end' => '2026-10-20']));
-        self::assertTrue(ProtheusQueries::allows(ActionPlanQuery::SQL));
-        self::assertFalse(ProtheusQueries::allows(ActionPlanQuery::SQL . '; DELETE FROM STJ010'));
-        self::assertStringContainsString('CASE WHEN a.entry_count > 0 THEN a.first_entry', ActionPlanQuery::SQL);
-        self::assertStringNotContainsString('EXISTS', ActionPlanQuery::SQL);
-        self::assertStringContainsString(ProtheusUnit::STJ_PREDICATE, ActionPlanQuery::SQL);
-        self::assertStringContainsString('CAST(:unidade AS varchar(10))', ActionPlanQuery::SQL);
+        self::assertTrue(ProtheusQueries::allows(ActionPlanQuery::sql()));
+        self::assertFalse(ProtheusQueries::allows(ActionPlanQuery::sql() . '; DELETE FROM STJ010'));
+        self::assertStringContainsString('CASE WHEN a.entry_count > 0 THEN a.first_entry', ActionPlanQuery::sql());
+        self::assertStringNotContainsString('EXISTS (SELECT 1 FROM dbo.STL010', ActionPlanQuery::sql());
+        self::assertStringContainsString(ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade'), ActionPlanQuery::sql());
+        self::assertStringContainsString('CAST(:unidade AS varchar(10))', ActionPlanQuery::sql());
         foreach ([['2026-02-30', '2026-03-01'], ['2026-10-20', '2026-01-01'], ['', '2026-01-01'],
             ['2026-1-01', '2026-01-01'], [[], '2026-01-01']] as [$start, $end]) {
             try {

@@ -16,7 +16,7 @@ final class ProtheusDashboardService
         'preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'];
     public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino', 'unidade'];
 
-    public function __construct(private ?ProtheusRepository $repository = null)
+    public function __construct(private ?ProtheusRepository $repository = null, private readonly ?\Closure $diagnostic = null)
     {
     }
 
@@ -34,8 +34,9 @@ final class ProtheusDashboardService
         $payload = ['available' => false, 'source' => 'Protheus', 'queried_at' => null,
             'filters' => $filters, 'record_count' => null, 'groups' => [],
             'indicators' => array_fill_keys(self::CARDS, null), 'screens' => [], 'analysis' => null, 'detail' => null];
+        $stage = 'management';
         try {
-            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 5);
+            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: $includeAnalysis ? 12 : 5);
             $rows = $repository->dashboard($filters, true, $includeAnalysis);
             $counts = array_fill_keys(self::CARDS, 0);
             $screens = ['general' => ['key' => 'general', 'title' => 'PCM - VISÃO GERAL'] + $counts];
@@ -82,6 +83,7 @@ final class ProtheusDashboardService
             uksort($screens, static fn ($a, $b) => [($order[substr($a, 5)] ?? PHP_INT_MAX), $a] <=> [($order[substr($b, 5)] ?? PHP_INT_MAX), $b]);
             $payload['screens'] = [$general, ...array_values($screens)];
             if ($includeAnalysis) {
+                $stage = 'historical analysis';
                 $payload['analysis'] = $filters['unidade'] === ProtheusUnit::OTHER
                     ? $this->emptyAnalysis() : $this->analysis($repository->dashboard($filters));
                 $detailQuery = [
@@ -96,13 +98,15 @@ final class ProtheusDashboardService
                     if (isset($query[$key])) $detailQuery[$key] = $query[$key];
                 }
                 if ($this->repository === null) {
-                    $payload['detail'] = (new ProtheusSectorService($repository))->load($filters['area'], $detailQuery);
+                    $stage = 'detail';
+                    $payload['detail'] = (new ProtheusSectorService($repository, $this->diagnostic))->load($filters['area'], $detailQuery);
                     if (!$payload['detail']['available']) throw new RuntimeException('Detalhamento geral indisponível.');
                 }
             }
             $payload['available'] = true;
             $payload['queried_at'] = (new DateTimeImmutable())->format(DATE_ATOM);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            if ($this->diagnostic !== null && PHP_SAPI === 'cli') ($this->diagnostic)($exception, $stage);
             $payload['record_count'] = null;
             $payload['groups'] = [];
             $payload['screens'] = [];

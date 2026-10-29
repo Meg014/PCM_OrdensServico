@@ -164,8 +164,8 @@ final class OrderListingTest extends TestCase
             self::assertStringContainsString('OPENJSON(f.offseason_services)', $sql);
             self::assertStringContainsString("CONVERT(date, '20250101', 112)", $sql);
             self::assertStringNotContainsString("RTRIM(j.TJ_CODBEM) <> 'FAB 80 020'", $sql);
-            self::assertStringContainsString("LIKE '31%'", $sql);
-            self::assertStringContainsString("LIKE '41%'", $sql);
+            self::assertStringContainsString("3.1.0.1.0.0.4", $sql);
+            self::assertStringContainsString("4.1.0.1.0.0.2", $sql);
             self::assertStringContainsString("j.TJ_SITUACA IS NULL OR j.TJ_SITUACA <> 'C'", $sql);
             self::assertSame($export ? 2000 : 20, $params['offset']);
             self::assertSame($export ? 1001 : 21, $params['fetch']);
@@ -180,7 +180,7 @@ final class OrderListingTest extends TestCase
         $result = (new OrderListingService($this->repository([], $calls)))->load(['unidade' => 'mill']);
         self::assertTrue($result['available']);
         self::assertSame('mill', $calls[0][1]['unidade']);
-        self::assertStringContainsString("f.unidade = 'mill'", $calls[0][0]);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unidade", $calls[0][0]);
     }
 
     public function testEquipmentNameIsCaseInsensitiveLiteralSubstringBeforePagination(): void
@@ -250,7 +250,7 @@ final class OrderListingTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
         $connection->method('execute')->willReturnCallback(function ($sql, $params, $types) use ($rows, &$calls, $fail) {
-            if ($sql === ProtheusQueries::HISTORICAL_SERVICE_DEFINITIONS) {
+            if ($sql === ProtheusQueries::historicalServiceDefinitions()) {
                 $statement = $this->createMock(StatementInterface::class);
                 $statement->method('fetchAll')->willReturn([]);
                 $statement->expects(self::once())->method('closeCursor');

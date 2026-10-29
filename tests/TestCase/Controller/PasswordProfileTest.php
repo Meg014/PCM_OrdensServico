@@ -38,6 +38,9 @@ final class PasswordProfileTest extends TestCase
         require_once CAKE . 'Core/functions_global.php';
         Configure::write('App.namespace', 'App');
         Configure::write('App.encoding', 'UTF-8');
+        \Cake\Routing\Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(\Cake\Routing\Router::createRouteBuilder('/'));
         if (!Cache::getConfig('_cake_translations_')) Cache::setConfig('_cake_translations_', ['className' => \Cake\Cache\Engine\NullEngine::class]);
         $this->connection = new Connection(['driver' => Sqlite::class, 'database' => ':memory:']);
         $this->connection->execute('CREATE TABLE maintenance_areas (id INTEGER PRIMARY KEY, source_code TEXT)');
@@ -51,6 +54,7 @@ final class PasswordProfileTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Cake\Routing\Router::reload();
         $this->locator->clear();
         $this->connection->getDriver()->disconnect();
         FactoryLocator::add('Table', new TableLocator());

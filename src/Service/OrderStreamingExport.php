@@ -98,6 +98,13 @@ final class OrderStreamingExport
         return $parts === [] ? '' : 'Filtros: ' . implode(' | ', $parts);
     }
 
+    private function unitColumns(): array
+    {
+        return [
+            'cost_center_unit_name' => ['Unidade da O.S.', 'text', 24, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::label($row['TJ_CCUSTO'] ?? null)],
+            'cost_center_source_unit' => ['Classificação do centro de custo', 'text', 30, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::sourceGroup($row['TJ_CCUSTO'] ?? null)],
+        ];
+    }
     private function orderColumns(string $context): array
     {
         if ($context === 'orders') {
@@ -126,23 +133,23 @@ final class OrderStreamingExport
                 'TJ_SERVICO' => ['Código do serviço', 'text'],
                 'service_name' => ['Descrição/Nome do serviço', 'text'],
                 'TJ_TIPO' => ['Tipo de manutenção', 'text'],
-                'TJ_CODAREA' => ['Área/Setor', 'text'],
+                'TJ_CODAREA' => ['Área/Setor', 'text', 24, static fn ($r) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)($r['TJ_CODAREA'] ?? ''))] ?? ($r['TJ_CODAREA'] ?? '')],
                 'TJ_CCUSTO' => ['Centro de custo', 'text'],
                 'situation_label' => ['Situação', 'text', 18, $situation],
                 'finished_label' => ['Finalizada', 'text', 14, $finished],
                 'TJ_DTORIGI' => ['Data de origem', 'date', 18],
                 'actual_start' => ['Data/Hora de início', 'datetime', 22, $actualStart],
                 'actual_end' => ['Data/Hora de fechamento', 'datetime', 22, $actualEnd],
-            ];
+            ] + $this->unitColumns();
         }
 
         $columns = ['TJ_ORDEM' => ['Número da OS', 'text'], 'descricao' => ['Descrição da OS', 'text', 30],
             'TJ_FILIAL' => ['Filial', 'text'], 'TJ_CODBEM' => ['Código do equipamento', 'text'],
             'equipment_name' => ['Nome do equipamento', 'text'], 'TJ_SERVICO' => ['Código do serviço', 'text'],
             'service_name' => ['Nome do serviço', 'text'], 'TJ_TIPO' => ['Tipo de manutenção', 'text'],
-            'TJ_CODAREA' => ['Área/Setor', 'text'], 'TJ_CCUSTO' => ['Centro de custo', 'text']];
+            'TJ_CODAREA' => ['Área/Setor', 'text', 24, static fn ($r) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)($r['TJ_CODAREA'] ?? ''))] ?? ($r['TJ_CODAREA'] ?? '')], 'TJ_CCUSTO' => ['Centro de custo', 'text']];
         if ($context === 'sector') return $columns + ['status' => ['Status', 'text'], 'planned_date' => ['Início previsto (manutenção)', 'date'],
-            'TJ_HOMPINI' => ['Hora prevista (manutenção)', 'time'], 'TJ_DTPRINI' => ['Início real (geral)', 'date'], 'TJ_HOPRINI' => ['Hora real (geral)', 'time']];
+            'TJ_HOMPINI' => ['Hora prevista (manutenção)', 'time'], 'TJ_DTPRINI' => ['Início real (geral)', 'date'], 'TJ_HOPRINI' => ['Hora real (geral)', 'time']] + $this->unitColumns();
         $columns += ['TJ_SITUACA' => ['Situação (código TOTVS)', 'text'], 'TJ_TERMINO' => ['Término (indicador TOTVS)', 'text'],
             'reference_date' => ['Data de referência', 'date'], 'TJ_DTORIGI' => ['Data de origem', 'date']];
         foreach (['PP' => 'previsto (geral)', 'PR' => 'real (geral)', 'MP' => 'previsto (manutenção)', 'MR' => 'real (manutenção)'] as $code => $label) {
@@ -151,7 +158,7 @@ final class OrderStreamingExport
                 $columns['TJ_HO' . $code . $suffix] = ['Hora: ' . $part . ' ' . $label, 'time'];
             }
         }
-        return $columns;
+        return $columns + $this->unitColumns();
     }
 
     private function entryColumns(): array
@@ -160,7 +167,7 @@ final class OrderStreamingExport
         return ['TJ_ORDEM' => ['Número da OS', 'text'], 'TJ_FILIAL' => ['Filial', 'text'], 'TJ_CODBEM' => ['Código do equipamento', 'text'],
             'equipment_name' => ['Nome do equipamento', 'text'], 'descricao' => ['Descrição da OS', 'text', 30],
             'TJ_SERVICO' => ['Código do serviço', 'text'], 'service_name' => ['Nome do serviço', 'text'],
-            'TJ_CODAREA' => ['Área/Setor', 'text'], 'TJ_CCUSTO' => ['Centro de custo', 'text'],
+            'TJ_CODAREA' => ['Área/Setor', 'text', 24, static fn ($r) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)($r['TJ_CODAREA'] ?? ''))] ?? ($r['TJ_CODAREA'] ?? '')], 'TJ_CCUSTO' => ['Centro de custo', 'text'],
             'cost_center_name' => ['Nome do centro de custo', 'text', 32],
             'TJ_TIPO' => ['Tipo de manutenção', 'text'], 'status' => ['Status da OS', 'text'],
             'entry_type' => ['Tipo do apontamento', 'text', 24, $type], 'TL_CODIGO' => ['Código do apontamento', 'text'],
@@ -169,6 +176,6 @@ final class OrderStreamingExport
             'product_code' => ['Código do material/produto', 'text', 24, static fn ($r) => rtrim((string)$r['TL_TIPOREG']) === 'P' ? $r['TL_CODIGO'] : ''],
             'product_name' => ['Descrição do material/produto', 'text'], 'TL_DTINICI' => ['Data inicial', 'date'],
             'TL_DTFIM' => ['Data final', 'date'], 'TL_HOINICI' => ['Hora inicial', 'time'], 'TL_HOFIM' => ['Hora final', 'time'],
-            'TL_QUANTID' => ['Quantidade registrada', 'text'], 'TL_UNIDADE' => ['Unidade', 'text']];
+            'TL_QUANTID' => ['Quantidade registrada', 'text'], 'TL_UNIDADE' => ['Unidade', 'text']] + $this->unitColumns();
     }
 }

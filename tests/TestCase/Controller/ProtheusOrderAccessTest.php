@@ -86,7 +86,7 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('name="date_start"', $html);
         self::assertStringContainsString('name="date_end"', $html);
         self::assertStringContainsString('name="unidade"', $html);
-        foreach (['Todas', 'Fábrica', 'Usina', 'Outros / Sem unidade'] as $label) {
+        foreach (['Todas', 'Adm', 'Fábrica', 'Usina', 'Externo', 'Setores', 'Não classificados'] as $label) {
             self::assertStringContainsString($label, $html);
         }
         self::assertStringContainsString('/pcm/plano-de-acao/excel', $html);
@@ -321,7 +321,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $html = $view->render('orders', false);
         self::assertStringContainsString('Exportar apontamentos', $html);
         self::assertStringContainsString('/pcm/ordens/apontamentos/excel', $html);
-        self::assertStringContainsString('<option value="ELETRI">ELETRI</option>', $html);
+        self::assertStringContainsString('<option value="ELETRI">Elétrica e Instrumentação</option>', $html);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
         self::assertStringContainsString('23/09/2026', $html);
         self::assertStringContainsString('24/09/2026', $html);
@@ -373,7 +373,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $friendlyHtml = $view->render('orders', false);
         self::assertStringContainsString('Mecânica', $friendlyHtml);
         self::assertStringContainsString('Fechada', $friendlyHtml);
-        self::assertMatchesRegularExpression('~<td>—</td>\s*<td>Mecânica</td>~', $friendlyHtml);
+        self::assertMatchesRegularExpression('~<td>—<small[^>]*>Não classificados</small>\s*</td>\s*<td>Mecânica</td>~', $friendlyHtml);
         self::assertStringNotContainsString('COR / L / S', $friendlyHtml);
         $listing['available'] = false;
         $view->set('listing', $listing);

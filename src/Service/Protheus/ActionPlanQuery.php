@@ -6,7 +6,9 @@ namespace App\Service\Protheus;
 /** Isolated read: calculate the historical reference before applying the requested dates. */
 final class ActionPlanQuery
 {
-    public const SQL = <<<'SQL'
+    public static function sql(): string
+    {
+        return <<<'SQL'
 WITH orders AS (
     SELECT j.*, COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) identity_count
     FROM dbo.STJ010 j
@@ -54,10 +56,11 @@ WHERE j.reference_date >= CONVERT(date, :date_start, 23)
     AND j.reference_date <= CONVERT(date, :date_end, 23)
     AND
 SQL
-        . ProtheusUnit::STJ_PREDICATE . <<<'SQL'
+        . ProtheusUnit::predicate('j.TJ_CCUSTO', 'f.unidade') . <<<'SQL'
 
 ORDER BY j.reference_date, j.TJ_FILIAL, j.TJ_ORDEM,
     CASE WHEN TRY_CONVERT(date, NULLIF(RTRIM(l.TL_DTINICI), ''), 112) IS NULL THEN 1 ELSE 0 END,
     l.TL_DTINICI, l.TL_HOINICI, l.R_E_C_N_O_
 SQL;
+    }
 }

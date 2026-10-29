@@ -30,7 +30,9 @@ final class OrderExcelReportTest extends TestCase
             self::assertSame('Filtros: Equipamento: +unsafe', $sheet->getCell('A5')->getValue());
             self::assertTrue($sheet->getStyle('A5')->getAlignment()->getWrapText());
             self::assertSame('A7', $sheet->getFreezePane());
-            self::assertSame('A6:O489', $sheet->getAutoFilter()->getRange());
+            self::assertSame('A6:Q489', $sheet->getAutoFilter()->getRange());
+            self::assertSame('Unidade da O.S.', $sheet->getCell('P6')->getValue());
+            self::assertSame('Não classificados', $sheet->getCell('P7')->getValue());
             foreach (['A7' => '000123', 'C7' => '01', 'D7' => '000045', 'F7' => '001',
                 'E7' => '=1+1', 'E8' => '+SUM(A1)', 'E9' => '-1+2', 'E10' => '@SUM(A1)', 'A5' => 'Filtros: Equipamento: +unsafe'] as $cell => $value) {
                 self::assertSame($value, $sheet->getCell($cell)->getValue());

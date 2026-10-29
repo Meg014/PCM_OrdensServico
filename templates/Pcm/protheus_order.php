@@ -1,4 +1,5 @@
 <?php $this->assign('title', 'OS ' . $identity['source_order_number']); ?>
+<?= $this->element('sector_return_link') ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | ORDENS DE SERVIÇO</p>
 <h1>OS <?= h($identity['source_order_number']) ?></h1>
 <p><span class="badge text-bg-secondary">Fonte: Protheus</span></p></div>

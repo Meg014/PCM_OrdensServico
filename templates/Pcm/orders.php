@@ -61,7 +61,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
     'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $filters['unidade'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
-<?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($area) ?></option><?php endforeach; ?>
+<?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($areaName($area)) ?></option><?php endforeach; ?>
 </select></div>
 <?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $key => $label): ?>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
@@ -91,7 +91,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <td class="pcm-order-text"><?= h($display($row['TJ_CODBEM'])) ?><br><?= h($display($row['equipment_name'])) ?></td>
 <td class="pcm-order-text"><?= h($display($row['TJ_SERVICO'])) ?><br><?= h($display($row['service_name'])) ?></td>
 <td><?= h($statusName($row)) ?></td>
-<td><?= h($display($row['TJ_CCUSTO'])) ?></td>
+<td><?= h($display($row['TJ_CCUSTO'])) ?><?= $this->element('protheus_unit_label', ['costCenter' => $row['TJ_CCUSTO'] ?? null]) ?></td>
 <td><?= h($areaName($row['TJ_CODAREA'] ?? null)) ?></td></tr>
 <?php endforeach; ?>
 <?php if ($listing['orders'] === []): ?><tr><td colspan="10" class="pcm-empty-table">Nenhuma OS encontrada nesta página para os filtros informados.</td></tr><?php endif; ?>

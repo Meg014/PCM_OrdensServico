@@ -96,7 +96,7 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertSame(14, $result['total']);
         self::assertSame('MECANI', $result['orders'][0]['TJ_CODAREA']);
         self::assertSame('MECÂNICA', $result['area_name']);
-        self::assertSame('FÁBRICA', $result['unit_name']);
+        self::assertSame('Fábrica', $result['unit_name']);
         self::assertSame(
             ['MECANI' => 'MECÂNICA', 'ELETRI' => 'ELÉTRICA'],
             (new OpportunityStopService())->workshops(),
@@ -111,7 +111,7 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertSame('factory', OpportunityStopService::unitForCostCenter('3101005'));
         self::assertSame('mill', OpportunityStopService::unitForCostCenter('4101005'));
         self::assertSame('other', OpportunityStopService::unitForCostCenter('9901'));
-        self::assertSame(['factory' => 'FÁBRICA', 'mill' => 'USINA', 'other' => 'OUTROS'], $service->units($centers));
+        self::assertSame(\App\Service\Protheus\ProtheusUnit::LABELS, $service->units($centers));
         self::assertSame(['3101005' => '3101005 — EXTRAÇÃO'], $service->costCentersForUnit($centers, 'factory'));
         self::assertSame('3101005 — EXTRAÇÃO', OpportunityStopService::costCenterLabel([
             'TJ_CCUSTO' => '3101005', 'cost_center_name' => 'EXTRAÇÃO',
@@ -160,10 +160,10 @@ final class OpportunityStopServiceTest extends TestCase
         self::assertStringContainsString("c.D_E_L_E_T_ <> '*'", $sql);
         self::assertStringContainsString('AS cost_center_name', $sql);
         self::assertStringContainsString('f.cost_center = \'\' OR n.TJ_CCUSTO = f.cost_center', $sql);
-        self::assertStringContainsString("f.unit = 'factory'", $sql);
-        self::assertStringContainsString("LIKE '31%'", $sql);
-        self::assertStringContainsString("f.unit = 'mill'", $sql);
-        self::assertStringContainsString("LIKE '41%'", $sql);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unit", $sql);
+        self::assertStringContainsString("3.1.0.1.0.0.4", $sql);
+        self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unit", $sql);
+        self::assertStringContainsString("4.1.0.1.0.0.2", $sql);
         self::assertStringContainsString("f.unit = 'other'", $sql);
     }
 }

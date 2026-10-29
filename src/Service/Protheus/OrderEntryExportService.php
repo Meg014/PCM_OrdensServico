@@ -44,7 +44,7 @@ final class OrderEntryExportService
             throw new InvalidArgumentException('Período inválido.');
         }
         $params = array_diff_key($filters, array_flip([
-            'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'entry_type', 'professional',
+            'equipment_q', 'date_start', 'date_end', 'card', 'card_status', 'backlog_age', 'entry_type', 'professional',
         ]));
         $params += ['area' => $area, 'cutoff' => str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START)];
         if ($params['q'] !== '') $params['q'] = '%' . strtr($params['q'], ['~' => '~~', '%' => '~%', '_' => '~_', '[' => '~[']) . '%';
@@ -58,7 +58,9 @@ final class OrderEntryExportService
         $result = ['available' => false, 'has_more' => false, 'entries' => [], 'filters' => $filters,
             'code' => $area, 'name' => MaintenanceAreasTable::FRIENDLY_NAMES[$area] ?? $area];
         try {
-            $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->sectorEntries(
+            $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 15);
+            if ($filters['equipment'] === '' && $filters['equipment_q'] !== '') $repository = $repository->withEquipmentSubstring($filters['equipment_q']);
+            $data = $repository->sectorEntries(
                 $params, $filters['date_start'], $filters['date_end'], $selection, $page, $limit,
             );
             return array_replace($result, $data, ['available' => true]);

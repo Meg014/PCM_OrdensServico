@@ -54,6 +54,7 @@ final class OrderEntryExcelReport
             'TL_HOINICI' => ['Hora inicial', 'time'], 'TL_HOFIM' => ['Hora final', 'time'],
             'TL_QUANTID' => ['Quantidade registrada', 'text'], 'TL_UNIDADE' => ['Unidade', 'text'],
         ];
+        $columns += ['cost_center_unit_name' => ['Unidade da O.S.', 'text'], 'cost_center_source_unit' => ['Classificação do centro de custo', 'text']];
         $textBytes = 0;
         foreach ($data['entries'] as $entry) {
             foreach ($columns as $key => $_definition) {
@@ -110,10 +111,13 @@ final class OrderEntryExcelReport
             };
             $entry['professional_code'] = rtrim((string)($entry['TL_TIPOREG'] ?? '')) === 'M' ? ($entry['TL_CODIGO'] ?? '') : '';
             $entry['product_code'] = rtrim((string)($entry['TL_TIPOREG'] ?? '')) === 'P' ? ($entry['TL_CODIGO'] ?? '') : '';
+            $entry['cost_center_unit_name'] = \App\Service\Protheus\ProtheusUnit::label($entry['TJ_CCUSTO'] ?? null);
+            $entry['cost_center_source_unit'] = \App\Service\Protheus\ProtheusUnit::sourceGroup($entry['TJ_CCUSTO'] ?? null);
             $index = 1;
             foreach ($columns as $key => [, $type]) {
                 $cell = Coordinate::stringFromColumnIndex($index++) . $row;
                 $value = $entry[$key] ?? null;
+                if ($key === 'TJ_CODAREA') $value = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)$value)] ?? $value;
                 if ($type === 'date' && is_scalar($value) && preg_match('/^(\d{4})-?(\d{2})-?(\d{2})$/D', rtrim((string)$value), $parts)
                     && checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1])) {
                     $sheet->setCellValue($cell, Date::PHPToExcel(new DateTimeImmutable($parts[1] . '-' . $parts[2] . '-' . $parts[3])));

@@ -82,6 +82,7 @@ final class ActionPlanService
             if ($order['description'] === '') {
                 $order['description'] = $this->descriptionText($order['service']);
             }
+            $order['description'] = \App\Service\Protheus\OrderDescriptions::display($order['description']);
         }
         unset($order);
 

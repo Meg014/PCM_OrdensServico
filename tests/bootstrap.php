@@ -62,3 +62,9 @@ ConnectionHelper::addTestAliases();
 // (new SchemaLoader())->loadSqlFiles('./tests/schema.sql', 'test');
 
 (new Migrator())->run();
+
+// Migrator truncates application data, including the singleton inserted by the migration.
+$ncAssignments = ConnectionManager::get('test');
+if (!$ncAssignments->execute('SELECT id FROM nonconformity_manager_assignments WHERE id = 1')->fetch('assoc')) {
+    $ncAssignments->insert('nonconformity_manager_assignments', ['id' => 1, 'user_id' => null, 'revision' => 0]);
+}

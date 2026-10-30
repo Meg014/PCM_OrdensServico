@@ -127,7 +127,7 @@ final class OrderStreamingExport
 
             return [
                 'TJ_ORDEM' => ['Número da OS', 'text'],
-                'descricao' => ['Descrição da OS', 'text', 30],
+                'descricao' => ['Descrição da OS', 'text', 30, static fn ($r) => \App\Service\Protheus\OrderDescriptions::display($r['descricao'] ?? null)],
                 'TJ_CODBEM' => ['Código do equipamento', 'text'],
                 'equipment_name' => ['Nome do equipamento', 'text'],
                 'TJ_SERVICO' => ['Código do serviço', 'text'],
@@ -143,7 +143,7 @@ final class OrderStreamingExport
             ] + $this->unitColumns();
         }
 
-        $columns = ['TJ_ORDEM' => ['Número da OS', 'text'], 'descricao' => ['Descrição da OS', 'text', 30],
+        $columns = ['TJ_ORDEM' => ['Número da OS', 'text'], 'descricao' => ['Descrição da OS', 'text', 30, static fn ($r) => \App\Service\Protheus\OrderDescriptions::display($r['descricao'] ?? null)],
             'TJ_FILIAL' => ['Filial', 'text'], 'TJ_CODBEM' => ['Código do equipamento', 'text'],
             'equipment_name' => ['Nome do equipamento', 'text'], 'TJ_SERVICO' => ['Código do serviço', 'text'],
             'service_name' => ['Nome do serviço', 'text'], 'TJ_TIPO' => ['Tipo de manutenção', 'text'],
@@ -165,7 +165,7 @@ final class OrderStreamingExport
     {
         $type = static fn (array $r): string => match (rtrim((string)($r['TL_TIPOREG'] ?? ''))) {'M' => 'Mão de obra', 'P' => 'Material', default => rtrim((string)($r['TL_TIPOREG'] ?? ''))};
         return ['TJ_ORDEM' => ['Número da OS', 'text'], 'TJ_FILIAL' => ['Filial', 'text'], 'TJ_CODBEM' => ['Código do equipamento', 'text'],
-            'equipment_name' => ['Nome do equipamento', 'text'], 'descricao' => ['Descrição da OS', 'text', 30],
+            'equipment_name' => ['Nome do equipamento', 'text'], 'descricao' => ['Descrição da OS', 'text', 30, static fn ($r) => \App\Service\Protheus\OrderDescriptions::display($r['descricao'] ?? null)],
             'TJ_SERVICO' => ['Código do serviço', 'text'], 'service_name' => ['Nome do serviço', 'text'],
             'TJ_CODAREA' => ['Área/Setor', 'text', 24, static fn ($r) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)($r['TJ_CODAREA'] ?? ''))] ?? ($r['TJ_CODAREA'] ?? '')], 'TJ_CCUSTO' => ['Centro de custo', 'text'],
             'cost_center_name' => ['Nome do centro de custo', 'text', 32],

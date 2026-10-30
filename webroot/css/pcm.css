@@ -274,6 +274,8 @@ body { background: var(--pcm-background); color: var(--pcm-text); min-height: 10
     max-width: 28rem; min-width: 20rem; overflow-wrap: anywhere; white-space: normal;
     width: 28rem;
 }
+.pcm-maintenance-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pcm-maintenance-description-preview { max-height: 9em; overflow: hidden; }
 .pcm-order-listing .pcm-order-text {
     max-width: 18rem; overflow-wrap: anywhere; white-space: normal;
 }

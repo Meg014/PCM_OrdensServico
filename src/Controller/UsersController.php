@@ -7,6 +7,27 @@ use Cake\Http\Response;
 
 class UsersController extends AppController
 {
+    /** Explicit administrator-only assignment; stale confirmations never replace a new owner. */
+    public function nonconformityManager(int $id): ?Response
+    {
+        $this->request->allowMethod(['get', 'post']);
+        $service = new \App\Service\NonconformityService();
+        $user = $this->fetchTable('Users')->get($id);
+        $assignment = $service->assignment();
+        $manager = $assignment->user_id ? $this->fetchTable('Users')->get($assignment->user_id) : null;
+        if ($this->request->is('post')) {
+            $revision = filter_var($this->request->getData('revision'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            if ($revision === false) throw new \Cake\Http\Exception\BadRequestException('Revisão inválida.');
+            $mode = $this->request->getData('mode');
+            if (!in_array($mode, ['grant', 'revoke'], true)) throw new \Cake\Http\Exception\BadRequestException('Operação inválida.');
+            if ($mode === 'revoke' && (int)$assignment->user_id !== $id) throw new \Cake\Http\Exception\ConflictException('Este usuário não é o gestor atual.');
+            $service->assign((int)$this->request->getAttribute('identity')->getIdentifier(), $mode === 'grant' ? $id : null, $revision, $this->request->getData('confirmed') === '1');
+            $this->Flash->success('Permissão de Não Conformidades atualizada. Histórico preservado.');
+            return $this->response->withStatus(302)->withHeader('Location', \Cake\Routing\Router::url('/usuarios'));
+        }
+        $this->set(compact('user', 'assignment', 'manager'));
+        return null;
+    }
     /** Revokes every persistent TV device; existing TV sessions require a valid device too. */
     public function revokeTv(int $id): Response
     {
@@ -99,7 +120,7 @@ class UsersController extends AppController
                             }
                             $user->maintenance_area_id = $area->id;
                         }
-                        return (bool)$table->save($user);
+                        return (bool)$table->save($user, ['nc_actor_id' => (int)$this->request->getAttribute('identity')->getIdentifier()]);
                     });
                 } catch (\Throwable) {
                     $saved = false;

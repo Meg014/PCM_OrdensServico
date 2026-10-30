@@ -87,7 +87,7 @@ final class ActionPlanTest extends TestCase
             array_replace($blank, ['TJ_FILIAL' => '02', 'entry_description' => 'Outra filial'])];
         $orders = (new ActionPlanService())->group($rows);
         self::assertCount(5, $orders);
-        self::assertSame(['Descrição própria', 'Primeira descrição válida', '', '', 'Outra filial'], array_column($orders, 'description'));
+        self::assertSame(['Descrição própria', 'Primeira descrição válida', \App\Service\Protheus\OrderDescriptions::MISSING, \App\Service\Protheus\OrderDescriptions::MISSING, 'Outra filial'], array_column($orders, 'description'));
         self::assertSame(['Ana', 'Ana', 'Ana', 'Ana', ''], array_column($orders, 'mechanics'));
         foreach ($orders as $order) {
             self::assertSame('2026-09-01', $order['date']);
@@ -125,7 +125,7 @@ final class ActionPlanTest extends TestCase
         $orders = (new ActionPlanService())->group($rows);
         self::assertCount(8, $orders);
         self::assertSame(['Descrição específica', 'Apontamento', 'PREVENTIVA MECANICA',
-            'PREVENTIVA MECANICA', '', 'PREVENTIVA MECANICA', 'Primeiro texto legível',
+            'PREVENTIVA MECANICA', \App\Service\Protheus\OrderDescriptions::MISSING, 'PREVENTIVA MECANICA', 'Primeiro texto legível',
             'Descrição útil com um controleisolado.'], array_column($orders, 'description'));
         self::assertSame(array_fill(0, 8, ''), array_column($orders, 'mechanics'));
     }

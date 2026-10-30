@@ -172,7 +172,7 @@ final class OpportunityStopExcelReport
     /** Writes one Protheus order using explicit text cells for injection safety. */
     private function orderRow(Worksheet $sheet, int $row, array $source): void
     {
-        $description = trim((string)($source['descricao'] ?? ''));
+        $description = \App\Service\Protheus\OrderDescriptions::display($source['descricao'] ?? null);
         $equipment = trim((string)($source['TJ_CODBEM'] ?? '')) . ' — ' . trim((string)($source['equipment_name'] ?? ''));
         $area = trim((string)($source['TJ_CODAREA'] ?? ''));
         foreach (

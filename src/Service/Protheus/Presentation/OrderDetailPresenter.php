@@ -52,9 +52,11 @@ final class OrderDetailPresenter
                     Availability::Available => null,
                 },
                 'origin_date' => $available ? $supplement->originDate : null,
-                'description' => $available ? \App\Service\Protheus\OrderDescriptions::maintenance($supplement->description) : null,
+                'description' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->description) : null,
                 'original_description' => $available ? $supplement->description : null,
-                'descriptions' => $available ? $this->project($supplement->descriptions, ['text', 'source']) : [],
+                'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
+                    static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
+                )), ['text', 'source']) : [],
                 'task_activities' => $available ? $supplement->taskActivities : OrderTaskActivities::present([], '', '', false),
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
                     'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center', 'unit_name', 'cost_center_source_unit',

@@ -67,12 +67,12 @@
         const descriptionText = data.description == null ? '' : String(data.description)
             .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
             .replace(/(^|\s)□(?=\s|$)/g, '$1').trim();
-        const description = node('p', descriptionText || 'Não existe descrição detalhada disponível no TOTVS.');
+        const description = node('p', descriptionText || 'Descrição da manutenção não informada.');
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
         if (data.original_description) {
             const original = node('details', undefined, 'mb-3');
-            original.append(node('summary', 'Conteúdo bruto/original do TOTVS — descrição da O.S.'));
+            original.append(node('summary', 'Descrição original registrada no TOTVS'));
             const text = node('p', data.original_description);
             text.style.whiteSpace = 'pre-wrap';
             text.style.overflowWrap = 'anywhere';

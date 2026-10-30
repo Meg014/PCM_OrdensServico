@@ -108,8 +108,12 @@ class UsersTable extends Table
     }
 
     /** Profile changes invalidate all remembered devices, even after reactivation. */
-    public function afterSave(\Cake\Event\EventInterface $event, \Cake\Datasource\EntityInterface $entity): void
+    public function afterSave(\Cake\Event\EventInterface $event, \Cake\Datasource\EntityInterface $entity, \ArrayObject $options): void
     {
+        if (!$entity->isNew() && ($entity->isDirty('ativo') || $entity->isDirty('role'))
+            && (!$entity->ativo || !in_array($entity->role, ['ADMIN', 'USUARIO'], true))) {
+            (new \App\Service\NonconformityService())->revokeIneligible((int)$entity->id, (int)($options['nc_actor_id'] ?? $entity->id));
+        }
         if (!$entity->isNew() && ($entity->isDirty('ativo') || $entity->isDirty('role') || $entity->isDirty('password'))) {
             \Cake\Datasource\FactoryLocator::get('Table')->get('TvDevices')->deleteAll(['user_id' => $entity->id]);
         }

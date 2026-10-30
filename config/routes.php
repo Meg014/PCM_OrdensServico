@@ -53,7 +53,17 @@ return function (RouteBuilder $routes): void {
         $builder->connect('/login', ['controller' => 'Auth', 'action' => 'login']);
         $builder->post('/logout', ['controller' => 'Auth', 'action' => 'logout']);
         $builder->connect('/meu-perfil', ['controller' => 'Profile', 'action' => 'index']);
+        $builder->get('/pcm/nao-conformidades', ['controller' => 'Nonconformities', 'action' => 'index']);
+        $builder->connect('/pcm/nao-conformidades/{id}/acoes/{actionId}/rapida', ['controller' => 'Nonconformities', 'action' => 'quickAction'], ['pass' => ['id', 'actionId'], 'id' => '[1-9][0-9]*', 'actionId' => '[1-9][0-9]*', '_method' => ['POST', 'PATCH']]);
+        $builder->connect('/pcm/nao-conformidades/nova', ['controller' => 'Nonconformities', 'action' => 'add'], ['_method' => ['GET', 'POST']]);
+        $builder->get('/pcm/nao-conformidades/notificacoes', ['controller' => 'NonconformityNotifications', 'action' => 'index']);
+        $builder->post('/pcm/nao-conformidades/notificacoes/{id}/abrir', ['controller' => 'NonconformityNotifications', 'action' => 'open'])->setPass(['id'])->setPatterns(['id' => '[1-9][0-9]*']);
+        $builder->get('/pcm/nao-conformidades/{id}', ['controller' => 'Nonconformities', 'action' => 'view'])->setPass(['id'])->setPatterns(['id' => '[1-9][0-9]*']);
+        $builder->connect('/pcm/nao-conformidades/{id}/editar', ['controller' => 'Nonconformities', 'action' => 'edit'], ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_method' => ['GET', 'POST', 'PATCH']]);
+        $builder->connect('/pcm/nao-conformidades/{id}/acoes/nova', ['controller' => 'Nonconformities', 'action' => 'addAction'], ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_method' => ['GET', 'POST']]);
+        $builder->connect('/pcm/nao-conformidades/{id}/acoes/{actionId}/editar', ['controller' => 'Nonconformities', 'action' => 'editAction'], ['pass' => ['id', 'actionId'], 'id' => '[1-9][0-9]*', 'actionId' => '[1-9][0-9]*', '_method' => ['GET', 'POST', 'PATCH']]);
         $builder->connect('/usuarios', ['controller' => 'Users', 'action' => 'index']);
+        $builder->connect('/usuarios/{id}/nao-conformidades', ['controller' => 'Users', 'action' => 'nonconformityManager'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);
         $builder->connect('/usuarios/novo', ['controller' => 'Users', 'action' => 'add']);
         $builder->connect('/usuarios/{id}/revogar-tv', ['controller' => 'Users', 'action' => 'revokeTv'], ['pass' => ['id'], 'id' => '[1-9][0-9]*', '_method' => 'POST']);
         $builder->connect('/usuarios/{id}/editar', ['controller' => 'Users', 'action' => 'edit'], ['pass' => ['id'], 'id' => '[1-9][0-9]*']);

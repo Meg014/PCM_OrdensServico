@@ -29,6 +29,9 @@ $title = trim($this->fetch('title')) ?: 'PCM';
         })();
     </script>
     <?= $this->Html->css(['bootstrap.min', 'pcm'], ['timestamp' => 'force']) ?>
+    <?php if (isset($currentUser) && !$isTv && !$currentUser->must_change_password): ?>
+    <?= $this->Html->css('pcm-nonconformities', ['timestamp' => 'force']) ?>
+    <?php endif; ?>
     <?= $this->fetch('meta') ?>
     <?= $this->fetch('css') ?>
 </head>
@@ -38,6 +41,9 @@ $title = trim($this->fetch('title')) ?: 'PCM';
         <div class="container-xl">
             <?= $this->Html->link('PCM', ['_name' => $isTv ? 'pcm-presentation' : 'pcm'], ['class' => 'navbar-brand fw-bold']) ?>
             <div class="d-flex align-items-center gap-2 order-lg-3">
+                <?php if (isset($currentUser) && !$isTv && !$currentUser->must_change_password): ?>
+                <div data-nc-notifications data-url="<?= $this->Url->build('/pcm/nao-conformidades/notificacoes') ?>"><?= $this->element('nonconformity_bell') ?></div>
+                <?php endif; ?>
                 <?php if (isset($currentUser)): ?>
                     <span class="small text-body-secondary"><?= h($currentUser->nome) ?></span>
                     <?= $this->Form->postLink('Sair', '/logout', ['class' => 'btn btn-sm btn-outline-secondary']) ?>
@@ -58,6 +64,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                     <?php if (!$currentUser->must_change_password): ?>
                     <li class="nav-item"><?= $this->Html->link('Ordens de Serviço', ['_name' => 'pcm-orders'], ['class' => 'nav-link']) ?></li>
                     <li class="nav-item"><?= $this->Html->link('Plano de Ação', ['_name' => 'pcm-action-plan'], ['class' => 'nav-link']) ?></li>
+                    <li class="nav-item"><?= $this->Html->link('Não Conformidades', '/pcm/nao-conformidades', ['class' => 'nav-link']) ?></li>
                     <?php if ($currentUser->role === 'ADMIN'): ?>
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>
@@ -87,6 +94,9 @@ $title = trim($this->fetch('title')) ?: 'PCM';
     <?= $this->Html->script('bootstrap.bundle.min', ['timestamp' => 'force']) ?>
     <?= $this->Html->script('pcm-theme', ['timestamp' => 'force']) ?>
     <?= $this->Html->script('pcm-sectors-menu', ['defer' => true, 'timestamp' => 'force']) ?>
+    <?php if (isset($currentUser) && !$isTv && !$currentUser->must_change_password): ?>
+    <?= $this->Html->script('pcm-nonconformity-notifications', ['defer' => true, 'timestamp' => 'force']) ?>
+    <?php endif; ?>
     <?= $this->fetch('script') ?>
 </body>
 </html>

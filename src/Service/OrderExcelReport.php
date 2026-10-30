@@ -121,6 +121,7 @@ final class OrderExcelReport
             foreach ($columns as $key => [$label, $type]) {
                 $cell = Coordinate::stringFromColumnIndex($index++) . $row;
                 $value = $order[$key] ?? null;
+                if ($key === 'descricao') $value = \App\Service\Protheus\OrderDescriptions::display($value);
                 if ($key === 'TJ_CODAREA') $value = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)$value)] ?? $value;
                 if ($type === 'date') {
                     $iso = $mapper->date($value);

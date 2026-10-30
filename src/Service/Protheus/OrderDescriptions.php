@@ -6,29 +6,34 @@ namespace App\Service\Protheus;
 /** Text from confirmed fields only; preserves internal whitespace and line breaks. */
 final class OrderDescriptions
 {
-    /** Only a complete standardized suffix is hidden; ambiguous text stays intact. */
+    public const MISSING = 'Descrição da manutenção não informada.';
+
+    /** Match only the five known questions, wherever placed; other questions stay intact. */
     public static function maintenance(?string $original): ?string
     {
         if ($original === null) return null;
         $questions = [
-            'As ferramentas foram limpas antes do serviço?',
-            'O equipamento foi limpo após o serviço?',
-            'Toda a sobra de material foi recolhida?',
-            'As condições de segurança estão conforme NR12?',
-            'A conclusão do serviço e as condições de segurança foram mantidas conforme NR12?',
+            'as\s+ferramentas\s+foram\s+limpas\s+antes\s+do\s+servi[cç]o',
+            'o\s+equipamento\s+foi\s+limpo\s+ap[oó]s\s+o\s+servi[cç]o',
+            'toda\s+a\s+sobra\s+de\s+material\s+foi\s+recolhida',
+            'as\s+condi[cç][oõ]es\s+de\s+seguran[cç]a\s*(?:\(\s*prote[cç][aã]o\s*[/,;-]\s*bot[oõ]es\s*[/,;-]\s*sinaliza[cç][aã]o\s*\)\s*)?est[aã]o\s+conforme\s*\(?\s*nr\s*[-.]?\s*12\s*\)?',
+            'a\s+conclus[aã]o\s+do\s+servi[cç]o\s*,?\s*e\s+as\s+condi[cç][oõ]es\s+de\s+seguran[cç]a\s+foram\s+mantidas\s+conforme\s*\(?\s*nr\s*[-.]?\s*12\s*\)?',
         ];
-        $normalize = static function (string $text): string {
-            $text = mb_strtolower(\Cake\Utility\Text::transliterate($text));
-            $text = preg_replace('/\(\s*\)\s*(?:nao\s+aplicavel|sim|nao)/u', '', $text);
-            $text = str_replace(['(protecao/botoes/sinalizacao)', '(nr12)', ','], ['', 'nr12', ''], $text);
-            return trim((string)preg_replace('/\s+/u', ' ', $text));
-        };
-        if (!preg_match_all('/(?:^|\R)[\t ]*as\s+ferramentas\s+foram/iu', $original, $matches, PREG_OFFSET_CAPTURE)) return $original;
-        $expected = $normalize(implode(' ', $questions));
-        foreach ($matches[0] as [$match, $offset]) {
-            if ($normalize(substr($original, $offset)) === $expected) return rtrim(substr($original, 0, $offset));
-        }
-        return $original;
+        $answer = '(?:\(\s*[x✓✔]?\s*\)|\[\s*[x✓✔]?\s*\]|[☐☑])\s*(?:n[aã]o\s+aplic[aá]vel|sim|n[aã]o)\b';
+        $bare = '(?:sim|n[aã]o(?:[\t ]+aplic[aá]vel)?)(?:[\t ]+(?:sim|n[aã]o(?:[\t ]+aplic[aá]vel)?))*(?=[\t ]*(?:\R|$))';
+        $pattern = '~(?<![\pL\pN])(?:\d{1,2}[.)-][\t ]*)?(?:' . implode('|', $questions) . ')'
+            . '(?=\s*(?:[?!:.;]|\R|$|\(|\[|[☐☑]))[\t ]*[?!:.;]?'
+            . '(?:\s*(?:' . $answer . '|' . $bare . '))*~iu';
+        $cleaned = preg_replace($pattern, '', $original, -1, $count);
+        if ($cleaned === null || $count === 0) return $original;
+        // Preserve activity text and its internal line breaks; remove only the resulting blank edges.
+        return trim($cleaned);
+    }
+
+    public static function display(?string $original): string
+    {
+        $cleaned = self::maintenance($original);
+        return self::text($cleaned) === null ? self::MISSING : $cleaned;
     }
 
     public static function text(mixed $value): ?string
@@ -46,7 +51,7 @@ final class OrderDescriptions
     {
         foreach ([$original, ...$entries, $service] as $candidate) {
             $text = self::text($candidate);
-            if ($text !== null) return $text;
+            if ($text !== null) return self::display($text);
         }
 
         return null;

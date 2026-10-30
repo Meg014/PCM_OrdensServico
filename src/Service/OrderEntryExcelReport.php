@@ -117,6 +117,7 @@ final class OrderEntryExcelReport
             foreach ($columns as $key => [, $type]) {
                 $cell = Coordinate::stringFromColumnIndex($index++) . $row;
                 $value = $entry[$key] ?? null;
+                if ($key === 'descricao') $value = \App\Service\Protheus\OrderDescriptions::display($value);
                 if ($key === 'TJ_CODAREA') $value = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[trim((string)$value)] ?? $value;
                 if ($type === 'date' && is_scalar($value) && preg_match('/^(\d{4})-?(\d{2})-?(\d{2})$/D', rtrim((string)$value), $parts)
                     && checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1])) {

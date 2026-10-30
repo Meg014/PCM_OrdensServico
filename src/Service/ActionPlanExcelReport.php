@@ -89,7 +89,7 @@ final class ActionPlanExcelReport
                 }
                 $values = ['B' => $order['sector'], 'C' => $order['equipment'],
                     'D' => $order['mechanics'], 'E' => Date::stringToExcel($order['date']),
-                    'H' => $order['description'], 'I' => $order['mechanics'],
+                    'H' => \App\Service\Protheus\OrderDescriptions::display($order['description']), 'I' => $order['mechanics'],
                     'J' => $order['service'], 'K' => $order['number'], 'L' => $order['status']];
                 foreach ($values as $column => $value) {
                     if (is_string($value) && mb_strlen($value, 'UTF-8') > 32767) {

@@ -17,7 +17,7 @@ final class SectorImprovementsTest extends TestCase
         . "as condições de segurança (proteção/botões/sinalização) estão conforme (nr12)? ( ) sim ( ) não\r\n"
         . 'a conclusão do serviço, e as condições de segurança foram mantidas conforme (nr12)? ( ) sim ( ) não';
 
-    public function testChecklistRequiresTheCompleteRecognizedSuffix(): void
+    public function testRecognizedQuestionsAreRemovedWithoutRemovingOtherActivities(): void
     {
         $activities = "INSPECIONAR REDUTOR E ACOPLAMENTO\r\nELIMINAR VAZAMENTO DO REDUTOR\r\n"
             . "REVISAR MANCAIS E ROLETES\r\nREVISÃO DOS RASPADORES\r\nLIMPAR E VERIFICAR SEGURANÇA";
@@ -27,10 +27,9 @@ final class SectorImprovementsTest extends TestCase
         self::assertSame($activities, OrderDescriptions::maintenance($activities . "\n" . mb_strtoupper(self::CHECKLIST)));
         $unaccented = \Cake\Utility\Text::transliterate(self::CHECKLIST);
         self::assertSame($activities, OrderDescriptions::maintenance($activities . "\n" . $unaccented));
-        foreach ([str_replace('toda a sobra de material foi recolhida?', 'outra atividade', $original),
-            $original . "\nREVISAR PROTEÇÃO", $activities . "\nAs ferramentas foram limpas antes do serviço?"] as $ambiguous) {
-            self::assertSame($ambiguous, OrderDescriptions::maintenance($ambiguous));
-        }
+        self::assertStringContainsString('outra atividade', OrderDescriptions::maintenance(str_replace('toda a sobra de material foi recolhida?', 'outra atividade', $original)));
+        self::assertStringEndsWith('REVISAR PROTEÇÃO', OrderDescriptions::maintenance($original . "\nREVISAR PROTEÇÃO"));
+        self::assertSame($activities, OrderDescriptions::maintenance($activities . "\nAs ferramentas foram limpas antes do serviço?"));
         self::assertNull(OrderDescriptions::maintenance(null));
     }
 

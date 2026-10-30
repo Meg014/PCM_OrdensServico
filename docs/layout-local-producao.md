@@ -1,5 +1,17 @@
 # Layout dos filtros: diagnóstico e publicação
 
+## Retomada em 30/10/2026 — situação atual
+
+As instruções e observações de 29/10 abaixo são o histórico do diagnóstico. Na nova consulta pública de 30/10, o HTML de login do servidor JÁ contém versionamento nos dois CSS e nos três scripts comuns. Por exemplo: `/css/pcm.css?1793296026`. Não há necessidade de repetir a publicação apenas por falta de versão nesses arquivos. Esta sessão não realizou publicação.
+
+Os oito assets públicos foram baixados novamente, com HTTP 200 e hashes idênticos aos locais. A comparação controlada com o mesmo HTML voltou a apresentar as mesmas coordenadas dos controles em 1440, 768 e 390 pixels. O teste de integração dos filtros com `debug=false` passou novamente: 1 teste, 64 asserções.
+
+A aplicação local está respondendo em `http://127.0.0.1:8765`. O acesso público ao setor de produção continua redirecionando para `/login`, portanto a validação visual da página autenticada real permanece pendente. Não se deve declarar essa comparação concluída com base apenas no teste controlado. A próxima verificação é abrir o setor autenticado, recarregar com Ctrl+F5 e comparar com a mesma largura de viewport (1440 pixels CSS, zoom 100%). Se o problema persistir, comparar as classes e o estilo calculado do formulário conforme o procedimento ao final deste documento.
+
+Nenhuma nova alteração de funcionalidade foi necessária nesta retomada. Evidências atualizadas: `tmp/sector-production-comparison.json` e `tmp/asset-version-recheck-2026-10-30.log`.
+
+**Encerramento:** em 30/10/2026, após a orientação de recarregar com Ctrl+F5, o usuário confirmou que os filtros no servidor estão alinhados. A pendência visual descrita acima foi resolvida por essa confirmação do usuário, sem acesso desta sessão à página autenticada. O resultado é compatível com atualização de cache após a publicação; não houve inspeção do cache antigo para comprovar sua origem.
+
 Verificação em 29/10/2026. Local: `http://127.0.0.1:8765`. Produção: `https://pcm.biolasa.com.br`.
 
 ## Conclusão e limites

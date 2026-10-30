@@ -1,6 +1,7 @@
 <?php $this->assign('title', $user->isNew() ? 'Cadastrar usuário' : 'Editar usuário'); ?>
 <header class="pcm-page-header"><h1><?= h($this->fetch('title')) ?></h1></header>
 <section class="pcm-panel p-4">
+<?php if (!$user->isNew()): ?><p><?= $this->Html->link('Gerenciar Não Conformidades — permissão específica', '/usuarios/' . $user->id . '/nao-conformidades', ['class' => 'btn btn-outline-primary']) ?></p><?php endif; ?>
 <?= $this->Form->create($user) ?>
 <div class="row g-3">
 <?php foreach (['nome' => ['label' => 'Nome/identificação'], 'email' => ['label' => 'E-mail usado para login', 'type' => 'email'], 'role' => ['label' => 'Perfil', 'options' => ['USUARIO' => 'USUARIO', 'ADMIN' => 'ADMIN', 'TV' => 'TV']], 'area_code' => ['label' => 'Setor Protheus (opcional, informativo)', 'options' => $areas, 'value' => $selectedAreaCode, 'empty' => 'Sem alteração de setor']] as $field => $options): ?>

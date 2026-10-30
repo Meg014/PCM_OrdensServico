@@ -6,6 +6,7 @@
 <?php foreach ($users as $user): ?>
 <tr><td><?= h($user->nome) ?></td><td><?= h($user->email) ?></td><td><?= h($user->role) ?></td><td><?= h($user->maintenance_area?->display_name ?? 'Sem setor') ?></td><td><?= $user->ativo ? 'Ativo' : 'Inativo' ?></td>
 <td><?= $this->Html->link('Editar', '/usuarios/' . $user->id . '/editar', ['class' => 'btn btn-sm btn-outline-primary']) ?>
+<?= $this->Html->link('Permissão Não Conformidades', '/usuarios/' . $user->id . '/nao-conformidades', ['class' => 'btn btn-sm btn-outline-secondary']) ?>
 <?= $this->Html->link('Redefinir senha', '/usuarios/' . $user->id . '/senha', ['class' => 'btn btn-sm btn-outline-secondary']) ?><?php if ($user->role === 'TV'): ?>
 <?= $this->Form->postLink('Revogar dispositivos TV', '/usuarios/' . $user->id . '/revogar-tv', ['class' => 'btn btn-sm btn-outline-danger', 'confirm' => 'Revogar todos os dispositivos desta TV?']) ?>
 <?php endif; ?></td></tr>

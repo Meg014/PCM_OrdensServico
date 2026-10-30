@@ -84,7 +84,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
 <tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?></td>
-<td class="pcm-order-description"><?= h($display($row['descricao'] ?? null)) ?></td>
+<td class="pcm-order-description"><?= $this->element('order_description', ['description' => $row['descricao'] ?? null]) ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate($row['TJ_DTMRINI'] ?? null)) ?></td>
 <td><?= h($protheusDate($row['TJ_DTMRFIM'] ?? null)) ?></td>

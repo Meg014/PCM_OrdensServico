@@ -86,6 +86,9 @@ final class NonconformitiesControllerTest extends TestCase
             ['item'=>'01','measure'=>'Medida livre e detalhada','description'=>'Primeira ação','responsible_name'=>'Pessoa sem login','status'=>'not_started','notes'=>"Observação\nsem cortes"],
             ['item'=>'02','measure'=>'Outra medida','description'=>'Segunda ação','responsible_name'=>'Outra pessoa','status'=>'unknown'],
         ]];
+        $incomplete=$input;unset($incomplete['form_complete']);$incomplete['actions'][1]['status']='in_progress';
+        $this->post('/pcm/nao-conformidades/nova',$incomplete);$this->assertResponseCode(422);
+        self::assertSame(0,$this->s->table('Nonconformities')->find()->count());
         $this->post('/pcm/nao-conformidades/nova',$input); $this->assertResponseCode(422); $this->assertResponseContains('Primeira ação'); $this->assertResponseContains('Segunda ação'); $this->assertResponseContains('Pessoa sem login');
         self::assertSame(0,$this->s->table('Nonconformities')->find()->count());
         $input['actions'][1]['status']='in_progress';

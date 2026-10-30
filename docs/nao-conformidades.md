@@ -1,5 +1,7 @@
 # Gestão de Não Conformidades — implementação
 
+**Reestruturação posterior de 30/10/2026:** a página principal passou a ser uma tabela de acompanhamento, sem os nove cards; o cadastro agora salva NC e vários itens juntos, Medida aceita texto livre e há edição rápida nas linhas. O estado atual, a migration e os testes estão em `docs/reestruturacao-nao-conformidades.md`. As seções abaixo preservam o registro da entrega inicial e da infraestrutura de permissões/notificações.
+
 Referência: `docs/plano-nao-conformidades.md`, complementado pelas regras aprovadas de status Não iniciada, Em andamento e Concluída. Nenhuma importação da planilha foi implementada ou executada.
 
 ## Etapas e arquivos

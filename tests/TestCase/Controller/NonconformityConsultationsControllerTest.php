@@ -50,6 +50,15 @@ final class NonconformityConsultationsControllerTest extends TestCase
     public function testAnonymousReadsOnlyTheLinkedActionWithoutAdministrativeControls(): void
     {
         $this->get($this->path); $this->assertResponseOk();
+        $this->assertResponseContains('/img/pcm-favicon.png');
+        $this->assertResponseContains('pcm-nc-consultation-theme');
+        $this->assertResponseContains('pcm-nc-public-results');
+        $this->assertResponseContains('pcm-nc-table-scroll');
+        if (getenv('NC_VISUAL_EXPORT') === '1') {
+            $dir = TMP . 'nc-visual'; if (!is_dir($dir)) mkdir($dir, 0775, true);
+            $html = preg_replace('~(href|src)="/(css|js|img)/~', '$1="http://localhost/PCM_OrdensServico/$2/', (string)$this->_response->getBody());
+            file_put_contents($dir . DS . 'consulta-publica.html', $html);
+        }
         foreach (['NC-VISIVEL', 'ATIVIDADE-PERMITIDA', 'Maria Destinatária', 'Ação Corretiva', 'Usina/ Fábrica', '&lt;script&gt;alert(1)&lt;/script&gt;'] as $text) $this->assertResponseContains($text);
         foreach (['SEGREDO-OUTRO-RESPONSAVEL', 'SEGREDO-OUTRA-NC', 'NC-SECRETA', 'outro@example.test', 'Salvar linha', 'Editar NC', 'Detalhes e histórico', 'data-nc-notifications', 'navbar-brand'] as $text) $this->assertResponseNotContains($text);
         $this->assertHeader('Referrer-Policy', 'no-referrer'); $this->assertHeader('Cache-Control', 'no-store, private');
@@ -106,6 +115,11 @@ final class NonconformityConsultationsControllerTest extends TestCase
             $html = $mailer->getMessage()->getBodyHtml(); $text = $mailer->getMessage()->getBodyText();
             self::assertMatchesRegularExpression('~href="(https://pcm\.biolasa\.com\.br/consulta/nao-conformidades/[A-Za-z0-9_-]+\.[a-f0-9]{64})"~', $html);
             preg_match('~href="(https://pcm\.biolasa\.com\.br/consulta/nao-conformidades/[A-Za-z0-9_-]+\.[a-f0-9]{64})"~', $html, $match);
+            self::assertStringContainsString('<v:roundrect', $html);
+            self::assertStringContainsString('<w:anchorlock/>', $html);
+            self::assertSame(2, substr_count($html, 'href="' . $match[1] . '"'));
+            self::assertStringContainsString('border:16px solid #07808b', $html);
+            if (getenv('NC_VISUAL_EXPORT') === '1') file_put_contents(TMP . 'nc-visual' . DS . 'email-final-' . $event . '.html', $html);
             self::assertStringContainsString($match[1], $text); self::assertStringNotContainsString('localhost', $html);
             self::assertSame($this->actionId, (int)(new Consult())->resolve(basename($match[1]))['action']->id);
             $this->get(substr($match[1], strlen(Consult::BASE_URL))); $this->assertResponseOk();

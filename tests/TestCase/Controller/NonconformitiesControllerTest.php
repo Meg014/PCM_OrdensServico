@@ -32,6 +32,28 @@ final class NonconformitiesControllerTest extends TestCase
         $t->saveOrFail($u); $t->updateAll(['must_change_password' => false], ['id' => $u->id]); $this->extraUsers[] = (int)$u->id; return $t->get($u->id);
     }
     private function createNc(): int { return $this->s->saveNc($this->authenticatedUserId, ['unit' => 'Servlasa/ Lasa', 'origin' => 'Auditoria Interna', 'occurred_on' => '2026-10-30', 'description' => '<script>teste</script>']); }
+    public function testBrazilianDatesAndIsoSubmissionStoreTheSameDatesAndRejectInvalidCalendarDates(): void
+    {
+        $this->enableCsrfToken();
+        $input = ['unit' => 'Usina/ Fábrica', 'origin' => 'Auditoria Interna', 'occurred_on' => '29/02/2024'];
+        $this->post('/pcm/nao-conformidades/nova', $input); $this->assertResponseCode(302);
+        $nc = $this->s->table('Nonconformities')->find()->firstOrFail();
+        self::assertSame('2024-02-29', $this->s::iso($nc->occurred_on));
+        $this->get('/pcm/nao-conformidades/' . $nc->id . '/editar'); $this->assertResponseOk();
+        $this->assertResponseContains('value="29/02/2024"'); $this->assertResponseContains('data-nc-date'); $this->assertResponseContains('pcm-nonconformity-dates');
+        $this->post('/pcm/nao-conformidades/nova', array_replace($input, ['occurred_on' => '31/02/2026'])); $this->assertResponseCode(422);
+        $action = ['measure' => 'Correção', 'description' => 'Datas padronizadas', 'responsible_id' => $this->responsibleId, 'status' => 'in_progress', 'due_on' => '2026-11-20'];
+        $url = '/pcm/nao-conformidades/' . $nc->id . '/acoes/nova';
+        $this->post($url, array_replace($action, ['due_on' => '31/02/2026'])); $this->assertResponseCode(422);
+        $this->post($url, $action); $this->assertResponseCode(302);
+        $a = $this->s->table('NonconformityActions')->find()->firstOrFail();
+        self::assertSame('2026-11-20', $this->s::iso($a->due_on));
+        $edit = '/pcm/nao-conformidades/' . $nc->id . '/acoes/' . $a->id . '/editar';
+        $this->get($edit); $this->assertResponseContains('value="20/11/2026"');
+        $this->post($edit, array_replace($action, ['revision' => 0, 'due_on' => '20/11/2026', 'status' => 'completed', 'completed_on' => '29/02/2024'])); $this->assertResponseCode(302);
+        $a = $this->s->table('NonconformityActions')->get($a->id);
+        self::assertSame('2026-11-20', $this->s::iso($a->due_on)); self::assertSame('2024-02-29', $this->s::iso($a->completed_on));
+    }
     public function testInlineCreationAndNormalizedSelectionReuseTheSavedResponsible(): void
     {
         $id = $this->createNc(); $url = '/pcm/nao-conformidades/' . $id . '/acoes/nova';

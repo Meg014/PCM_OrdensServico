@@ -18,4 +18,11 @@ if ($action->due_on === null) $noticeText = 'Consulte o PCM para acompanhar a de
 <tr><td style="padding:16px 0 0;word-break:break-word;overflow-wrap:anywhere"><p style="margin:0 0 5px;color:#77838b;font-size:10px;font-weight:bold"><?= h($label) ?></p><div style="white-space:pre-wrap"><?= h($content ?: 'Não informado') ?></div></td></tr>
 <?php endforeach; ?></table>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px"><tr><td style="padding:14px 16px;background:<?= h($meta['background']) ?>;color:<?= h($meta['color']) ?>;border-radius:6px;font-size:12px;line-height:1.7"><strong><?= h($meta['notice']) ?></strong><br><?= h($noticeText) ?></td></tr></table>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:14px"><tr><td align="center" bgcolor="#07808b" style="border-radius:6px"><a href="<?= h($link) ?>" style="display:block;padding:14px 18px;color:#fff;font-size:14px;font-weight:bold;line-height:1.5;text-decoration:none">Consultar ação no PCM</a></td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:18px"><tr><td align="center">
+<!--[if mso]>
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="<?= h($link) ?>" style="height:52px;v-text-anchor:middle;width:540px" arcsize="15%" stroke="f" fillcolor="#07808b"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold">Consultar ação no PCM</center></v:roundrect>
+<![endif]-->
+<!--[if !mso]><!-->
+<a href="<?= h($link) ?>" style="display:block;background-color:#07808b;border:16px solid #07808b;border-radius:8px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;line-height:20px;text-align:center;text-decoration:none;-webkit-text-size-adjust:none;mso-hide:all">Consultar ação no PCM</a>
+<!--<![endif]-->
+</td></tr></table>

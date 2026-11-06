@@ -10,8 +10,8 @@ $dateBr = static function ($v): string { $s = NC::iso($v) ?? ''; return preg_mat
 <?= $this->element('nonconformity_responsible_inline', ['prefix' => $prefix, 'domPrefix' => $domPrefix, 'itemValues' => $itemValues]) ?>
 <?php foreach ([
     'item' => ['label' => 'Item NC', 'maxlength' => 80],
-    'due_on' => ['label' => 'Quando? (When)', 'placeholder' => 'dd/mm/aaaa', 'maxlength' => 10, 'value' => $dateBr($value('due_on'))],
-    'completed_on' => ['label' => 'Data conclusão', 'placeholder' => 'dd/mm/aaaa', 'maxlength' => 10, 'value' => $dateBr($value('completed_on'))],
+    'due_on' => ['label' => 'Quando? (When)', 'placeholder' => 'DD/MM/AAAA', 'maxlength' => 10, 'value' => $dateBr($value('due_on')), 'inputmode' => 'numeric', 'pattern' => '[0-9]{2}/[0-9]{2}/[0-9]{4}', 'title' => 'Data no formato DD/MM/AAAA', 'data-nc-date' => true],
+    'completed_on' => ['label' => 'Data conclusão', 'placeholder' => 'DD/MM/AAAA', 'maxlength' => 10, 'value' => $dateBr($value('completed_on')), 'inputmode' => 'numeric', 'pattern' => '[0-9]{2}/[0-9]{2}/[0-9]{4}', 'title' => 'Data no formato DD/MM/AAAA', 'data-nc-date' => true],
     'status' => ['label' => 'Realizado', 'type' => 'select', 'options' => NC::STATUSES, 'value' => $value('status', 'not_started')],
 ] as $key => $options): ?><div class="col-12 col-md-6 col-xl-4"><?= $this->Form->control($prefix . $key, $options + ['type' => 'text', 'value' => $value($key), 'id' => $domPrefix . '-' . $key, 'class' => 'form-control']) ?></div><?php endforeach; ?>
 <div class="col-12 col-md-6 col-xl-4"><?= $this->Form->control($prefix . 'measure', ['type' => 'select', 'label' => 'Medida', 'options' => array_combine(NC::MEASURES, NC::MEASURES) + ($value('id') && !in_array($value('measure'), NC::MEASURES, true) ? [$value('measure') => $value('measure') . ' (histórico — manter)'] : []), 'empty' => 'Selecione', 'value' => $value('measure'), 'id' => $domPrefix . '-measure', 'class' => 'form-select', 'required' => true]) ?></div>

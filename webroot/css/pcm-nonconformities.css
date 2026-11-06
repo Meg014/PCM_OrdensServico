@@ -1,4 +1,17 @@
 .pcm-nc-container { width: 95%; max-width: none; margin-inline: auto; }
+.pcm-nc-public-header { align-items: center; gap: 1.5rem; }
+.pcm-nc-public-identity { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.pcm-nc-public-logo { flex: 0 0 auto; border-radius: .75rem; }
+.pcm-nc-public-header h1 { font-size: clamp(1.45rem, 2.5vw, 2.25rem); overflow-wrap: anywhere; }
+.pcm-nc-public-access { flex: 0 0 auto; padding: .45rem .85rem; border: 1px solid var(--border-primary); border-radius: 2rem; background: var(--bg-surface); color: var(--text-muted); font-size: .78rem; font-weight: 600; }
+.pcm-nc-public-filters label { font-size: .82rem; font-weight: 600; }
+.pcm-nc-public-filters .form-control, .pcm-nc-public-filters .form-select, .pcm-nc-public-filters .btn { min-height: 2.75rem; }
+.pcm-nc-public-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-primary); }
+.pcm-nc-public-table-heading h2 { margin: 0; font-size: 1rem; font-weight: 650; }
+.pcm-nc-public-table-heading p { margin: 0; font-size: .78rem; color: var(--text-muted); }
+.pcm-nc-public-results { min-width: 0; }
+.pcm-nc-public-results .pcm-nc-sheet tbody tr:hover td { background-color: var(--bg-hover); }
+@media(max-width:767.98px) { .pcm-nc-public-header { align-items: flex-start; flex-direction: column; gap: 1rem; } .pcm-nc-public-identity { align-items: flex-start; gap: .75rem; } .pcm-nc-public-logo { width: 40px; height: 40px; } .pcm-nc-public-table-heading { align-items: flex-start; flex-direction: column; gap: .5rem; padding: 1rem; } }
 .pcm-nc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .pcm-nc-sheet .pcm-nc-cell-text:not([open]) summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .pcm-nc-timeline { border: 1px solid var(--border-primary); border-radius: .5rem; padding: 1rem; }

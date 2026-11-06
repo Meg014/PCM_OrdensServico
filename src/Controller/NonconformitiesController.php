@@ -19,6 +19,10 @@ final class NonconformitiesController extends AppController
         $this->nc = new NonconformityService(); $this->actorId = (int)$identity->getIdentifier();
         $this->nc->actor($this->actorId);
         $this->set('canManage', $this->nc->canWrite($this->actorId));
+        $this->set('ncWide', true);
+        if ($this->nc->canWrite($this->actorId)) {
+            $this->set('registeredResponsibles', $this->nc->table('NonconformityResponsibles')->find()->orderByAsc('name')->all()->toList());
+        }
     }
     public function index(): void
     {
@@ -33,9 +37,10 @@ final class NonconformitiesController extends AppController
         if ($filters['origin'] !== '' && !in_array($filters['origin'], NonconformityService::ORIGINS, true)) throw new \Cake\Http\Exception\BadRequestException('Origem inválida.');
         if (!in_array($filters['deadline'], ['', 'overdue', 'today', 'soon', 'none'], true)) throw new \Cake\Http\Exception\BadRequestException('Prazo inválido.');
         $query = $this->nc->table('Nonconformities')->find()->leftJoin(['A' => 'nonconformity_actions'], ['A.nonconformity_id = Nonconformities.id'])
+            ->leftJoin(['R' => 'nonconformity_responsibles'], ['R.id = A.responsible_id'])
             ->select(['Nonconformities.id', 'Nonconformities.number', 'Nonconformities.unit', 'Nonconformities.origin', 'Nonconformities.occurred_on', 'Nonconformities.description',
                 'action_id' => 'A.id', 'item' => 'A.item', 'measure' => 'A.measure', 'action_description' => 'A.description',
-                'responsible_name' => 'A.responsible_name', 'due_on' => 'A.due_on', 'completed_on' => 'A.completed_on',
+                'responsible_name' => 'A.responsible_name', 'responsible_id' => 'A.responsible_id', 'linked_responsible_name' => 'R.name', 'due_on' => 'A.due_on', 'completed_on' => 'A.completed_on',
                 'status' => 'A.status', 'effectiveness' => 'A.effectiveness', 'notes' => 'A.notes', 'action_revision' => 'A.revision']);
         if ($filters['origin'] !== '') $query->where(['Nonconformities.origin' => $filters['origin']]);
         if ($filters['q'] !== '') {
@@ -43,18 +48,20 @@ final class NonconformitiesController extends AppController
             $query->where(['OR' => ['Nonconformities.description LIKE' => $term, 'Nonconformities.number LIKE' => $term, 'Nonconformities.unit LIKE' => $term, 'A.description LIKE' => $term, 'A.notes LIKE' => $term, 'A.item LIKE' => $term]]);
         }
         if ($filters['status'] !== '') $query->where(['A.status' => $filters['status']]);
-        if ($filters['responsible'] !== '') $query->where(['A.responsible_name' => $filters['responsible']]);
+        if ($filters['responsible'] !== '') $query->where(['OR' => [['R.name' => $filters['responsible']], ['A.responsible_id IS' => null, 'A.responsible_name' => $filters['responsible']]]]);
         $today = $this->nc->today();
         if ($filters['deadline'] !== '') {
             $query->where(['A.status !=' => 'completed']);
             match ($filters['deadline']) {
                 'overdue' => $query->where(['A.due_on <' => $today]),
                 'today' => $query->where(['A.due_on' => $today]),
-                'soon' => $query->where(['A.due_on >=' => $today, 'A.due_on <=' => (new \DateTimeImmutable($today))->modify('+3 days')->format('Y-m-d')]),
+                'soon' => $query->where(['A.due_on >=' => $today, 'A.due_on <=' => (new \DateTimeImmutable($today))->modify('+5 days')->format('Y-m-d')]),
                 'none' => $query->where(['A.due_on IS' => null]),
             };
         }
-        $responsibles = $this->nc->table('NonconformityActions')->find()->select(['responsible_name'])->distinct()->orderByAsc('responsible_name')->all()->extract('responsible_name')->toArray();
+        $responsibles = $this->nc->table('NonconformityActions')->find()->select(['responsible_name'])->where(['responsible_id IS' => null])->distinct()->all()->extract('responsible_name')->toArray();
+        $responsibles = array_unique(array_merge($responsibles, $this->nc->table('NonconformityResponsibles')->find()->all()->extract('name')->toArray()));
+        sort($responsibles);
         $records = $this->paginate($query->orderBy(['Nonconformities.id' => 'DESC', 'A.id' => 'ASC']), ['limit' => 25, 'maxLimit' => 100, 'sortableFields' => []]);
         $this->set(compact('records', 'filters', 'responsibles'));
     }
@@ -63,6 +70,9 @@ final class NonconformitiesController extends AppController
         $this->request->allowMethod(['get']);
         $record = $this->nc->table('Nonconformities')->get($id);
         $actions = $this->nc->table('NonconformityActions')->find()->where(['nonconformity_id' => $id])->orderByAsc('id')->all();
+        foreach ($actions as $a) {
+            if ($a->responsible_id !== null) $a->set('linked_responsible_name', $this->nc->table('NonconformityResponsibles')->get($a->responsible_id)->name);
+        }
         $actionIds = $actions->extract('id')->toArray();
         $conditions = [['object_type' => 'nc', 'object_id' => $id]];
         if ($actionIds) $conditions[] = ['object_type' => 'action', 'object_id IN' => $actionIds];
@@ -70,6 +80,28 @@ final class NonconformitiesController extends AppController
         $this->set(compact('record', 'actions', 'history'));
     }
     public function add(): ?Response { return $this->saveRecord(); }
+    public function responsibles(?int $responsibleId = null): ?Response
+    {
+        $this->request->allowMethod(['get', 'post']);
+        if (!$this->nc->canWrite($this->actorId)) throw new \Cake\Http\Exception\ForbiddenException('Acesso somente para consulta.');
+        $responsible = $responsibleId === null ? $this->nc->table('NonconformityResponsibles')->newEntity(['active' => true]) : $this->nc->table('NonconformityResponsibles')->get($responsibleId);
+        $values = $responsible->toArray();
+        if ($this->request->is('post')) {
+            try {
+                $this->nc->saveResponsible($this->actorId, $this->request->getData(), $responsibleId);
+                $this->Flash->success('Responsável salvo.');
+                return $this->destination('/pcm/nao-conformidades/responsaveis');
+            } catch (\Cake\Http\Exception\UnprocessableContentException|\Cake\Http\Exception\ConflictException $e) {
+                $this->response = $this->response->withStatus($e->getCode()); $this->Flash->error($e->getMessage());
+                $values = $this->request->getData();
+            }
+        }
+        $legacyActions = $this->paginate($this->nc->table('NonconformityActions')->find()->where(['responsible_id IS' => null])->orderByAsc('responsible_name'), ['limit' => 25, 'sortableFields' => []]);
+        $responsibleHistory = $this->nc->table('NonconformityAuditEvents')->find()->where(['object_type' => 'responsible'])->orderByDesc('id')->limit(30)->all();
+        $mailQueue = $this->nc->table('NonconformityEmailQueue')->find()->orderByDesc('id')->limit(50)->all();
+        $this->set(compact('responsible', 'values', 'legacyActions', 'responsibleHistory', 'mailQueue'));
+        return null;
+    }
     public function edit(int $id): ?Response { return $this->saveRecord($id); }
     private function saveRecord(?int $id = null): ?Response
     {
@@ -90,7 +122,10 @@ final class NonconformitiesController extends AppController
                 if ($this->request->getData('actions') !== null && $this->request->getData('form_complete') !== '1') {
                     throw new \Cake\Http\Exception\UnprocessableContentException('Formulário incompleto. Nenhum registro foi salvo. Reduza os itens por operação.');
                 }
-                $saved = $this->nc->saveComplete($this->actorId, $this->request->getData(), $id);
+                $input = $this->request->getData();
+                if (is_array($input['actions'] ?? null)) foreach ($input['actions'] as &$item) { if (is_array($item)) $item['require_responsible_id'] = true; }
+                unset($item);
+                $saved = $this->nc->saveComplete($this->actorId, $input, $id);
                 $this->Flash->success('NC e itens salvos.'); return $this->destination('/pcm/nao-conformidades/' . $saved);
             } catch (\Cake\Http\Exception\UnprocessableContentException|\Cake\Http\Exception\ConflictException $e) {
                 $this->response = $this->response->withStatus($e->getCode()); $this->Flash->error($e->getMessage());
@@ -127,14 +162,15 @@ final class NonconformitiesController extends AppController
         if ($actionId !== null && (int)$action->nonconformity_id !== $id) throw new \Cake\Http\Exception\NotFoundException('Ação não encontrada nesta NC.');
         if ($this->request->is(['post', 'patch'])) {
             try {
-                $saved = $this->nc->saveAction($this->actorId, $id, $this->request->getData(), $actionId);
+                $saved = $this->nc->saveAction($this->actorId, $id, ['require_responsible_id' => true] + $this->request->getData(), $actionId);
                 $this->Flash->success('Ação atualizada.'); return $this->destination('/pcm/nao-conformidades/' . $id . '#acao-' . $saved);
             } catch (\Cake\Http\Exception\UnprocessableContentException $e) {
                 $this->response = $this->response->withStatus(422); $this->Flash->error($e->getMessage());
-                $action->patch(array_intersect_key($this->request->getData(), array_flip(['item', 'measure', 'description', 'responsible_name', 'due_on', 'completed_on', 'status', 'effectiveness', 'notes'])));
+                $action->patch(array_intersect_key($this->request->getData(), array_flip(['item', 'measure', 'description', 'responsible_id', 'due_on', 'completed_on', 'status', 'effectiveness', 'notes'])));
             }
         }
-        $this->set(compact('record', 'action')); $this->viewBuilder()->setTemplate('action'); return null;
+        $itemValues = $this->request->is(['post', 'patch']) ? $this->request->getData() : $action->toArray();
+        $this->set(compact('record', 'action', 'itemValues')); $this->viewBuilder()->setTemplate('action'); return null;
     }
     private function destination(string $path): Response
     {

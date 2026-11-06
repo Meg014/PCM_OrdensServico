@@ -1,0 +1,8 @@
+# Instalar em /etc/cron.d/pcm-nao-conformidades SOMENTE após validar o SMTP.
+# Caminho de instalação usado neste exemplo: /var/www/PCM_OrdensServico
+# Para obter os caminhos reais no Ubuntu, use deployment/scripts/gerar-cron-nao-conformidades.php --user=USUARIO_PHP.
+# O gerador só escreve o arquivo para revisão; não instala nem ativa o cron.
+# NC_MAIL_ENABLED deve continuar false até a ativação deliberada pela TI.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/5 * * * * www-data cd /var/www/PCM_OrdensServico && /usr/bin/flock -n /var/www/PCM_OrdensServico/tmp/nc-email-worker.lock /usr/bin/php bin/cake.php nonconformity_alerts --limit 100 >> /var/www/PCM_OrdensServico/logs/nc-email-cron.log 2>&1

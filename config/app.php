@@ -235,6 +235,17 @@ return [
      * 'YourTransport.php', where 'Your' is the name of the transport.
      */
     'EmailTransport' => [
+        'nc_debug' => ['className' => \Cake\Mailer\Transport\DebugTransport::class],
+        'nc_smtp' => [
+            'className' => \App\Mailer\Transport\NonconformitySmtpTransport::class,
+            'host' => env('MAIL_HOST', 'smtp.office365.com'),
+            'port' => (int)env('MAIL_PORT', 587), 'timeout' => 30,
+            'username' => env('MAIL_USER', 'qualidade@biolasa.com.br'), 'password' => env('MAIL_PASSWORD', null),
+            'tls' => env('MAIL_ENCRYPTION', 'tls') === 'tls',
+            'authType' => 'LOGIN',
+            'keepAlive' => false,
+            'context' => ['ssl' => ['verify_peer' => true, 'verify_peer_name' => true, 'allow_self_signed' => false]],
+        ],
         'default' => [
             'className' => MailTransport::class,
             /*
@@ -265,6 +276,10 @@ return [
      * for more information.
      */
     'Email' => [
+        'nonconformity' => [
+            'transport' => 'nc_smtp',
+            'from' => ['qualidade@biolasa.com.br' => 'Biolasa | PCM Qualidade'],
+        ],
         'default' => [
             'transport' => 'default',
             'from' => 'you@localhost',
@@ -289,6 +304,13 @@ return [
      *   E.g set it to 'utf8mb4' in MariaDB and MySQL and 'utf8' for any
      *   other RDBMS.
      */
+    'NonconformityMail' => [
+        'enabled' => filter_var(env('NC_MAIL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'from' => env('NC_MAIL_FROM', 'qualidade@biolasa.com.br'),
+        'provider' => env('NC_MAIL_PROVIDER', 'smtp'),
+        'testRecipient' => env('NC_MAIL_TEST_RECIPIENT', ''),
+        'profile' => env('NC_MAIL_PROFILE', 'nonconformity'),
+    ],
     'Datasources' => [
         // Isolated integration: never use this datasource for ORM writes or migrations.
         'protheus' => [

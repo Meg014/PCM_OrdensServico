@@ -10,7 +10,7 @@ $this->Html->script('pcm-nonconformities', ['block' => true, 'defer' => true, 't
 <section class="mb-4"><h2 class="h4">Itens / Ações</h2><div class="pcm-panel">
 <?php $rows = $actions->map(static fn ($a) => (object)[
     'id' => $record->id, 'number' => $record->number, 'unit' => $record->unit, 'origin' => $record->origin, 'occurred_on' => $record->occurred_on, 'description' => $record->description,
-    'action_id' => $a->id, 'item' => $a->item, 'measure' => $a->measure, 'action_description' => $a->description, 'responsible_name' => $a->responsible_name,
+    'action_id' => $a->id, 'item' => $a->item, 'measure' => $a->measure, 'action_description' => $a->description, 'responsible_name' => $a->responsible_name, 'responsible_id' => $a->responsible_id, 'linked_responsible_name' => $a->linked_responsible_name,
     'due_on' => $a->due_on, 'completed_on' => $a->completed_on, 'status' => $a->status, 'effectiveness' => $a->effectiveness, 'notes' => $a->notes, 'action_revision' => $a->revision,
 ])->toArray(); ?>
 <?= $this->element('nonconformity_table', ['rows' => $rows, 'canManage' => $canManage]) ?></div></section>

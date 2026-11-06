@@ -16,7 +16,7 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date ?? '')) $date = implode('/', arra
     'number' => ['label' => 'NC nº', 'maxlength' => 80],
     'origin' => ['label' => 'Origem', 'type' => 'select', 'options' => array_combine(NC::ORIGINS, NC::ORIGINS), 'empty' => 'Selecione', 'required' => true],
     'occurred_on' => ['label' => 'Data NC', 'value' => $date, 'placeholder' => 'dd/mm/aaaa', 'maxlength' => 10, 'required' => true],
-    'unit' => ['label' => 'Unidade / Setor', 'required' => true, 'maxlength' => 150],
+    'unit' => ['label' => 'Unidade', 'type' => 'select', 'options' => array_combine(NC::UNITS, NC::UNITS) + (!$record->isNew() && !in_array($record->unit, NC::UNITS, true) ? [$record->unit => $record->unit . ' (histórico — manter)'] : []), 'empty' => 'Selecione', 'required' => true],
 ] as $key => $options): ?><div class="col-12 col-md-6"><?= $this->Form->control($key, $options + ['type' => 'text', 'value' => $value($key), 'class' => 'form-control']) ?></div><?php endforeach; ?>
 <div class="col-12"><?= $this->Form->control('description', ['type' => 'textarea', 'label' => 'Não conformidade (Se aplicável)', 'value' => $value('description'), 'class' => 'form-control', 'rows' => 4, 'maxlength' => 20000]) ?></div>
 </div><p class="small text-body-secondary mt-2 mb-0">NC nº e Item NC podem ficar vazios. Nenhuma numeração é criada automaticamente.</p></section>

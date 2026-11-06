@@ -1,5 +1,28 @@
 (() => {
     'use strict';
+    document.addEventListener('invalid', event => {
+        if (event.target.matches('[data-nc-required-email]')) event.target.setCustomValidity(event.target.value.trim() === ''
+            ? 'Informe o e-mail do responsável.' : 'Informe um endereço de e-mail válido, como nome@empresa.com.br.');
+    }, true);
+    document.addEventListener('input', event => {
+        if (event.target.matches('[data-nc-required-email]')) event.target.setCustomValidity('');
+        if (event.target.matches('[data-nc-contact-name]')) {
+            const picker = event.target.closest('[data-nc-inline-responsible]');
+            const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+            const option = [...picker.querySelectorAll('datalist option')].find(item => normalize(item.value) === normalize(event.target.value));
+            picker.querySelector('[data-nc-contact-id]').value = option?.dataset.id || '';
+            const email = picker.querySelector('[data-nc-contact-email]');
+            email.value = option?.dataset.email || '';
+            email.setCustomValidity('');
+        }
+    });
+    document.addEventListener('input', event => {
+        if (!event.target.matches('[data-nc-responsible-search]')) return;
+        const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+        const term = normalize(event.target.value.trim());
+        const select = event.target.closest('[data-nc-responsible-picker]').querySelector('select');
+        for (const option of select.options) option.hidden = option.value !== '' && !option.selected && !normalize(option.textContent).includes(term);
+    });
     const form = document.querySelector('[data-nc-complete-form]');
     if (form) {
         const items = form.querySelector('[data-nc-items]');

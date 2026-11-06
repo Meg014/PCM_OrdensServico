@@ -86,7 +86,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
     </nav>
     <?php endif; ?>
     <main class="pcm-main">
-        <div class="container-xl">
+        <div class="<?= !empty($ncWide) ? 'pcm-nc-container' : 'container-xl' ?>">
             <?= $this->Flash->render() ?>
             <?= $this->fetch('content') ?>
         </div>

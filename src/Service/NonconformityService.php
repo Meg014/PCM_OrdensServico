@@ -18,8 +18,9 @@ final class NonconformityService
     public const ORIGINS = ['Auditoria Interna', 'Auditoria Externa', 'Inspeção BPF', 'Meio Ambiente',
         'Inspeção vidros', 'Reclamação de cliente', 'Não conformidade interna', 'Análise crítica', 'MOC', 'Fiscalização'];
     public const STATUSES = ['not_started' => 'Não iniciada', 'in_progress' => 'Em andamento', 'completed' => 'Concluída'];
-    public const MEASURES = ['Correção', 'Ação corretiva'];
-    public const EVENTS = ['three_days' => 'Faltam 3 dias', 'one_day' => 'Falta 1 dia', 'today' => 'Vence hoje', 'overdue' => 'Ação atrasada'];
+    public const UNITS = ['Servlasa/ Lasa', 'Usina/ Fábrica'];
+    public const MEASURES = ['Correção', 'Ação Corretiva'];
+    public const EVENTS = ['five_days' => 'Faltam 5 dias', 'one_day' => 'Falta 1 dia', 'today' => 'Vence hoje', 'overdue' => 'Ação atrasada'];
 
     public function table(string $name): Table { return FactoryLocator::get('Table')->get($name); }
     public function assignment(): \Cake\Datasource\EntityInterface { return $this->table('NonconformityManagerAssignments')->get(1); }
@@ -47,10 +48,16 @@ final class NonconformityService
     }
     private function atomic(callable $operation): mixed
     {
-        return $this->table('NonconformityManagerAssignments')->getConnection()->transactional(function () use ($operation) {
+        $connection = $this->table('NonconformityManagerAssignments')->getConnection();
+        return $connection->transactional(function () use ($operation) {
             $this->lock();
             return $operation();
         });
+    }
+    private function mailAtomic(callable $operation): mixed
+    {
+        $connection = $this->table('NonconformityManagerAssignments')->getConnection();
+        return NonconformityOperationMutex::run($connection, fn () => $this->atomic($operation));
     }
     private function audit(int $actorId, string $type, int $id, string $operation, array $before, array $after): void
     {
@@ -116,6 +123,77 @@ final class NonconformityService
     {
         if (!isset($input['revision']) || !is_scalar($input['revision']) || (string)$input['revision'] !== (string)$revision) throw new ConflictException('Este registro foi atualizado. Recarregue antes de salvar.');
     }
+    public static function normalizeName(string $name): string
+    {
+        $name = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $name);
+        return trim(preg_replace('/\s+/u', ' ', $name));
+    }
+    public function saveResponsible(int $actorId, array $input, ?int $id = null): int
+    {
+        return $this->mailAtomic(function () use ($actorId, $input, $id) {
+            if (!$this->canWrite($actorId)) throw new ForbiddenException('Acesso somente para consulta.');
+            $t = $this->table('NonconformityResponsibles');
+            $e = $id === null ? $t->newEmptyEntity() : $t->get($id);
+            if ($id !== null) $this->assertRevision($input, (int)$e->revision);
+            $before = $e->toArray();
+            $name = $this->text($input, 'name', 150, true);
+            $normalized = self::normalizeName($name);
+            if ($normalized === '' || mb_strlen($normalized) > 150) throw new UnprocessableContentException('Nome inválido ou muito longo após normalização.');
+            $duplicate = $t->find()->where(['normalized_name' => $normalized]);
+            if ($id !== null) $duplicate->where(['id !=' => $id]);
+            if ($duplicate->count()) throw new UnprocessableContentException('Responsável já cadastrado, inclusive se inativo.');
+            $email = $this->text($input, 'email', 254);
+            if ($email === null) throw new UnprocessableContentException('Informe o e-mail do responsável.');
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new UnprocessableContentException('Informe um endereço de e-mail válido, como nome@empresa.com.br.');
+            if (!is_scalar($input['active'] ?? null) || !in_array((string)$input['active'], ['0', '1'], true)) throw new UnprocessableContentException('Situação inválida.');
+            $e->patch(['name' => $name, 'normalized_name' => $normalized, 'email' => $email,
+                'sector' => $this->text($input, 'sector', 150), 'active' => (bool)$input['active'],
+                'revision' => $id === null ? 0 : (int)$e->revision + 1, 'modified' => $this->now()]);
+            if ($id === null) $e->set('created', $this->now());
+            $t->saveOrFail($e);
+            $this->audit($actorId, 'responsible', (int)$e->id, $id === null ? 'create' : 'update', $before, $e->toArray());
+            // Pending messages must never use an obsolete address or an inactive recipient.
+            if ($id !== null && (!$e->active || ($before['email'] ?? null) !== $email)) {
+                $this->table('NonconformityEmailQueue')->updateAll(['status' => 'cancelled'], ['responsible_id' => $id, 'status' => 'pending']);
+            }
+            return (int)$e->id;
+        });
+    }
+    private function resolveResponsible(int $actorId, array $input, \Cake\Datasource\EntityInterface $existing, ?int $id): array
+    {
+        if (array_key_exists('responsible_email', $input)) {
+            $name = $this->text($input, 'responsible_name', 150, true);
+            $email = $this->text($input, 'responsible_email', 254, true);
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new UnprocessableContentException('Informe um e-mail válido para o responsável.');
+            $contacts = $this->table('NonconformityResponsibles');
+            $contact = $contacts->find()->where(['normalized_name' => self::normalizeName($name)])->first();
+            if ($contact !== null) {
+                if (!$contact->active) throw new UnprocessableContentException('Responsável inativo. Revise o cadastro em Responsáveis.');
+                if ((string)$contact->email !== $email) throw new UnprocessableContentException('O e-mail difere do cadastro existente. Corrija-o na administração de Responsáveis antes de salvar a ação.');
+                if (!empty($input['responsible_id']) && (string)$input['responsible_id'] !== (string)$contact->id) throw new UnprocessableContentException('Nome e responsável selecionado não correspondem. Selecione novamente.');
+                $input['responsible_id'] = $contact->id;
+            } else {
+                if (!empty($input['responsible_id'])) throw new UnprocessableContentException('Nome e responsável selecionado não correspondem.');
+                $input['responsible_id'] = $this->saveResponsible($actorId, ['name' => $name, 'email' => $email, 'active' => '1']);
+            }
+        }
+        $raw = $input['responsible_id'] ?? null;
+        if ($raw !== null && $raw !== '') {
+            $rid = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $r = $rid === false ? null : $this->table('NonconformityResponsibles')->find()->where(['id' => $rid])->first();
+            if ($r === null || (!$r->active && ($id === null || (int)$existing->responsible_id !== (int)$r->id))) throw new UnprocessableContentException('Selecione um responsável ativo.');
+            if (($id === null || (int)$existing->responsible_id !== (int)$r->id) && !filter_var($r->email, FILTER_VALIDATE_EMAIL)) throw new UnprocessableContentException('Preencha um e-mail válido no cadastro do responsável antes de atribuir novas ações.');
+            // Preserve the imported text as provenance. Display the linked name separately.
+            return ['responsible_id' => (int)$r->id, 'responsible_name' => $id === null ? $r->name : $existing->responsible_name];
+        }
+        if ($id !== null) {
+            if ($existing->responsible_id !== null) throw new UnprocessableContentException('Selecione o responsável da ação.');
+            return ['responsible_id' => null, 'responsible_name' => $existing->responsible_name];
+        }
+        // Compatibility for existing import/integration callers; browser forms require an ID.
+        if (!empty($input['require_responsible_id'])) throw new UnprocessableContentException('Selecione um responsável cadastrado.');
+        return ['responsible_id' => null, 'responsible_name' => $this->text($input, 'responsible_name', 150, true)];
+    }
     public function saveNc(int $actorId, array $input, ?int $id = null): int
     {
         return $this->atomic(function () use ($actorId, $input, $id) {
@@ -123,9 +201,10 @@ final class NonconformityService
             $t = $this->table('Nonconformities'); $e = $id === null ? $t->newEmptyEntity() : $t->get($id);
             if ($id !== null) $this->assertRevision($input, (int)$e->revision);
             $before = $e->toArray();
-            $data = ['number' => $this->text($input, 'number', 80), 'unit' => $this->text($input, 'unit', 150, true),
+            $data = ['number' => $this->text($input, 'number', 80), 'unit' => $this->text($input, 'unit', 150, true, true),
                 'origin' => $this->text($input, 'origin', 100, true), 'occurred_on' => $this->date($input, 'occurred_on', true),
                 'description' => $this->text($input, 'description', 20000, false, true) ?? ''];
+            if (!in_array($data['unit'], self::UNITS, true) && ($id === null || $data['unit'] !== $e->unit)) throw new UnprocessableContentException('Selecione uma Unidade da lista. Valores históricos podem apenas ser mantidos.');
             if (!in_array($data['origin'], self::ORIGINS, true)) throw new UnprocessableContentException('Origem inválida.');
             $duplicate = $t->find()->where(['unit' => $data['unit'], 'origin' => $data['origin'], 'number IS' => $data['number']]);
             if ($id !== null) $duplicate->where(['id !=' => $id]);
@@ -139,7 +218,7 @@ final class NonconformityService
     }
     public function saveAction(int $actorId, int $ncId, array $input, ?int $id = null): int
     {
-        return $this->atomic(function () use ($actorId, $ncId, $input, $id) {
+        return $this->mailAtomic(function () use ($actorId, $ncId, $input, $id) {
             if (!$this->canWrite($actorId)) throw new ForbiddenException('Você possui acesso somente para consulta.');
             $this->table('Nonconformities')->get($ncId);
             $t = $this->table('NonconformityActions'); $e = $id === null ? $t->newEmptyEntity() : $t->get($id);
@@ -148,9 +227,11 @@ final class NonconformityService
             $before = $e->toArray();
             $data = ['nonconformity_id' => $ncId, 'item' => $this->text($input, 'item', 80),
                 'measure' => $this->text($input, 'measure', 20000, true, true), 'description' => $this->text($input, 'description', 20000, true, true),
-                'responsible_name' => $this->text($input, 'responsible_name', 150, true), 'due_on' => $this->date($input, 'due_on'),
+                'due_on' => $this->date($input, 'due_on'),
                 'completed_on' => $this->date($input, 'completed_on'), 'status' => $this->text($input, 'status', 30, true),
                 'effectiveness' => $this->text($input, 'effectiveness', 10000, false, true), 'notes' => $this->text($input, 'notes', 20000, false, true)];
+            if (!in_array($data['measure'], self::MEASURES, true) && ($id === null || $data['measure'] !== $e->measure)) throw new UnprocessableContentException('Selecione uma Medida da lista. Valores históricos podem apenas ser mantidos.');
+            $data += $this->resolveResponsible($actorId, $input, $e, $id);
             if (!isset(self::STATUSES[$data['status']])) throw new UnprocessableContentException('Realizado inválido.');
             if (($data['status'] === 'completed') !== ($data['completed_on'] !== null)) throw new UnprocessableContentException('Informe conclusão somente para ação concluída.');
             if ($data['completed_on'] !== null && $data['completed_on'] > $this->today()) throw new UnprocessableContentException('Conclusão não pode estar no futuro.');
@@ -160,7 +241,13 @@ final class NonconformityService
             $cycleChanged = $id !== null && (self::iso($e->due_on) !== $data['due_on'] || ($e->status === 'completed' && $data['status'] !== 'completed'));
             $data += ['revision' => $id === null ? 0 : (int)$e->revision + 1, 'deadline_cycle' => ($id === null ? 0 : (int)$e->deadline_cycle) + (int)$cycleChanged, 'modified' => $this->now()];
             if ($id === null) $data['created'] = $this->now();
+            $changedResponsible = $id === null || (int)$e->responsible_id !== (int)$data['responsible_id'];
+            $assignmentPending = $id !== null && $this->table('NonconformityEmailQueue')->exists(['action_id' => $id, 'event' => 'assigned', 'status' => 'pending']);
+            $data['assignment_cycle'] = ($id === null ? 0 : (int)$e->assignment_cycle) + (int)$changedResponsible;
             $e->patch($data); $t->saveOrFail($e);
+            $mail = new NonconformityEmailService();
+            $mail->cancelObsolete($e);
+            if (($changedResponsible || ($cycleChanged && $assignmentPending)) && $e->responsible_id !== null && $e->status !== 'completed') $mail->enqueue($e, 'assigned');
             $this->audit($actorId, 'action', (int)$e->id, $id === null ? 'create' : 'update', $before, $e->toArray());
             if ($cycleChanged || $data['status'] === 'completed') $this->invalidate(['action_id' => $e->id]);
             $this->generateLocked($this->today());
@@ -171,7 +258,7 @@ final class NonconformityService
     /** NC and all supplied items commit together, retaining existing items omitted by the form. */
     public function saveComplete(int $actorId, array $input, ?int $id = null): int
     {
-        return $this->atomic(function () use ($actorId, $input, $id) {
+        return $this->mailAtomic(function () use ($actorId, $input, $id) {
             if (!$this->canWrite($actorId)) throw new ForbiddenException('Acesso somente para consulta.');
             $items = $input['actions'] ?? [];
             if (!is_array($items) || count($items) > 100) throw new UnprocessableContentException('Envie até 100 itens por operação.');
@@ -192,12 +279,12 @@ final class NonconformityService
     }
     public function quickAction(int $actorId, int $ncId, int $id, array $input): int
     {
-        return $this->atomic(function () use ($actorId, $ncId, $id, $input) {
+        return $this->mailAtomic(function () use ($actorId, $ncId, $id, $input) {
             if (!$this->canWrite($actorId)) throw new ForbiddenException('Acesso somente para consulta.');
             $a = $this->table('NonconformityActions')->get($id);
             if ((int)$a->nonconformity_id !== $ncId) throw new ForbiddenException('Ação não pertence a esta NC.');
             $data = $a->toArray(); $data['due_on'] = self::iso($a->due_on); $data['completed_on'] = self::iso($a->completed_on);
-            $data = array_replace($data, array_intersect_key($input, array_flip(['status', 'responsible_name', 'due_on', 'completed_on', 'notes'])));
+            $data = array_replace($data, array_intersect_key($input, array_flip(['status', 'responsible_id', 'due_on', 'completed_on', 'notes'])));
             $data['revision'] = $input['revision'] ?? null;
             return $this->saveAction($actorId, $ncId, $data, $id);
         });
@@ -207,7 +294,7 @@ final class NonconformityService
         if ($status === 'completed') return 'completed';
         $due = self::iso($due); if ($due === null) return 'none';
         $days = (int)(new DateTimeImmutable($today ?? (new self())->today()))->diff(new DateTimeImmutable($due))->format('%r%a');
-        return $days < 0 ? 'overdue' : ($days === 0 ? 'today' : ($days === 1 ? 'urgent' : ($days <= 3 ? 'attention' : 'on_time')));
+        return $days < 0 ? 'overdue' : ($days === 0 ? 'today' : ($days === 1 ? 'urgent' : ($days <= 5 ? 'attention' : 'on_time')));
     }
     public static function deadline(mixed $due, string $status, ?string $today = null): string
     {
@@ -216,7 +303,7 @@ final class NonconformityService
         if ($due === null) return 'Sem prazo';
         $today ??= (new self())->today();
         $days = (int)(new DateTimeImmutable($today))->diff(new DateTimeImmutable($due))->format('%r%a');
-        return $days < 0 ? 'Atrasada' : ($days === 0 ? 'Vence hoje' : ($days <= 3 ? 'Vence em ' . $days . ' dia(s)' : 'No prazo'));
+        return $days < 0 ? 'Atrasada' : ($days === 0 ? 'Vence hoje' : ($days <= 5 ? 'Vence em ' . $days . ' dia(s)' : 'No prazo'));
     }
     private function invalidate(array $conditions): void
     {
@@ -229,9 +316,9 @@ final class NonconformityService
         $u = $this->table('Users')->get($a->user_id);
         if (!$u->ativo || !in_array($u->role, ['ADMIN', 'USUARIO'], true)) return 0;
         $t = $this->table('NonconformityNotifications'); $count = 0;
-        foreach ($this->table('NonconformityActions')->find()->where(['status !=' => 'completed', 'due_on IS NOT' => null, 'due_on <=' => (new DateTimeImmutable($today))->modify('+3 days')->format('Y-m-d')]) as $action) {
+        foreach ($this->table('NonconformityActions')->find()->where(['status !=' => 'completed', 'due_on IS NOT' => null, 'due_on <=' => (new DateTimeImmutable($today))->modify('+5 days')->format('Y-m-d')]) as $action) {
             $days = (int)(new DateTimeImmutable($today))->diff(new DateTimeImmutable(self::iso($action->due_on)))->format('%r%a');
-            $event = $days < 0 ? 'overdue' : ([0 => 'today', 1 => 'one_day', 3 => 'three_days'][$days] ?? null);
+            $event = $days < 0 ? 'overdue' : ([0 => 'today', 1 => 'one_day', 5 => 'five_days'][$days] ?? null);
             if ($event === null) continue;
             $key = ['user_id' => $u->id, 'action_id' => $action->id, 'event' => $event, 'due_on' => self::iso($action->due_on), 'deadline_cycle' => $action->deadline_cycle, 'assignment_revision' => $a->revision];
             if ($t->exists($key)) continue;

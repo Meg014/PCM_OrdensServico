@@ -1,4 +1,10 @@
+.pcm-nc-container { width: 95%; max-width: none; margin-inline: auto; }
 .pcm-nc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pcm-nc-sheet .pcm-nc-cell-text:not([open]) summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pcm-nc-timeline { border: 1px solid var(--border-primary); border-radius: .5rem; padding: 1rem; }
+.pcm-nc-timeline ol { padding-left: 1.2rem; margin-bottom: 0; }
+.pcm-nc-timeline li { padding-block: .3rem; }
+@media(max-width:575.98px) { .pcm-nc-container { width: auto; margin-inline: .75rem; } }
 .pcm-nc-item { border: 1px solid var(--border-primary); border-radius: .4rem; padding: 1rem; min-width: 0; }
 .pcm-nc-filters { display: grid; grid-template-columns: minmax(12rem, 1.4fr) repeat(4, minmax(8rem, 1fr)) auto; align-items: end; gap: .75rem; }
 .pcm-nc-filters > div { min-width: 0; }
@@ -9,7 +15,7 @@
 .pcm-nc-sheet th, .pcm-nc-sheet td { width: 11rem; min-width: 11rem; padding: .65rem; border-right: 1px solid var(--border-primary); }
 .pcm-nc-sheet th:nth-child(5), .pcm-nc-sheet td:nth-child(5), .pcm-nc-sheet th:nth-child(6), .pcm-nc-sheet td:nth-child(6),
 .pcm-nc-sheet th:nth-child(7), .pcm-nc-sheet td:nth-child(7), .pcm-nc-sheet th:nth-child(12), .pcm-nc-sheet td:nth-child(12),
-.pcm-nc-sheet th:nth-child(13), .pcm-nc-sheet td:nth-child(13) { width: 21rem; min-width: 21rem; max-width: 21rem; }
+.pcm-nc-sheet th:nth-child(13), .pcm-nc-sheet td:nth-child(13) { width: 24rem; min-width: 24rem; max-width: 24rem; }
 .pcm-nc-sheet th:nth-child(1), .pcm-nc-sheet td:nth-child(1), .pcm-nc-sheet th:nth-child(2), .pcm-nc-sheet td:nth-child(2) { width: 8rem; min-width: 8rem; }
 .pcm-nc-sheet td:first-child { border-left: 3px solid transparent; }
 .pcm-nc-sheet [data-deadline-tone=overdue] td:first-child, .pcm-nc-sheet [data-deadline-tone=today] td:first-child { border-left-color: var(--bs-danger); }
@@ -32,3 +38,64 @@
 .pcm-nc-bell-list .btn { color: var(--text-body); white-space: normal; overflow-wrap: anywhere; }
 .pcm-nc-bell-list .btn:hover { background: var(--bg-hover); }
 @media(max-width:575.98px) { .pcm-nc-bell-list { position: fixed; top: 4rem; right: 1rem; } }
+
+.pcm-nc-sheet th:nth-child(8), .pcm-nc-sheet td:nth-child(8) { width: 16rem; min-width: 16rem; }
+
+.pcm-nc-responsibles .pcm-page-header { gap: 1.25rem; }
+.pcm-nc-subtitle { margin: .65rem 0 0; color: var(--text-muted); font-size: .95rem; }
+.pcm-nc-responsible-grid { display: grid; grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr); gap: 1.25rem; align-items: start; margin-bottom: 1.25rem; }
+.pcm-nc-responsible-grid > *, .pcm-nc-operations > * { min-width: 0; }
+.pcm-nc-responsible-content { display: grid; gap: 1.25rem; }
+.pcm-nc-responsible-content > * { min-width: 0; }
+.pcm-nc-responsible-content .pcm-nc-association { margin-bottom: 0; }
+.pcm-nc-contact-form, .pcm-nc-contact-list, .pcm-nc-association { overflow: hidden; }
+.pcm-nc-contact-form { padding: 1.5rem; }
+.pcm-nc-section-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding: 1.5rem; }
+.pcm-nc-contact-form .pcm-nc-section-heading { padding: 0 0 1.4rem; }
+.pcm-nc-kicker { display: block; margin-bottom: .5rem; font-size: .68rem; font-weight: 700; letter-spacing: .12em; color: var(--text-muted); }
+.pcm-nc-section-heading h2 { display: flex; align-items: center; gap: .65rem; font-size: 1.15rem; font-weight: 650; margin: 0; }
+.pcm-nc-section-heading p { margin: .5rem 0 0; font-size: .85rem; line-height: 1.6; color: var(--text-muted); }
+.pcm-nc-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7rem; padding: .15rem .5rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-primary); border-radius: 2rem; color: var(--text-muted); font-size: .75rem; }
+.pcm-nc-contact-field { margin-bottom: 1rem; }
+.pcm-nc-contact-field label { display: block; margin-bottom: .45rem; font-size: .82rem; font-weight: 500; }
+.pcm-nc-contact-field .form-control, .pcm-nc-contact-field .form-select { min-height: 2.7rem; font-size: .875rem; }
+.pcm-nc-contact-field .form-control::placeholder { color: var(--text-muted); opacity: .7; }
+.pcm-nc-contact-note { display: grid; gap: .25rem; padding: .9rem 1rem; margin: 1.25rem 0; border: 1px solid var(--border-primary); border-radius: .5rem; background: var(--bg-surface-subtle); font-size: .78rem; line-height: 1.6; color: var(--text-muted); }
+.pcm-nc-contact-note strong { font-weight: 550; }
+.pcm-nc-contact-buttons { display: flex; flex-wrap: wrap; gap: .6rem; }
+.pcm-nc-contact-buttons .btn { font-size: .82rem; padding: .65rem .85rem; }
+.pcm-nc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: .65rem; padding: 2rem 1.5rem; border-top: 1px solid var(--border-primary); }
+.pcm-nc-empty-symbol { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 2.8rem; height: 2.8rem; border: 1px solid var(--border-secondary); border-radius: .85rem; color: var(--text-muted); background: var(--bg-surface-subtle); font-size: 1.3rem; margin-bottom: .35rem; }
+.pcm-nc-empty h3 { font-size: .95rem; margin: 0; font-weight: 600; }
+.pcm-nc-empty p { color: var(--text-muted); font-size: .84rem; line-height: 1.7; margin: 0; }
+.pcm-nc-association { margin-bottom: 1.25rem; }
+.pcm-nc-empty-inline { flex-direction: row; justify-content: flex-start; text-align: left; gap: 1rem; padding: 1.3rem 1.5rem; background: var(--bg-surface-subtle); }
+.pcm-nc-empty-inline .pcm-nc-empty-symbol { margin: 0; }
+.pcm-nc-empty-inline h3 { margin-bottom: .35rem; }
+.pcm-nc-admin-table { margin: 0; font-size: .84rem; }
+.pcm-nc-admin-table th { background: var(--bg-surface-subtle); white-space: nowrap; font-size: .73rem; font-weight: 600; color: var(--text-muted); }
+.pcm-nc-admin-table th, .pcm-nc-admin-table td { padding: 1rem 1.25rem; vertical-align: middle; }
+.pcm-nc-admin-table td { min-width: 7rem; overflow-wrap: anywhere; }
+.pcm-nc-admin-table td:last-child { text-align: right; }
+.pcm-nc-admin-table tbody tr:last-child td { border-bottom: 0; }
+.pcm-nc-admin-table tbody tr:hover td { background: var(--bg-hover); }
+.pcm-nc-table-caption { display: block; margin-top: .3rem; color: var(--text-muted); font-size: .75rem; }
+.pcm-nc-person-status { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--border-secondary); border-radius: 2rem; padding: .25rem .6rem; font-size: .72rem; color: var(--text-muted); }
+.pcm-nc-person-status::before { content: ''; width: .35rem; height: .35rem; border-radius: 50%; background: currentColor; }
+.pcm-nc-person-status.is-active { color: var(--bs-success-text-emphasis); background: var(--bs-success-bg-subtle); border-color: var(--bs-success-border-subtle); }
+.pcm-nc-operations { display: grid; grid-template-columns: 1fr; gap: .8rem; }
+.pcm-nc-admin-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.15rem 1.5rem; list-style: none; cursor: pointer; }
+.pcm-nc-admin-details > summary::-webkit-details-marker { display: none; }
+.pcm-nc-admin-details > summary strong { display: block; font-size: .9rem; font-weight: 550; }
+.pcm-nc-admin-details > summary small { display: block; margin-top: .25rem; font-size: .77rem; color: var(--text-muted); }
+.pcm-nc-details-chevron { color: var(--text-muted); transition: transform .15s ease; }
+.pcm-nc-admin-details[open] > summary .pcm-nc-details-chevron { transform: rotate(180deg); }
+.pcm-nc-details-content { border-top: 1px solid var(--border-primary); }
+.pcm-nc-details-content > .pcm-nc-history { margin: 0 1.5rem; }
+.pcm-nc-muted-empty { color: var(--text-muted); font-size: .85rem; margin: 0; padding: 1.25rem 1.5rem; }
+.pcm-nc-audit-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding-top: 1rem; }
+.pcm-nc-audit-values h3 { font-size: .8rem; }
+.pcm-nc-audit-values pre { padding: .75rem; border-radius: .4rem; background: var(--bg-surface-subtle); color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
+@media(max-width:991.98px) { .pcm-nc-responsible-grid { grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr); } }
+@media(max-width:767.98px) { .pcm-nc-responsible-grid { grid-template-columns: minmax(0, 1fr); } .pcm-nc-audit-values { grid-template-columns: minmax(0, 1fr); } }
+@media(max-width:575.98px) { .pcm-nc-contact-form, .pcm-nc-section-heading { padding: 1.15rem; } .pcm-nc-contact-buttons .btn { flex: 1 1 auto; } .pcm-nc-empty-inline { align-items: start; padding: 1.15rem; } .pcm-nc-admin-details > summary { padding: 1rem 1.15rem; } }

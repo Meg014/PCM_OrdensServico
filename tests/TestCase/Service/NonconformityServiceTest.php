@@ -29,7 +29,7 @@ final class NonconformityServiceTest extends TestCase
         $this->s->table('NonconformityManagerAssignments')->updateAll(['user_id' => null, 'revision' => 0], ['id' => 1]);
         $this->s->table('Users')->deleteAll(['id IN' => $this->ids]); parent::tearDown();
     }
-    private function nc(): int { return $this->s->saveNc($this->ids[0], ['unit' => 'Servlasa', 'origin' => 'Auditoria Interna', 'occurred_on' => '2026-10-30', 'description' => 'Teste']); }
+    private function nc(): int { return $this->s->saveNc($this->ids[0], ['unit' => 'Servlasa/ Lasa', 'origin' => 'Auditoria Interna', 'occurred_on' => '2026-10-30', 'description' => 'Teste']); }
     private function action(array $extra = []): int
     {
         return $this->s->saveAction($this->ids[0], $this->nc(), $extra + ['measure' => 'Correção', 'description' => 'Corrigir', 'responsible_name' => 'Pessoa sem conta', 'status' => 'in_progress', 'due_on' => $this->s->today()]);
@@ -75,7 +75,7 @@ final class NonconformityServiceTest extends TestCase
     {
         $this->s->assign($this->ids[0], $this->ids[1], 0, false);
         $id = $this->action(['due_on' => '2030-02-10']);
-        foreach (['2030-02-07' => 'three_days', '2030-02-09' => 'one_day', '2030-02-10' => 'today', '2030-02-11' => 'overdue'] as $today => $event) {
+        foreach (['2030-02-05' => 'five_days', '2030-02-09' => 'one_day', '2030-02-10' => 'today', '2030-02-11' => 'overdue'] as $today => $event) {
             self::assertSame(1, $this->s->generate($today)); self::assertSame(0, $this->s->generate($today));
             self::assertTrue($this->s->table('NonconformityNotifications')->exists(['action_id' => $id, 'event' => $event]));
         }
@@ -120,14 +120,17 @@ final class NonconformityServiceTest extends TestCase
     public function testCompleteFormSavesAndEditsAllSpreadsheetFieldsWithoutTruncation(): void
     {
         $long = "  Medida livre\n" . str_repeat('Texto integral com acentuação. ', 80) . "\nFim  ";
-        $input = ['number' => '001-A', 'unit' => 'Setor', 'origin' => 'Auditoria Interna', 'occurred_on' => '30/10/2026', 'description' => "NC\nTexto longo",
-            'actions' => [['item' => '001', 'measure' => $long, 'description' => $long, 'responsible_name' => 'Pessoa sem login', 'due_on' => '31/10/2026',
+        $input = ['number' => '001-A', 'unit' => 'Servlasa/ Lasa', 'origin' => 'Auditoria Interna', 'occurred_on' => '30/10/2026', 'description' => "NC\nTexto longo",
+            'actions' => [['item' => '001', 'measure' => 'Correção', 'description' => $long, 'responsible_name' => 'Pessoa sem login', 'due_on' => '31/10/2026',
                 'status' => 'completed', 'completed_on' => '01/09/2025', 'effectiveness' => "Atende\nVerificado", 'notes' => $long],
-                ['item' => '002', 'measure' => 'Medida não catalogada', 'description' => 'Segundo item', 'responsible_name' => 'Outra pessoa', 'status' => 'not_started']]];
+                ['item' => '002', 'measure' => 'Ação Corretiva', 'description' => 'Segundo item', 'responsible_name' => 'Outra pessoa', 'status' => 'not_started']]];
         $id = $this->s->saveComplete($this->ids[0], $input);
         $actions = $this->s->table('NonconformityActions')->find()->where(['nonconformity_id' => $id])->orderByAsc('id')->all()->toList();
         self::assertCount(2, $actions); self::assertSame('001', $actions[0]->item);
-        foreach (['measure','description','notes'] as $field) self::assertSame($long, $actions[0]->get($field));
+        foreach (['description','notes'] as $field) self::assertSame($long, $actions[0]->get($field));
+        // Seed an imported historical value; the form may preserve it, never create it anew.
+        $this->s->table('NonconformityActions')->updateAll(['measure' => $long], ['id' => $actions[0]->id]);
+        $input['actions'][0]['measure'] = $long;
         self::assertSame('2025-09-01', $this->s::iso($actions[0]->completed_on));
         $input['revision'] = 0; $input['origin'] = 'Fiscalização'; $input['description'] = '';
         foreach ($actions as $i => $a) { $input['actions'][$i]['id'] = $a->id; $input['actions'][$i]['revision'] = 0; }
@@ -142,7 +145,7 @@ final class NonconformityServiceTest extends TestCase
     public function testCompleteFormRollsBackNcActionsAuditAndAlertsOnInvalidSecondItem(): void
     {
         try {
-            $this->s->saveComplete($this->ids[0], ['unit'=>'Setor','origin'=>'Auditoria Interna','occurred_on'=>'30/10/2026','actions'=>[
+            $this->s->saveComplete($this->ids[0], ['unit'=>'Servlasa/ Lasa','origin'=>'Auditoria Interna','occurred_on'=>'30/10/2026','actions'=>[
                 ['measure'=>'Correção','description'=>'Válida','responsible_name'=>'Pessoa','status'=>'in_progress'],
                 ['measure'=>'Medida','description'=>'Inválida','responsible_name'=>'Pessoa','status'=>'unknown'],
             ]]); self::fail('Expected validation failure');
@@ -160,7 +163,7 @@ final class NonconformityServiceTest extends TestCase
     }
     public function testDeadlineToneHasSeparateUrgentAndAttentionForTwoDays(): void
     {
-        foreach (['2026-10-29'=>'overdue','2026-10-30'=>'today','2026-10-31'=>'urgent','2026-11-01'=>'attention','2026-11-02'=>'attention','2026-11-03'=>'on_time'] as $date=>$tone) self::assertSame($tone, $this->s::deadlineTone($date,'in_progress','2026-10-30'));
+        foreach (['2026-10-29'=>'overdue','2026-10-30'=>'today','2026-10-31'=>'urgent','2026-11-01'=>'attention','2026-11-02'=>'attention','2026-11-03'=>'attention','2026-11-04'=>'attention','2026-11-05'=>'on_time'] as $date=>$tone) self::assertSame($tone, $this->s::deadlineTone($date,'in_progress','2026-10-30'));
         self::assertSame('completed', $this->s::deadlineTone('2026-10-20','completed','2026-10-30'));
     }
 }

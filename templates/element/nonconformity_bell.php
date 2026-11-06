@@ -19,7 +19,7 @@ if (!isset($notifications)) {
 <?php foreach ($notifications['items'] as $notification): ?>
 <?= $this->Form->create(null, ['url' => '/pcm/nao-conformidades/notificacoes/' . $notification->id . '/abrir']) ?>
 <button class="btn btn-sm text-start w-100 <?= $notification->read_at === null ? 'fw-bold' : '' ?>" type="submit">
-<?= h(\App\Service\NonconformityService::EVENTS[$notification->event]) ?> · Ação #<?= (int)$notification->action_id ?><br>
+<?= h(\App\Service\NonconformityService::EVENTS[$notification->event] ?? ($notification->event === 'three_days' ? 'Faltam 3 dias (aviso anterior)' : $notification->event)) ?> · Ação #<?= (int)$notification->action_id ?><br>
 <small>Prazo: <?= h($notification->due_on->format('d/m/Y')) ?><?= $notification->read_at === null ? ' · Não lida' : ' · Lida' ?></small></button>
 <?= $this->Form->end() ?>
 <?php endforeach; ?></div></details>

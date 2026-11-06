@@ -51,9 +51,13 @@ return function (RouteBuilder $routes): void {
 
     $routes->scope('/', function (RouteBuilder $builder): void {
         $builder->connect('/login', ['controller' => 'Auth', 'action' => 'login']);
+        $builder->get('/consulta/nao-conformidades/{token}', ['controller' => 'NonconformityConsultations', 'action' => 'view'])
+            ->setPass(['token'])->setPatterns(['token' => '[A-Za-z0-9_-]+\.[a-f0-9]{64}']);
         $builder->post('/logout', ['controller' => 'Auth', 'action' => 'logout']);
         $builder->connect('/meu-perfil', ['controller' => 'Profile', 'action' => 'index']);
         $builder->get('/pcm/nao-conformidades', ['controller' => 'Nonconformities', 'action' => 'index']);
+        $builder->connect('/pcm/nao-conformidades/responsaveis', ['controller' => 'Nonconformities', 'action' => 'responsibles'], ['_method' => ['GET', 'POST']]);
+        $builder->connect('/pcm/nao-conformidades/responsaveis/{responsibleId}', ['controller' => 'Nonconformities', 'action' => 'responsibles'], ['pass' => ['responsibleId'], 'responsibleId' => '[1-9][0-9]*', '_method' => ['GET', 'POST']]);
         $builder->connect('/pcm/nao-conformidades/{id}/acoes/{actionId}/rapida', ['controller' => 'Nonconformities', 'action' => 'quickAction'], ['pass' => ['id', 'actionId'], 'id' => '[1-9][0-9]*', 'actionId' => '[1-9][0-9]*', '_method' => ['POST', 'PATCH']]);
         $builder->connect('/pcm/nao-conformidades/nova', ['controller' => 'Nonconformities', 'action' => 'add'], ['_method' => ['GET', 'POST']]);
         $builder->get('/pcm/nao-conformidades/notificacoes', ['controller' => 'NonconformityNotifications', 'action' => 'index']);

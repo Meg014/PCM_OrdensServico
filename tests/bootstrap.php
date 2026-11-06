@@ -31,6 +31,22 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 require dirname(__DIR__) . '/config/bootstrap.php';
 
+// Tests never contact a real mail server, even when local SMTP settings are present.
+\Cake\Mailer\TransportFactory::drop('default');
+\Cake\Mailer\TransportFactory::setConfig('default', ['className' => \Cake\Mailer\Transport\DebugTransport::class]);
+\Cake\Mailer\Mailer::drop('default');
+\Cake\Mailer\Mailer::setConfig('default', ['transport' => 'default', 'from' => 'pcm@example.test']);
+\Cake\Mailer\Mailer::drop('nonconformity');
+\Cake\Mailer\Mailer::setConfig('nonconformity', ['transport' => 'default', 'from' => 'pcm@example.test']);
+Configure::write('NonconformityMail.enabled', false);
+Configure::write('NonconformityMail.provider', 'debug');
+Configure::write('NonconformityMail.from', 'qualidade@biolasa.com.br');
+Configure::write('NonconformityMail.testRecipient', '');
+foreach (\Cake\Mailer\TransportFactory::configured() as $transportName) {
+    \Cake\Mailer\TransportFactory::drop($transportName);
+    \Cake\Mailer\TransportFactory::setConfig($transportName, ['className' => \Cake\Mailer\Transport\DebugTransport::class]);
+}
+
 // Test databases are rebuilt by migrations; never reuse metadata from an older schema.
 ConnectionManager::get('test')->cacheMetadata(false);
 

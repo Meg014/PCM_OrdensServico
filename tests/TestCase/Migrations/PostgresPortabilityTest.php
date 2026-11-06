@@ -27,6 +27,6 @@ final class PostgresPortabilityTest extends TestCase
             $checked++;
         }
 
-        $this->assertSame(12, $checked, 'Toda migration existente deve participar da auditoria.');
+        $this->assertSame(13, $checked, 'Toda migration existente deve participar da auditoria.');
     }
 }

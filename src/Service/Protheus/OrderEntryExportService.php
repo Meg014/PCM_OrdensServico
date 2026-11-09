@@ -30,7 +30,7 @@ final class OrderEntryExportService
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)
             || !in_array($filters['entry_type'], ['', 'M', 'P'], true)
-            || !in_array($filters['backlog_age'], ['', 'all', ...array_keys(ProtheusSectorService::BACKLOG_AGES)], true)
+            || !in_array($filters['backlog_age'], ['', 'all', 'route_all', ...array_keys(RouteChecklist::AGES), ...array_keys(ProtheusSectorService::BACKLOG_AGES)], true)
             || !in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(ProtheusSectorService::CATEGORIES)], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) {
             throw new InvalidArgumentException('Filtro inválido.');

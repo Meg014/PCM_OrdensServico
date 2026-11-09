@@ -20,7 +20,7 @@ final class ActionPlanTest extends TestCase
 {
     private function template(): string
     {
-        return dirname(__DIR__, 3) . '/resources/templates/PLANO DE AÇÃO 2026 ATUALIZADO.xlsx';
+        return dirname(__DIR__, 3) . '/resources/templates/PLANO_DE_ACAO_APROVADO.xlsx';
     }
 
     private function order(): array
@@ -49,6 +49,47 @@ final class ActionPlanTest extends TestCase
                 self::assertTrue(true);
             }
         }
+    }
+
+    public function testRecordedTasksAreDistinctAndKeptSeparateFromServiceAndDescription(): void
+    {
+        $base = ['TJ_FILIAL' => '01', 'TJ_ORDEM' => '000042', 'TJ_TERMINO' => 'S', 'reference_date' => '2026-09-01',
+            'cost_center_name' => 'Fábrica', 'equipment_name' => 'Rota', 'description' => 'Planejado', 'service_name' => 'Serviço',
+            'TL_TAREFA' => '000117', 'task_description' => 'CHECKLIST CONFORME DOCUMENTO', 'task_matches' => 1];
+        $orders = (new ActionPlanService())->group([$base, $base, array_replace($base, ['TL_TAREFA' => '000118', 'task_description' => 'Outra tarefa'])]);
+        self::assertCount(1, $orders); self::assertSame('Planejado', $orders[0]['description']); self::assertSame('Serviço', $orders[0]['service']);
+        self::assertSame("000117 — CHECKLIST CONFORME DOCUMENTO\n000118 — Outra tarefa", $orders[0]['tasks']);
+        $stream = (new ActionPlanExcelReport($this->template()))->write($orders);
+        $book = IOFactory::load(stream_get_meta_data($stream)['uri']);
+        try {
+            $sheet = $book->getSheet(0); self::assertSame('TAREFAS APONTADAS', (string)$sheet->getCell('L7')->getValue());
+            self::assertSame($orders[0]['tasks'], (string)$sheet->getCell('L9')->getValue()); self::assertSame('000042', (string)$sheet->getCell('K9')->getValue());
+            self::assertGreaterThan(40, $sheet->getColumnDimension('L')->getWidth());
+            self::assertSame('B7:N9', $sheet->getAutoFilter()->getRange());
+            self::assertSame('SERVIÇO EXECUTADO', (string)$sheet->getCell('M7')->getValue());
+            self::assertSame('', (string)$sheet->getCell('M9')->getValue());
+            self::assertTrue($sheet->getStyle('L9')->getAlignment()->getWrapText());
+            self::assertSame('Finalizada', (string)$sheet->getCell('N9')->getValue());
+        } finally { $book->disconnectWorksheets(); fclose($stream); }
+        $this->expectException(\DomainException::class);
+        (new ActionPlanService())->group([array_replace($base, ['task_matches' => 2])]);
+    }
+
+    public function testRouteOverridesUseOnlyExactAuditedTuplesAndDoNotChangeSharedClassification(): void
+    {
+        $routes = require ROOT . '/resources/data/action-plan-factory-routes.php';
+        self::assertCount(25, $routes);
+        foreach ($routes as $route) {
+            self::assertSame('01', $route['branch']); self::assertContains($route['cost_center'], ['4101012', '5101006']);
+            self::assertNotSame('factory', ProtheusUnit::classify($route['cost_center']));
+        }
+        $sql = ActionPlanQuery::sql();
+        self::assertStringContainsString('route.equipment COLLATE DATABASE_DEFAULT = j.TJ_CODBEM', $sql);
+        self::assertStringContainsString('route.service COLLATE DATABASE_DEFAULT = j.TJ_SERVICO', $sql);
+        self::assertStringContainsString('t.TT9_TAREFA = l.TL_TAREFA', $sql);
+        self::assertStringNotContainsString('FROM dbo.ST5010', $sql);
+        self::assertTrue(ProtheusQueries::allows(ActionPlanQuery::AUDIT));
+        self::assertFalse(ProtheusQueries::allows(ActionPlanQuery::AUDIT . '; UPDATE dbo.STJ010 SET TJ_TERMINO = 1'));
     }
 
     public function testOneRowPerBranchAndOrderAndEntireMechanicHistory(): void
@@ -145,7 +186,7 @@ final class ActionPlanTest extends TestCase
             self::assertSame($original->numFiles, $output->numFiles);
             for ($i = 0; $i < $original->numFiles; $i++) {
                 $part = $original->getNameIndex($i);
-                if (!in_array($part, ['xl/worksheets/sheet1.xml', 'xl/styles.xml'], true)) {
+                if (!in_array($part, ['xl/worksheets/sheet1.xml', 'xl/styles.xml', 'xl/workbook.xml'], true)) {
                     self::assertSame($original->getFromName($part), $output->getFromName($part), $part);
                 }
             }
@@ -169,7 +210,7 @@ final class ActionPlanTest extends TestCase
             $after = $this->xml($output->getFromName('xl/worksheets/sheet1.xml'));
             $afterXpath = $this->xpath($after);
             $newRules = $afterXpath->query('/s:worksheet/s:conditionalFormatting')->item(0);
-            self::assertSame('L9:L10', $newRules->getAttribute('sqref'));
+            self::assertSame('N9:N10', $newRules->getAttribute('sqref'));
             foreach ($afterXpath->query('s:cfRule', $newRules) as $i => $rule) {
                 self::assertSame((string)($i + 1), $rule->getAttribute('priority'));
                 self::assertSame('1', $rule->getAttribute('stopIfTrue'));
@@ -189,22 +230,24 @@ final class ActionPlanTest extends TestCase
                 self::assertGreaterThan(3, (int)$rule->getAttribute('priority'));
                 $rule->setAttribute('priority', (string)((int)$rule->getAttribute('priority') - 3));
             }
-            // Headers, styles, merges, row/column dimensions, image anchors, print and conditional rules.
+            // Metadata outside the changed layout remains identical.
+            foreach (['sheetPr', 'sheetViews', 'sheetFormatPr', 'pageMargins', 'pageSetup', 'drawing'] as $name) {
+                $beforeNode = $this->xpath($before)->query('/s:worksheet/s:' . $name)->item(0);
+                $afterNode = $afterXpath->query('/s:worksheet/s:' . $name)->item(0);
+                self::assertSame($beforeNode?->C14N(), $afterNode?->C14N(), $name);
+            }
             foreach ([$before, $after] as $document) {
                 $xp = $this->xpath($document);
-                $data = $xp->query('/s:worksheet/s:sheetData')->item(0);
-                foreach ($xp->query('s:row', $data) as $row) {
-                    if ((int)$row->getAttribute('r') < 9) {
-                        continue;
+                foreach (iterator_to_array($xp->query('/s:worksheet/*[not(self::s:sheetData)]')) as $node) $node->parentNode->removeChild($node);
+                foreach (iterator_to_array($xp->query('//s:c')) as $cell) {
+                    $column = preg_replace('/[0-9]+$/', '', $cell->getAttribute('r'));
+                    if (\PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($column) >= 12) {
+                        $cell->parentNode->removeChild($cell); continue;
                     }
-                    foreach ($xp->query('s:c', $row) as $cell) {
-                        foreach (iterator_to_array($xp->query('s:v | s:is | s:f', $cell)) as $value) {
-                            $cell->removeChild($value);
-                        }
-                        $cell->removeAttribute('t');
-                    }
+                    if ((int)preg_replace('/^[A-Z]+/', '', $cell->getAttribute('r')) < 9) continue;
+                    foreach (iterator_to_array($xp->query('s:v | s:is | s:f', $cell)) as $value) $cell->removeChild($value);
+                    $cell->removeAttribute('t');
                 }
-                $xp->query('/s:worksheet/s:autoFilter')->item(0)->setAttribute('ref', 'B7:L10');
             }
             self::assertSame($before->C14N(), $after->C14N());
         } finally {
@@ -221,8 +264,8 @@ final class ActionPlanTest extends TestCase
             self::assertSame('Ana / José', (string)$sheet->getCell('D9')->getValue());
             self::assertSame('Ana / José', (string)$sheet->getCell('I9')->getValue());
             self::assertEquals(Date::stringToExcel('2026-10-01'), $sheet->getCell('E9')->getValue());
-            self::assertSame('Finalizada', (string)$sheet->getCell('L10')->getValue());
-            $rules = $sheet->getConditionalStyles('L9:L10');
+            self::assertSame('Finalizada', (string)$sheet->getCell('N10')->getValue());
+            $rules = $sheet->getConditionalStyles('N9:N10');
             self::assertCount(2, $rules);
             self::assertSame('FFC00000', $rules[0]->getStyle()->getFill()->getStartColor()->getARGB());
             self::assertSame('FF008000', $rules[1]->getStyle()->getFill()->getStartColor()->getARGB());
@@ -230,7 +273,7 @@ final class ActionPlanTest extends TestCase
             self::assertTrue($rules[1]->getStopIfTrue());
             self::assertNull($sheet->getCell('K11')->getValue());
             self::assertNull($sheet->getCell('K1138')->getValue());
-            self::assertCount(7, $book->getAllSheets());
+            self::assertCount(1, $book->getAllSheets());
         } finally {
             $book->disconnectWorksheets();
             fclose($stream);
@@ -267,9 +310,9 @@ final class ActionPlanTest extends TestCase
                 self::assertSame('inlineStr', $sheet->getCell($address)->getDataType());
                 self::assertSame($template->getSheet(0)->getStyle($address)->getBorders()->exportArray(),
                     $sheet->getStyle($address)->getBorders()->exportArray());
-                self::assertSame($orders[1130 + $i]['status'], (string)$sheet->getCell('L' . (1139 + $i))->getValue());
+                self::assertSame($orders[1130 + $i]['status'], (string)$sheet->getCell('N' . (1139 + $i))->getValue());
             }
-            $statusRules = $sheet->getConditionalStyles('L9:L1145');
+            $statusRules = $sheet->getConditionalStyles('N9:N1145');
             self::assertSame('FFC00000', $statusRules[0]->getStyle()->getFill()->getStartColor()->getARGB());
             self::assertSame('FF008000', $statusRules[1]->getStyle()->getFill()->getStartColor()->getARGB());
             self::assertTrue($statusRules[0]->getStopIfTrue());
@@ -289,15 +332,38 @@ final class ActionPlanTest extends TestCase
             $book = IOFactory::load($path);
             try {
                 $sheet = $book->getSheet(0);
-                self::assertSame('B7:L' . max(8, $count + 8), $sheet->getAutoFilter()->getRange());
+                self::assertSame('B7:N' . max(8, $count + 8), $sheet->getAutoFilter()->getRange());
+                self::assertSame('TAREFAS APONTADAS', (string)$sheet->getCell('L7')->getValue());
+                self::assertSame('SERVIÇO EXECUTADO', (string)$sheet->getCell('M7')->getValue());
+                self::assertSame('Status', (string)$sheet->getCell('N7')->getValue());
+                self::assertEquals(65, $sheet->getColumnDimension('L')->getWidth());
+                self::assertEquals(65, $sheet->getColumnDimension('M')->getWidth());
+                self::assertLessThan(25, $sheet->getColumnDimension('N')->getWidth());
+                self::assertContains('L7:L8', $sheet->getMergeCells());
+                self::assertContains('M7:M8', $sheet->getMergeCells());
+                self::assertContains('N7:N8', $sheet->getMergeCells());
+                $archive = new ZipArchive(); self::assertTrue($archive->open($path) === true);
+                $workbookXml = $this->xml($archive->getFromName('xl/workbook.xml'));
+                $filterName = $this->xpath($workbookXml)->query('//s:definedName[@name="_xlnm._FilterDatabase"][@localSheetId="0"]')->item(0);
+                self::assertSame("'PLANO DE AÇAO 2026'!\$B\$7:\$N\$" . max(8, $count + 8), $filterName->textContent);
+                $sheetXml = $this->xml($archive->getFromName('xl/worksheets/sheet1.xml'));
+                foreach ($this->xpath($sheetXml)->query('//s:conditionalFormatting') as $rule) {
+                    self::assertDoesNotMatchRegularExpression('/\b[LM][0-9]/', $rule->getAttribute('sqref'));
+                }
+                $archive->close();
                 if ($count === 0) {
                     self::assertNull($sheet->getCell('K9')->getValue());
                 } else {
                     self::assertSame('000007', (string)$sheet->getCell('K2121')->getValue());
+                    self::assertSame('Aberta', (string)$sheet->getCell('N2121')->getValue());
+                    self::assertSame('', (string)$sheet->getCell('L2121')->getValue());
+                    self::assertSame('', (string)$sheet->getCell('M2121')->getValue());
+                    self::assertTrue($sheet->getStyle('L2121')->getAlignment()->getWrapText());
+                    self::assertTrue($sheet->getStyle('M2121')->getAlignment()->getWrapText());
                     self::assertSame($sheet->getStyle('K10')->exportArray(), $sheet->getStyle('K2121')->exportArray());
                     self::assertSame($sheet->getRowDimension(10)->getRowHeight(), $sheet->getRowDimension(2121)->getRowHeight());
                     self::assertSame('A1:S2121', $sheet->calculateWorksheetDimension());
-                    $rules = array_values(array_filter($sheet->getConditionalStyles('L9:L2121'),
+                    $rules = array_values(array_filter($sheet->getConditionalStyles('N9:N2121'),
                         static fn($rule): bool => $rule->getPriority() <= 2));
                     self::assertCount(2, $rules);
                     self::assertSame('FFC00000', $rules[0]->getStyle()->getFill()->getStartColor()->getARGB());

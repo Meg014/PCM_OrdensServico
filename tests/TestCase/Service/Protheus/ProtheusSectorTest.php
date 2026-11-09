@@ -22,6 +22,8 @@ final class ProtheusSectorTest extends TestCase
         self::assertTrue($sector['available']);
         self::assertSame(2, $sector['backlog']['total']);
         self::assertSame(2, $sector['backlog']['ages']['0_7']);
+        self::assertSame(3, $sector['checklists']['total']);
+        self::assertSame(3, $sector['checklists']['ages']['route_attention']);
         self::assertCount(6, $calls);
         foreach ([4, 5] as $index) {
             self::assertSame('ELETRI', $calls[$index][1]['area']);
@@ -61,6 +63,24 @@ final class ProtheusSectorTest extends TestCase
         $statement = $db->prepare($sql);
         $statement->execute(['area' => 'ELETRI']);
         self::assertSame(1, (int)$statement->fetchColumn());
+    }
+
+    public function testChecklistDrilldownKeepsSectorUnitAndPeriodAndHidesOtherSectors(): void
+    {
+        foreach ([['ELETRI', '', true], ['MECANI', 'factory', true], ['ELETRI', 'mill', false],
+            ['USINAG', '', false]] as [$area, $unit, $visible]) {
+            $calls = [];
+            $sector = (new ProtheusSectorService($this->repository($calls)))->load($area,
+                ['backlog_age' => 'route_attention', 'unit' => $unit, 'date_start' => '2026-01-01']);
+            self::assertTrue($sector['available']);
+            self::assertSame($visible, $sector['checklists']['visible']);
+            self::assertCount(6, $calls);
+            self::assertSame($area, $calls[5][1]['area']);
+            self::assertSame($unit, $calls[5][1]['unit']);
+            self::assertSame('route_attention', $calls[5][1]['backlog_bucket']);
+            self::assertSame('2026-01-01', $calls[5][1]['sector_start']);
+            self::assertSame('2026-01-01', $calls[4][1]['sector_start']);
+        }
     }
 
     public function testUnitScopesEverySectorComponentBeforeAggregationAndPagination(): void
@@ -136,10 +156,23 @@ final class ProtheusSectorTest extends TestCase
         self::assertStringNotContainsString('· filial 01', $html);
         self::assertStringNotContainsString('Filial / OS', $html);
         self::assertStringNotContainsString('<label for="filial">Filial</label>', $html);
-        self::assertLessThan(strpos($html, 'Backlog / O.S. em aberto'), strpos($html, 'Safra / Entressafra'));
+        self::assertLessThan(strpos($html, 'Backlog de O.S. normais'), strpos($html, 'Safra / Entressafra'));
         self::assertLessThan(strpos($html, 'Resumo operacional do setor'), strpos($html, 'Safra / Entressafra'));
         self::assertStringNotContainsString('data-sector-chart=', $html);
         self::assertSame(4, substr_count($html, 'pcm-season-card'));
+        self::assertStringContainsString('Checklists das rotas em aberto', $html);
+        self::assertStringContainsString('backlog_age=route_attention', $html);
+        self::assertStringContainsString('date_start=2026-01-01', $this->hrefFor($html, 'backlog_age=route_attention'));
+        self::assertStringContainsString('border-success', $html);
+        self::assertStringContainsString('border-warning', $html);
+        self::assertStringContainsString('border-danger', $html);
+        self::assertStringContainsString('EM DIA', $html);
+        self::assertStringContainsString('ATENÇÃO', $html);
+        self::assertStringContainsString('CRÍTICO', $html);
+        self::assertStringContainsString('0 a 17 dias', $html);
+        self::assertStringContainsString('18 a 20 dias', $html);
+        self::assertStringContainsString('Mais de 20 dias', $html);
+        self::assertStringNotContainsString('8 a 14 dias', $html);
         self::assertStringContainsString('card=offseason', $html);
         self::assertStringContainsString('card_status=EM+ABERTO', $html);
         self::assertMatchesRegularExpression('~href="/pcm/setor/ELETRI\?[^\"]*card=offseason[^\"]*"~', $html);
@@ -258,14 +291,14 @@ final class ProtheusSectorTest extends TestCase
         $sql = ProtheusSectorQueries::backlog();
         self::assertTrue(ProtheusQueries::allows($sql));
         self::assertStringNotContainsString('GROUPING SETS ((),', $sql);
-        self::assertSame(1, preg_match("/SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,.*?FROM bucketed/s", $sql, $match));
+        self::assertSame(1, preg_match("/SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,.*?FROM classified WHERE is_checklist = 0/s", $sql, $match));
         self::assertStringNotContainsString('GROUP BY', $match[0]);
         // Execute the actual scalar branch offline; SQLite's COUNT is SQL Server's COUNT_BIG here.
         $db = new \PDO('sqlite::memory:');
-        $db->exec('CREATE TABLE bucketed (identity_count INTEGER, equipment_matches INTEGER, service_matches INTEGER)');
+        $db->exec('CREATE TABLE classified (identity_count INTEGER, equipment_matches INTEGER, service_matches INTEGER, is_checklist INTEGER)');
         $scalarSql = str_replace('COUNT_BIG(*)', 'COUNT(*)', $match[0]);
         foreach ([0, 3] as $expected) {
-            if ($expected > 0) $db->exec('INSERT INTO bucketed VALUES (1,1,1), (1,1,1), (1,1,1)');
+            if ($expected > 0) $db->exec('INSERT INTO classified VALUES (1,1,1,0), (1,1,1,0), (1,1,1,0), (1,1,1,1)');
             $rows = $db->query($scalarSql)->fetchAll(\PDO::FETCH_ASSOC);
             self::assertCount(1, $rows);
             self::assertSame($expected, (int)$rows[0]['quantity']);
@@ -404,7 +437,9 @@ final class ProtheusSectorTest extends TestCase
                 ['dimension' => 'maintenance', 'TJ_TIPO' => 'COR'] + $base,
             ];
             if ($sql === ProtheusSectorQueries::backlog()) $rows = [['dimension' => 'total', 'quantity' => 2] + $base,
-                ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base];
+                ['dimension' => 'age', 'age_bucket' => '0_7', 'quantity' => 2] + $base,
+                ['dimension' => 'checklist_total', 'quantity' => 3] + $base,
+                ['dimension' => 'checklist_age', 'age_bucket' => 'route_attention', 'quantity' => 3] + $base];
             if ($sql === ProtheusSectorQueries::backlog() && $backlog !== null) {
                 $rows = array_map(static fn (array $row): array => $row + $base, $backlog);
             }

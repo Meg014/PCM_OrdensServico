@@ -1,5 +1,7 @@
 # Plano de Ação
 
+Modelo vigente: [arquivo visual aprovado pelo usuário](plano-de-acao-modelo-aprovado.md), com apenas a aba principal. Os resultados de validações mais antigas abaixo ficam como histórico.
+
 Acesso: menu **Plano de Ação**, `/pcm/plano-de-acao`. Download autenticado em
 `/pcm/plano-de-acao/excel?date_start=2026-10-01&date_end=2026-10-20`.
 Mantém as permissões existentes: ADMIN/USUARIO; TV e visitantes sem acesso.
@@ -80,23 +82,22 @@ No banco atual, 2710 apontamentos ativos possuem payload em TL_OBSERVA, mas nenh
 contém texto válido após remover NUL e espaços. Por isso o cenário positivo da
 alternativa foi validado com dados controlados, sem gravações no TOTVS, e no Excel.
 
-Modelo obrigatório: `resources/templates/PLANO DE AÇÃO 2026 ATUALIZADO.xlsx`.
-PhpSpreadsheet carrega o modelo e preenche as células com tipos explícitos.
-Para evitar perdas em uma regravação completa, o pacote XLSX original é copiado
-para um temporário; os valores das linhas de dados da primeira aba são
-reescritos no XML original. Para os status, são acrescentados dois estilos
-diferenciais a styles.xml, preservando todos os estilos existentes. As outras
-partes do ZIP permanecem byte a byte iguais, incluindo seis abas de rotas,
-shared strings, logotipo e relacionamentos.
+Modelo obrigatório: `resources/templates/PLANO_DE_ACAO_APROVADO.xlsx`, derivado
+do arquivo aprovado e sanitizado, com apenas a aba PLANO DE AÇAO 2026.
+O pacote XLSX é copiado para um temporário e preenchido diretamente no OOXML,
+sem carregar todas as células em objetos PhpSpreadsheet. Os registros antigos
+e as abas de rotas não fazem parte do modelo utilizado no download.
+Estilos, larguras, cabeçalhos, mesclagens, imagem e impressão são preservados.
 O modelo nunca é salvo. O temporário é removido; o stream do download é temporário.
 
-Preserva cabeçalhos 1–8, mesclagens, larguras, alturas existentes, colunas ocultas,
+Preserva cabeçalhos 1–8, mesclagens, larguras, altura mínima, colunas ocultas,
 impressão e regras condicionais. Limpa todos os valores antigos a partir da linha
-9, mantendo as linhas formatadas vazias do original. Atualiza o autofiltro; quando
+9, mantendo as linhas formatadas vazias do modelo. A altura cresce conforme a
+extensão e as quebras do texto atual. Atualiza o autofiltro até N; quando
 ultrapassa a linha 2120, clona o estilo e altura da linha 10, expande a dimensão e
 estende os finais dos intervalos condicionais de dados, preservando as regras.
 Mantém as regras condicionais antigas e sua ordem relativa. Acrescenta regras
-prioritárias, com stopIfTrue, exclusivamente no intervalo L9:Lúltima exportada:
+prioritárias, com stopIfTrue, exclusivamente no intervalo N9:Núltima exportada:
 Aberta com fundo vermelho C00000; Finalizada com fundo verde 008000; ambas com
 texto branco. As regras não alteram fonte, tamanho, bordas ou alinhamento e
 impedem que as condições antigas sobrescrevam essas cores.

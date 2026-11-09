@@ -574,6 +574,9 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if (in_array($sql, [ActionPlanStageQueries::PERMISSIONS, ActionPlanStageQueries::METADATA], true)) return true;
+        if (in_array($sql, [ActionPlanObservationQueries::SOURCES, ActionPlanObservationQueries::HISTORY_METADATA, ActionPlanObservationQueries::HEADER], true)) return true;
+        if ($sql === ActionPlanQuery::AUDIT) return true;
         if (in_array($sql, [CostCenterUnitQueries::AUDIT, CostCenterUnitQueries::CENTERS], true)) return true;
         if (in_array($sql, [OrderTaskQueries::ORDER_AUDIT, OrderTaskQueries::CATALOG_AUDIT], true)) return true;
         foreach ([false, true] as $tasks) {

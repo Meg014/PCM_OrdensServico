@@ -31,17 +31,31 @@ final class PcmController extends AppController
     public function exportActionPlan(): Response
     {
         $this->request->allowMethod(['get']);
+        $started = hrtime(true);
+        $actor = $this->request->getAttribute('identity');
+        $lock = fopen(TMP . 'pcm-action-plan-' . hash('sha256', (string)($actor?->getIdentifier() ?? 'anonymous-test')) . '.lock', 'c');
+        if ($lock === false) return $this->exportError('Não foi possível iniciar a geração. Tente novamente.', 503);
+        if (!flock($lock, LOCK_EX | LOCK_NB)) {
+            fclose($lock);
+            return $this->exportError('Já existe um Plano de Ação sendo gerado para este usuário. Aguarde a conclusão.', 409);
+        }
         $this->request->getSession()->close();
         try {
             $period = \App\Service\ActionPlanService::period($this->request->getQueryParams());
             $orders = (new \App\Service\ActionPlanService())->load($this->request->getQueryParams());
+            $excelStarted = hrtime(true);
             $stream = (new \App\Service\ActionPlanExcelReport())->write($orders);
+            \Cake\Log\Log::info('ActionPlan stage=excel ms=' . round((hrtime(true) - $excelStarted) / 1e6, 1)
+                . ' bytes=' . (fstat($stream)['size'] ?? 0) . ' total_prepare_ms=' . round((hrtime(true) - $started) / 1e6, 1));
         } catch (InvalidArgumentException $error) {
             return $this->exportError($error->getMessage(), 400);
         } catch (\DomainException $error) {
             return $this->exportError($error->getMessage(), 422);
-        } catch (\Throwable) {
+        } catch (\Throwable $error) {
+            \Cake\Log\Log::error('ActionPlan generation failed type=' . get_class($error));
             return $this->exportError('Não foi possível consultar o TOTVS ou gerar o Plano de Ação. Tente novamente.', 503);
+        } finally {
+            flock($lock, LOCK_UN); fclose($lock);
         }
 
         return $this->response->withType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

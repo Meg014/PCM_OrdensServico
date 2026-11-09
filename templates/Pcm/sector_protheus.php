@@ -6,7 +6,8 @@ $this->Html->script('pcm-protheus-sector', ['block' => true, 'defer' => true, 't
 $sectorNavigationFilters = array_filter($sector['filters'], static fn ($value): bool => $value !== '');
 $equipmentScopeEmpty = $sector['available'] && !$sector['orders']
     && array_sum(array_intersect_key($sector['cards'], array_flip(['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed']))) === 0
-    && ($sector['backlog']['total'] ?? 0) === 0;
+    && ($sector['backlog']['total'] ?? 0) === 0
+    && ($sector['checklists']['total'] ?? 0) === 0;
 ?>
 <section data-protheus-sector data-url="<?= $this->Url->build(['_name' => 'pcm-sector-data', 'code' => $sector['code'], '?' => $sectorNavigationFilters + ['page' => $sector['page'], 'limit' => $sector['limit']]]) ?>">
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | SETOR</p><h1><?= h($sector['name']) ?></h1>

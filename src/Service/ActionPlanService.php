@@ -36,9 +36,14 @@ final class ActionPlanService
     {
         $period = self::period($query);
         $unit = ProtheusUnit::validate($query['unidade'] ?? ProtheusUnit::ALL);
+        $started = hrtime(true);
         $rows = (new ProtheusRepository())->actionPlan($period['date_start'], $period['date_end'], $unit);
+        \Cake\Log\Log::info('ActionPlan stage=query ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' rows=' . count($rows));
+        $started = hrtime(true);
+        $orders = $this->group($rows);
+        \Cake\Log\Log::info('ActionPlan stage=group ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' orders=' . count($orders));
 
-        return $this->group($rows);
+        return $orders;
     }
 
     /** SQL orders all active entries chronologically; only M entries contribute mechanics. */
@@ -47,8 +52,9 @@ final class ActionPlanService
         $orders = [];
         $employees = [];
         $names = [];
+        $tasks = [];
         foreach ($rows as $row) {
-            foreach (['identity_count', 'cost_center_matches', 'equipment_matches', 'service_matches', 'professional_matches'] as $field) {
+            foreach (['identity_count', 'cost_center_matches', 'equipment_matches', 'service_matches', 'professional_matches', 'task_matches'] as $field) {
                 if ((int)($row[$field] ?? 0) > 1) {
                     throw new DomainException('Há cadastros ambíguos no TOTVS. Nenhum arquivo foi gerado.');
                 }
@@ -70,6 +76,11 @@ final class ActionPlanService
                 // Keep the first nonblank entry text; an O.S. description always takes precedence.
                 $orders[$key]['description'] = $this->descriptionText($row['entry_description'] ?? null);
             }
+            $task = trim((string)($row['TL_TAREFA'] ?? ''));
+            if ($task !== '') {
+                $description = $this->descriptionText($row['task_description'] ?? null);
+                $tasks[$key][$task] = $task . ($description !== '' ? ' — ' . $description : '');
+            }
             $code = trim((string)($row['TL_CODIGO'] ?? ''));
             $name = trim((string)($row['professional_name'] ?? ''));
             if (($row['TL_TIPOREG'] ?? null) === 'M' && $code !== '' && $name !== '' && !isset($employees[$key][$code])) {
@@ -79,6 +90,7 @@ final class ActionPlanService
         }
         foreach ($orders as $key => &$order) {
             $order['mechanics'] = implode(' / ', $names[$key] ?? []);
+            $order['tasks'] = implode("\n", $tasks[$key] ?? []);
             if ($order['description'] === '') {
                 $order['description'] = $this->descriptionText($order['service']);
             }

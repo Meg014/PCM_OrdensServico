@@ -101,6 +101,20 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertSame(400, $response->getStatusCode());
     }
 
+    public function testActionPlanConcurrentGenerationIsRejectedWithoutQueryingTotvsAndLockIsReleased(): void
+    {
+        $request = new ServerRequest(['url' => '/pcm/plano-de-acao/excel', 'environment' => ['REQUEST_METHOD' => 'GET']]);
+        $request = $request->withQueryParams(['date_start' => 'invalid', 'date_end' => 'invalid']);
+        $path = TMP . 'pcm-action-plan-' . hash('sha256', 'anonymous-test') . '.lock';
+        $lock = fopen($path, 'c'); self::assertTrue(flock($lock, LOCK_EX | LOCK_NB));
+        try { self::assertSame(409, (new PcmController($request))->exportActionPlan()->getStatusCode()); }
+        finally { flock($lock, LOCK_UN); fclose($lock); }
+        self::assertSame(400, (new PcmController($request))->exportActionPlan()->getStatusCode());
+        $lock = fopen($path, 'c');
+        try { self::assertTrue(flock($lock, LOCK_EX | LOCK_NB)); }
+        finally { flock($lock, LOCK_UN); fclose($lock); }
+    }
+
     public function testTvRemainsBlockedAndRegularLoggedInUserKeepsAccess(): void
     {
         foreach (['TV', 'ADMIN'] as $role) {
@@ -234,6 +248,7 @@ final class ProtheusOrderAccessTest extends TestCase
             'operational' => ['total' => 10, 'open' => 3, 'closed' => 7],
             'breakdown' => array_fill_keys(array_keys(\App\Service\Protheus\ProtheusSectorService::CATEGORIES), ['open' => 0, 'closed' => 0]),
             'backlog' => ['total' => 3, 'ages' => array_fill_keys(array_keys(\App\Service\Protheus\ProtheusSectorService::BACKLOG_AGES), 0), 'as_of' => '28/09/2026'],
+            'checklists' => ['total' => 2, 'ages' => array_replace(array_fill_keys(array_keys(\App\Service\Protheus\RouteChecklist::AGES), 0), ['route_attention' => 2]), 'as_of' => '28/09/2026', 'visible' => true],
             'missing_start' => 2, 'charts' => ['equipment' => [], 'services' => []], 'orders' => [],
             'page' => 1, 'limit' => 20, 'has_more' => false];
         $view->set('payload', $generalPayload);
@@ -247,9 +262,12 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('O.S. por Setor', $general);
         self::assertStringContainsString('Situação das O.S.', $general);
         self::assertStringContainsString('Distribuição das O.S.', $general);
-        foreach (['Resumo operacional geral', 'Detalhamento por classificação', 'Backlog / O.S. em aberto',
+        foreach (['Resumo operacional geral', 'Detalhamento por classificação', 'Backlog de O.S. normais', 'Checklists das rotas em aberto',
             'Ordens de Serviço'] as $heading) self::assertStringContainsString($heading, $general);
         self::assertStringNotContainsString('Pontos de atenção', $general);
+        self::assertStringContainsString('backlog_age=route_attention', $general);
+        self::assertStringContainsString('Mecânica: 0 a 7 dias · Elétrica: 0 a 17 dias', $general);
+        self::assertStringContainsString('Mecânica: 8 a 14 dias · Elétrica: 18 a 20 dias', $general);
         self::assertStringNotContainsString('Situação / término', $general);
         self::assertSame(1, substr_count($general, 'data-analysis-chart='));
         $scripts = $view->fetch('script');

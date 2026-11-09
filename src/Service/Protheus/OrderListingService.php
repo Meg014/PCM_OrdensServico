@@ -44,7 +44,7 @@ final class OrderListingService
         $filters['unidade'] = ProtheusUnit::validate($filters['unidade']);
         if (!in_array($filters['card'], ['', 'safra', 'offseason'], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)
-            || !in_array($filters['backlog_age'], ['', 'all', ...array_keys(ProtheusSectorService::BACKLOG_AGES)], true)) {
+            || !in_array($filters['backlog_age'], ['', 'all', 'route_all', ...array_keys(RouteChecklist::AGES), ...array_keys(ProtheusSectorService::BACKLOG_AGES)], true)) {
             throw new InvalidArgumentException('Drill-down invÃ¡lido.');
         }
         $drilldown = $filters['card'] !== '' || $filters['backlog_age'] !== '';
@@ -92,8 +92,7 @@ final class OrderListingService
                 if (!$sector['available']) throw new \RuntimeException('Drill-down indisponÃ­vel.');
                 if ($filters['backlog_age'] !== '') {
                     $age = $filters['backlog_age'];
-                    $total = $age === 'all' ? $sector['backlog']['total'] : $sector['backlog']['ages'][$age];
-                    $label = 'Backlog · ' . ($age === 'all' ? 'Total de O.S. em aberto' : ProtheusSectorService::BACKLOG_AGES[$age]);
+                    ['total' => $total, 'label' => $label] = RouteChecklist::selection($age, $sector['backlog'], $sector['checklists']);
                 } else {
                     $state = $filters['card_status'] === 'EM ABERTO' ? 'open' : 'completed';
                     $total = $sector['cards'][$filters['card'] . '_' . $state];

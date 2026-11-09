@@ -207,7 +207,13 @@ SQL;
     /** Same sector/master/manual-filter scope, exclusively L/N, with no planned-date cutoff. */
     private static function backlogBase(bool $area): string
     {
-        return self::base($area, ProtheusOperationalEligibility::OPEN) . self::AGE;
+        $base = self::base($area, ProtheusOperationalEligibility::OPEN);
+        // Route assets belong to Factory even when their legacy cost center maps elsewhere.
+        $base = str_replace(ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit'),
+            RouteChecklist::unitPredicate(), $base);
+        return $base . self::AGE . ', classified AS (SELECT bucketed.*, CASE WHEN '
+            . RouteChecklist::predicate() . ' THEN 1 ELSE 0 END AS is_checklist, '
+            . RouteChecklist::ageCase() . ' AS checklist_bucket FROM bucketed)';
     }
 
     public static function backlog(bool $area = true): string
@@ -220,21 +226,29 @@ SQL;
         NULL AS equipment_name, NULL AS TJ_CCUSTO,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
-    FROM bucketed
+    FROM classified WHERE is_checklist = 0
     GROUP BY age_bucket
     UNION ALL
     -- A scalar aggregate always emits one total row, including an empty backlog.
     SELECT 'total', NULL, NULL, NULL, NULL, NULL, NULL,
         COUNT_BIG(*) AS quantity, MAX(identity_count) AS identity_count,
         MAX(equipment_matches) AS equipment_matches, MAX(service_matches) AS service_matches
-    FROM bucketed
+    FROM classified WHERE is_checklist = 0
+    UNION ALL
+    SELECT 'checklist_age', checklist_bucket, NULL, NULL, NULL, NULL, NULL,
+        COUNT_BIG(*), MAX(identity_count), MAX(equipment_matches), MAX(service_matches)
+    FROM classified WHERE is_checklist = 1 GROUP BY checklist_bucket
+    UNION ALL
+    SELECT 'checklist_total', NULL, NULL, NULL, NULL, NULL, NULL,
+        COUNT_BIG(*), MAX(identity_count), MAX(equipment_matches), MAX(service_matches)
+    FROM classified WHERE is_checklist = 1
 ), ranked AS (
     SELECT g.*, ROW_NUMBER() OVER (PARTITION BY dimension ORDER BY quantity DESC,
         age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, TJ_CCUSTO) AS position FROM grouped g
 )
 SELECT dimension, age_bucket, TJ_FILIAL, TJ_TIPO, TJ_CODBEM, equipment_name, TJ_CCUSTO,
     quantity, identity_count, equipment_matches, service_matches
-FROM ranked WHERE dimension IN ('total', 'age')
+FROM ranked WHERE dimension IN ('total', 'age', 'checklist_total', 'checklist_age')
 ORDER BY dimension, position
 OPTION (RECOMPILE)
 SQL;
@@ -242,9 +256,10 @@ SQL;
 
     public static function page(bool $backlog = false, bool $area = true, bool $costCenterName = false): string
     {
-        $source = $backlog ? 'bucketed' : 'filtered';
+        $source = $backlog ? 'classified' : 'filtered';
         $ageColumns = $backlog ? ', CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, age_days' : '';
-        $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+        $ageFilter = $backlog ? " AND (CASE WHEN is_checklist = 1 THEN 'route_all' ELSE 'all' END = :backlog_age"
+            . " OR CASE WHEN is_checklist = 1 THEN checklist_bucket ELSE age_bucket END = :backlog_bucket)" : '';
 
         $costCenterColumn = $costCenterName
             ? ", COALESCE(cost_center.name, NULLIF(LTRIM(RTRIM(filtered.TJ_CCUSTO)), '')) AS cost_center_name"
@@ -294,8 +309,9 @@ SQL;
     /** One bounded row per STL010 entry, with order/master data resolved in the same read. */
     public static function entriesPage(bool $backlog = false, bool $area = true): string
     {
-        $source = $backlog ? 'bucketed' : 'filtered';
-        $ageFilter = $backlog ? " AND (:backlog_age = 'all' OR age_bucket = :backlog_bucket)" : '';
+        $source = $backlog ? 'classified' : 'filtered';
+        $ageFilter = $backlog ? " AND (CASE WHEN is_checklist = 1 THEN 'route_all' ELSE 'all' END = :backlog_age"
+            . " OR CASE WHEN is_checklist = 1 THEN checklist_bucket ELSE age_bucket END = :backlog_bucket)" : '';
 
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 

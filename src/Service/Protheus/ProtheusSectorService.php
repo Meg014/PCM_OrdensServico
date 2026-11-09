@@ -47,7 +47,7 @@ final class ProtheusSectorService
             $filters[$key] = trim($value);
         }
         if (!in_array($filters['status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Status inválido.');
-        if (!in_array($filters['backlog_age'], ['', 'all', ...array_keys(self::BACKLOG_AGES)], true)) throw new InvalidArgumentException('Faixa de backlog inválida.');
+        if (!in_array($filters['backlog_age'], ['', 'all', 'route_all', ...array_keys(RouteChecklist::AGES), ...array_keys(self::BACKLOG_AGES)], true)) throw new InvalidArgumentException('Faixa de backlog inválida.');
         $filters['unit'] = ProtheusUnit::validate($filters['unit']);
         if (!in_array($filters['card'], ['', 'all', 'safra', 'offseason', ...array_keys(self::CATEGORIES)], true)
             || !in_array($filters['card_status'], ['', 'EM ABERTO', 'FECHADA'], true)) throw new InvalidArgumentException('Indicador inválido.');
@@ -124,6 +124,9 @@ final class ProtheusSectorService
             $stage = 'validation: backlog / dimensions and totals';
             $backlog = ['total' => null, 'ages' => array_fill_keys(array_keys(self::BACKLOG_AGES), 0),
                 'as_of' => $selection['as_of']];
+            $checklists = ['total' => 0, 'ages' => array_fill_keys(array_keys(RouteChecklist::AGES), 0), 'area' => $area,
+                'as_of' => $selection['as_of'], 'visible' => in_array($area, ['', 'ELETRI', 'MECANI'], true)
+                    && in_array($filters['unit'], ['', ProtheusUnit::FACTORY], true)];
             $genericEquipment = [];
             $topEquipment = [];
             foreach ($data['equipment_ranking'] as $row) {
@@ -149,9 +152,12 @@ final class ProtheusSectorService
             foreach ($data['backlog'] as $row) {
                 $quantity = (int)$row['quantity'];
                 $dimension = $row['dimension'];
+                if ($dimension === 'checklist_total') { $checklists['total'] = $quantity; continue; }
+                if ($dimension === 'checklist_age') { $checklists['ages'][$row['age_bucket']] = $quantity; continue; }
                 if ($dimension === 'total') { $backlog['total'] = $quantity; continue; }
                 if ($dimension === 'age') { $backlog['ages'][$row['age_bucket']] = $quantity; continue; }
             }
+            if ($checklists['total'] !== array_sum($checklists['ages'])) throw new RuntimeException('Checklists incompletos.');
             if ($backlog['total'] === null || $backlog['total'] !== array_sum($backlog['ages'])) {
                 // Counts only: enough to diagnose the SQL result contract without exposing OS data.
                 $dimensions = array_fill_keys(['total', 'age'], 0);
@@ -169,7 +175,7 @@ final class ProtheusSectorService
             }
             return array_replace($result, ['available' => true, 'queried_at' => (new DateTimeImmutable())->format(DATE_ATOM),
                 'orders' => $data['orders'], 'cards' => $cards, 'breakdown' => $breakdown, 'operational' => $operational,
-                'rankings' => ['services' => $historical['services']], 'backlog' => $backlog, 'top_equipment' => $topEquipment,
+                'rankings' => ['services' => $historical['services']], 'backlog' => $backlog, 'checklists' => $checklists, 'top_equipment' => $topEquipment,
                 'generic_equipment' => $genericEquipment,
                 'historical_rankings' => $historical,
                 'missing_start' => $missing, 'has_more' => $data['has_more']]);

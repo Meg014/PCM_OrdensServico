@@ -21,10 +21,8 @@ $returnContext = ['return_sector' => $sector['code'], 'return_filters' => $secto
 $activeDrilldown = null;
 if ($sector['filters']['backlog_age'] !== '') {
     $age = $sector['filters']['backlog_age'];
-    $activeDrilldown = ['label' => 'Backlog · ' . ($age === 'all' ? 'Total de O.S. em aberto' : (
-        \App\Service\Protheus\ProtheusSectorService::BACKLOG_AGES[$age] ?? $age)),
-        'total' => $age === 'all' ? $sector['backlog']['total'] : $sector['backlog']['ages'][$age],
-        'clear' => $backlogUrl('')];
+    $activeDrilldown = \App\Service\Protheus\RouteChecklist::selection($age, $sector['backlog'], $sector['checklists'])
+        + ['clear' => $backlogUrl('')];
 } elseif (in_array($sector['filters']['card'], ['safra', 'offseason'], true) && $sector['filters']['card_status'] !== '') {
     $season = $sector['filters']['card'];
     $state = $sector['filters']['card_status'] === 'EM ABERTO' ? 'open' : 'completed';
@@ -37,7 +35,8 @@ if ($sector['filters']['backlog_age'] !== '') {
 <p class="text-body-secondary">Comparativo informativo. As demais análises desta página consideram somente Safra.</p><div class="row g-3">
 <?php foreach ($labels as $key => $label): ?><?php [$season, $state] = explode('_', $key, 2); ?><div class="col-sm-6"><a class="pcm-kpi-card pcm-season-card text-decoration-none" href="<?= $this->Url->build($cardOrderUrl($season, $state === 'open' ? 'EM ABERTO' : 'FECHADA')) ?>"><p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($sector['cards'][$key], 0, ',', '.')) ?></strong></a></div><?php endforeach; ?>
 </div></section>
-<section class="pcm-dashboard-section"><h2>Backlog / O.S. em aberto</h2>
+<section class="pcm-dashboard-section"><h2>Backlog de O.S. normais</h2>
+<p class="text-body-secondary">Não inclui os checklists das rotas de manutenção.</p>
 <p class="text-body-secondary">Abertas liberadas do setor, conforme os filtros manuais. Idade desde a origem da O.S. até <?= h($sector['backlog']['as_of']) ?>, respeitando o período de início planejado. O período planejado filtra toda a carteira apresentada.</p>
 <div class="row g-3">
 <?php foreach (['all' => 'Total de O.S. em aberto'] + \App\Service\Protheus\ProtheusSectorService::BACKLOG_AGES as $key => $label): ?>
@@ -46,7 +45,9 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <div class="col-sm-6 col-xl-4"><a class="pcm-kpi-card text-decoration-none" href="<?= $this->Url->build($backlogOrderUrl($key)) ?>">
 <p class="pcm-kpi-label"><?= h($label) ?></p><strong class="pcm-kpi-value"><?= h(number_format($quantity, 0, ',', '.')) ?></strong></a></div>
 <?php endforeach; ?></div>
-<div class="row g-3 mt-2">
+</section>
+<?= $this->element('protheus_route_checklists', ['checklists' => $sector['checklists'], 'checklistUrl' => $backlogOrderUrl]) ?>
+<section class="pcm-dashboard-section"><h2>Análises de O.S.</h2><div class="row g-3 mt-2">
 <?php foreach (['equipment' => 'Top 10 equipamentos por O.S.', 'costCenters' => 'Top 10 centros de custo por O.S.', 'maintenance' => 'O.S. por Tipo de Manutenção'] as $key => $label): ?>
 <?php $rankingRows = $key === 'equipment' ? $sector['top_equipment'] : $sector['historical_rankings'][$key]; ?>
 <div class="col-lg-4"><article class="pcm-panel p-3"><h3 class="h5"><?= h($label) ?></h3>

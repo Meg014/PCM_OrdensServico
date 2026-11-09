@@ -1,0 +1,509 @@
+{
+    "source_sha256": "4e02bef640f27ac6695cf30e047ef37154b0d8a0b3a627e215344896c7ec578c",
+    "sheet_name": "PLANO DE AÇAO 2026",
+    "parts": {
+        "xl\/styles.xml": "0337025d6190513f24875b5de6a6660fb305d116847c366466bc24ac32e0d93f",
+        "xl\/theme\/theme1.xml": "3b82ffc6a62a3f12746eb91e64ea3268bebe9e17632d1251d95c38d3ee53e40f",
+        "xl\/drawings\/drawing1.xml": "d788c77c4553d3adb7acc94a879dfdabbd24e1fad2a7faf0640bcaf9cb2fef0f",
+        "xl\/drawings\/_rels\/drawing1.xml.rels": "ae407ef3ed46e88941b5912fd6a7b5ccd8c3cd3c0539ccef040dc9d8398c5180",
+        "xl\/media\/image1.jpeg": "ca1976b2e29aaf790d1aebf5d61f7b682a855daf26ad7682b048312121fde8a4",
+        "xl\/printerSettings\/printerSettings1.bin": "fb1cb71a7e4c4fa9e3807f4272cdd0eda6f3395e6dd9c97ce1725c6edcedd522"
+    },
+    "layout": {
+        "sheetPr": [
+            "078955e106082be8c071aebb9d6bc6b6dec823585358bfa6d3575adb0239d3bf"
+        ],
+        "dimension": [
+            "23c4e254d9338beccec8e1122113a57fd92dd60fdb3316225934fb3c4be2d33e"
+        ],
+        "sheetViews": [
+            "a5c4ab0c199e2c6c9f2c14bc9d1ff0a5c53e2d44cce29e3a2cb3e1493edc9604"
+        ],
+        "sheetFormatPr": [
+            "c5eb00b168c46e9bf4b61037119f1d7d540a149a86d266f70a963bd14a06db64"
+        ],
+        "cols": [
+            "9faa393200f271979c87e5d9b69a1b6b5a4675b74a871829c49d5ec9f16b76f5"
+        ],
+        "mergeCells": [
+            "6413e4999c83f94b6e78fc529b63face73898a81c61b440e3f01d5766c3c9dbd"
+        ],
+        "phoneticPr": [
+            "3ff0a1c37e70b0680244cbb72cb645afa72e3ffca5203c7f455fcee0a02d3298"
+        ],
+        "conditionalFormatting": [
+            "8813c1d7018c78f684dce68648f3cbe5a18dc3634bc592443ba8aad71126318a",
+            "5798b38e615b6fae64e6d4ee8bcb55b1179292a4fe026d971a4acb8c503c14e5",
+            "d43cf7ae5cafdb4d08aaf21cbb4b549b0cc35a6b5b6748ff539c7f7f3217d271",
+            "35675c5fcba97bb41a9f0d3bf64b5eab19a3ff5a53266ccb39c6ffe429fa1d28",
+            "94e230698ec60d6abbbac6702ce9a183e08b28d20ceb67c73768d0461a27e7c1",
+            "358ef69dd14dde4378a711d3b32b0db450d1e6b230fc7c9486ec110e723fc03d",
+            "7f5855d65ee3dceb919440074dc5bcdcd3d0ef0eb6420a3e4467f814d0ba2a53",
+            "15eb4c327ba3c09e9d6dd808760614e3872a59d2b8518e63e88365aa7c09f8a3",
+            "12e4f945028334d01efca625cd203d1478247a69cce8859f82e5e6856213d0b0",
+            "ed9daba73b507337e6d6fa38c09d9344884ac9ef2d9f2cfc743e407656a3c35c",
+            "dc2b8d8e4d52b1af1ea3316c05778960dab09f243419ef0e3658e9733b511a44",
+            "1839b635f0da56a8577cc68696d3253c19752e5df8978b870a6d10a042a7cc30",
+            "c5c467eaef9bf42348f4d9cf9eb4528d9d14d47e66f9dbe351b63029152ed1e4"
+        ],
+        "pageMargins": [
+            "de0e1b645ea5cbbae444027d1acd5c1469a1fed73a9d1eae05562ca1403e82d6"
+        ],
+        "pageSetup": [
+            "b963742192ea34a63753f0d5d557e73ec837bf8f351f43451e1e417e22895ebd"
+        ],
+        "drawing": [
+            "603c74685efc475e3096d6d8eac6efa51c26ec5f8686881b2b622978c5b64d8c"
+        ]
+    },
+    "headers": {
+        "A1": {
+            "style": "27",
+            "value": ""
+        },
+        "B1": {
+            "style": "41",
+            "value": ""
+        },
+        "C1": {
+            "style": "138",
+            "value": "MANUTENÇÃO PREVENTIVA - NÃO CONFORMIDADES ENCONTRADAS NO CHECKLIST"
+        },
+        "D1": {
+            "style": "139",
+            "value": ""
+        },
+        "E1": {
+            "style": "139",
+            "value": ""
+        },
+        "F1": {
+            "style": "139",
+            "value": ""
+        },
+        "G1": {
+            "style": "139",
+            "value": ""
+        },
+        "H1": {
+            "style": "139",
+            "value": ""
+        },
+        "I1": {
+            "style": "139",
+            "value": ""
+        },
+        "J1": {
+            "style": "139",
+            "value": ""
+        },
+        "K1": {
+            "style": "139",
+            "value": ""
+        },
+        "L1": {
+            "style": "139",
+            "value": ""
+        },
+        "M1": {
+            "style": "105",
+            "value": ""
+        },
+        "N1": {
+            "style": "106",
+            "value": ""
+        },
+        "A2": {
+            "style": "29",
+            "value": ""
+        },
+        "B2": {
+            "style": "42",
+            "value": ""
+        },
+        "C2": {
+            "style": "136",
+            "value": ""
+        },
+        "D2": {
+            "style": "137",
+            "value": ""
+        },
+        "E2": {
+            "style": "137",
+            "value": ""
+        },
+        "F2": {
+            "style": "137",
+            "value": ""
+        },
+        "G2": {
+            "style": "137",
+            "value": ""
+        },
+        "H2": {
+            "style": "137",
+            "value": ""
+        },
+        "I2": {
+            "style": "137",
+            "value": ""
+        },
+        "J2": {
+            "style": "137",
+            "value": ""
+        },
+        "K2": {
+            "style": "137",
+            "value": ""
+        },
+        "L2": {
+            "style": "137",
+            "value": ""
+        },
+        "M2": {
+            "style": "142",
+            "value": "FML-MM-001-02\/03"
+        },
+        "N2": {
+            "style": "143",
+            "value": ""
+        },
+        "A3": {
+            "style": "30",
+            "value": ""
+        },
+        "B3": {
+            "style": "43",
+            "value": ""
+        },
+        "C3": {
+            "style": "140",
+            "value": ""
+        },
+        "D3": {
+            "style": "141",
+            "value": ""
+        },
+        "E3": {
+            "style": "141",
+            "value": ""
+        },
+        "F3": {
+            "style": "141",
+            "value": ""
+        },
+        "G3": {
+            "style": "141",
+            "value": ""
+        },
+        "H3": {
+            "style": "141",
+            "value": ""
+        },
+        "I3": {
+            "style": "141",
+            "value": ""
+        },
+        "J3": {
+            "style": "141",
+            "value": ""
+        },
+        "K3": {
+            "style": "141",
+            "value": ""
+        },
+        "L3": {
+            "style": "141",
+            "value": ""
+        },
+        "M3": {
+            "style": "144",
+            "value": ""
+        },
+        "N3": {
+            "style": "145",
+            "value": ""
+        },
+        "A4": {
+            "style": "101",
+            "value": "NORMAL = N"
+        },
+        "B4": {
+            "style": "102",
+            "value": ""
+        },
+        "C4": {
+            "style": "127",
+            "value": "Ausência de vibrações elevadas\/Ausência de temperaturas elevadas\/Ausência de ruídos anormais\/Ausência de vazamentos de óleo\/selo mecânico\/Sujidade\/Proteção devidamente fixada."
+        },
+        "D4": {
+            "style": "128",
+            "value": ""
+        },
+        "E4": {
+            "style": "128",
+            "value": ""
+        },
+        "F4": {
+            "style": "128",
+            "value": ""
+        },
+        "G4": {
+            "style": "128",
+            "value": ""
+        },
+        "H4": {
+            "style": "128",
+            "value": ""
+        },
+        "I4": {
+            "style": "128",
+            "value": ""
+        },
+        "J4": {
+            "style": "128",
+            "value": ""
+        },
+        "K4": {
+            "style": "128",
+            "value": ""
+        },
+        "L4": {
+            "style": "128",
+            "value": ""
+        },
+        "M4": {
+            "style": "128",
+            "value": ""
+        },
+        "N4": {
+            "style": "129",
+            "value": ""
+        },
+        "A5": {
+            "style": "103",
+            "value": "ALERTA = A"
+        },
+        "B5": {
+            "style": "104",
+            "value": ""
+        },
+        "C5": {
+            "style": "133",
+            "value": "Se apresentar anomalias pequenas e que não resulte em parada do processo"
+        },
+        "D5": {
+            "style": "134",
+            "value": ""
+        },
+        "E5": {
+            "style": "134",
+            "value": ""
+        },
+        "F5": {
+            "style": "134",
+            "value": ""
+        },
+        "G5": {
+            "style": "134",
+            "value": ""
+        },
+        "H5": {
+            "style": "134",
+            "value": ""
+        },
+        "I5": {
+            "style": "134",
+            "value": ""
+        },
+        "J5": {
+            "style": "134",
+            "value": ""
+        },
+        "K5": {
+            "style": "134",
+            "value": ""
+        },
+        "L5": {
+            "style": "134",
+            "value": ""
+        },
+        "M5": {
+            "style": "134",
+            "value": ""
+        },
+        "N5": {
+            "style": "135",
+            "value": ""
+        },
+        "A6": {
+            "style": "85",
+            "value": "CRITICO = C"
+        },
+        "B6": {
+            "style": "86",
+            "value": ""
+        },
+        "C6": {
+            "style": "130",
+            "value": "Se apresentar anomalias mais graves e que podem resultar na parada do processo"
+        },
+        "D6": {
+            "style": "131",
+            "value": ""
+        },
+        "E6": {
+            "style": "131",
+            "value": ""
+        },
+        "F6": {
+            "style": "131",
+            "value": ""
+        },
+        "G6": {
+            "style": "131",
+            "value": ""
+        },
+        "H6": {
+            "style": "131",
+            "value": ""
+        },
+        "I6": {
+            "style": "131",
+            "value": ""
+        },
+        "J6": {
+            "style": "131",
+            "value": ""
+        },
+        "K6": {
+            "style": "131",
+            "value": ""
+        },
+        "L6": {
+            "style": "131",
+            "value": ""
+        },
+        "M6": {
+            "style": "131",
+            "value": ""
+        },
+        "N6": {
+            "style": "132",
+            "value": ""
+        },
+        "A7": {
+            "style": "75",
+            "value": "INSPEÇÃO DE EQUIPAMENTOS"
+        },
+        "B7": {
+            "style": "79",
+            "value": "SETOR"
+        },
+        "C7": {
+            "style": "79",
+            "value": "INSPEÇÃO DE EQUIPAMENTOS"
+        },
+        "D7": {
+            "style": "87",
+            "value": "MECANICO RELATOU"
+        },
+        "E7": {
+            "style": "89",
+            "value": "Data Relatada"
+        },
+        "F7": {
+            "style": "91",
+            "value": "PLANO DE AÇÃO"
+        },
+        "G7": {
+            "style": "92",
+            "value": ""
+        },
+        "H7": {
+            "style": "93",
+            "value": ""
+        },
+        "I7": {
+            "style": "97",
+            "value": "RESPONSÁVEL DA AÇÃO"
+        },
+        "J7": {
+            "style": "97",
+            "value": "MANUTENÇÃO"
+        },
+        "K7": {
+            "style": "99",
+            "value": "O.S"
+        },
+        "L7": {
+            "style": "97",
+            "value": "TAREFAS APONTADAS"
+        },
+        "M7": {
+            "style": "97",
+            "value": "SERVIÇO EXECUTADO"
+        },
+        "N7": {
+            "style": "83",
+            "value": "Status"
+        },
+        "A8": {
+            "style": "76",
+            "value": ""
+        },
+        "B8": {
+            "style": "77",
+            "value": ""
+        },
+        "C8": {
+            "style": "78",
+            "value": ""
+        },
+        "D8": {
+            "style": "88",
+            "value": ""
+        },
+        "E8": {
+            "style": "90",
+            "value": ""
+        },
+        "F8": {
+            "style": "94",
+            "value": ""
+        },
+        "G8": {
+            "style": "95",
+            "value": ""
+        },
+        "H8": {
+            "style": "96",
+            "value": ""
+        },
+        "I8": {
+            "style": "98",
+            "value": ""
+        },
+        "J8": {
+            "style": "98",
+            "value": ""
+        },
+        "K8": {
+            "style": "100",
+            "value": ""
+        },
+        "L8": {
+            "style": "98",
+            "value": ""
+        },
+        "M8": {
+            "style": "98",
+            "value": ""
+        },
+        "N8": {
+            "style": "84",
+            "value": ""
+        }
+    }
+}

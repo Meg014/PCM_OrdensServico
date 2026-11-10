@@ -1,5 +1,7 @@
 # Plano de Ação — modelo visual aprovado
 
+Atualização de 10/11/2026: [SERVIÇO EXECUTADO passou a utilizar STQ010.TQ_OBSERVA](plano-de-acao-servico-executado-stq.md). O layout permanece; as referências abaixo à fonte ainda não confirmada descrevem a etapa anterior.
+
 Referência fornecida pelo usuário: `plano-de-acao_2026-11-01_2026-11-09 (2).xlsx`, aba **PLANO DE AÇAO 2026**.
 
 SHA-256 da referência: `4e02bef640f27ac6695cf30e047ef37154b0d8a0b3a627e215344896c7ec578c`.

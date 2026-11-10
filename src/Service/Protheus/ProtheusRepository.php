@@ -71,6 +71,19 @@ final class ProtheusRepository implements ProtheusReaderInterface
         ]);
     }
 
+    public function actionPlanExecution(array $orders): array
+    {
+        if ($orders === []) return [];
+        $identities = [];
+        foreach ($orders as $order) {
+            $identity = ['branch' => (string)$order['branch'], 'number' => (string)$order['number']];
+            $identities[json_encode($identity, JSON_THROW_ON_ERROR)] = $identity;
+        }
+        return $this->read(ActionPlanExecutionQuery::SQL, [
+            'identities' => json_encode(array_values($identities), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
     public function findAreas(): array
     {
         return $this->read(ProtheusQueries::AREAS);
@@ -656,6 +669,16 @@ final class ProtheusRepository implements ProtheusReaderInterface
         } catch (\Throwable) {
             // The separate activity section reports this source as unavailable.
         }
+        $result['executed_service'] = '';
+        $result['executed_service_available'] = false;
+        try {
+            $identities = [['branch' => $order['TJ_FILIAL'], 'number' => $numero]];
+            $execution = \App\Service\ActionPlanExecution::attach($identities, $this->actionPlanExecution($identities));
+            $result['executed_service'] = $execution[0]['executed_service'];
+            $result['executed_service_available'] = true;
+        } catch (\Throwable) {
+            // An optional source failure must not hide the rest of the order.
+        }
         return $result;
     }
 
@@ -773,8 +796,9 @@ final class ProtheusRepository implements ProtheusReaderInterface
             $statement->closeCursor();
         }
         foreach ($rows as &$row) {
-            foreach ($row as &$value) {
-                if (is_string($value)) {
+            foreach ($row as $field => &$value) {
+                // Stage observations are employee text; preserve their trailing spaces verbatim.
+                if (is_string($value) && $field !== 'executed_observation') {
                     $value = rtrim($value, ' ');
                 }
             }

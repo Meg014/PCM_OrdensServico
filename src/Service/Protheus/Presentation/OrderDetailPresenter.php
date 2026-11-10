@@ -54,6 +54,8 @@ final class OrderDetailPresenter
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->description) : null,
                 'original_description' => $available ? $supplement->description : null,
+                'executed_service' => $available ? $supplement->executedService : null,
+                'executed_service_available' => $available && $supplement->executedServiceAvailable,
                 'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
                     static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
                 )), ['text', 'source']) : [],

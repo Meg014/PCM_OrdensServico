@@ -574,6 +574,7 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if ($sql === ActionPlanExecutionQuery::SQL) return true;
         if (in_array($sql, [ActionPlanStageQueries::PERMISSIONS, ActionPlanStageQueries::METADATA], true)) return true;
         if (in_array($sql, [ActionPlanObservationQueries::SOURCES, ActionPlanObservationQueries::HISTORY_METADATA, ActionPlanObservationQueries::HEADER], true)) return true;
         if ($sql === ActionPlanQuery::AUDIT) return true;

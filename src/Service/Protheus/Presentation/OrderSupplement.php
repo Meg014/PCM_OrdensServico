@@ -27,6 +27,8 @@ final readonly class OrderSupplement
         public array $maintenance = [],
         public array $descriptions = [],
         public array $taskActivities = ['planning_state' => 'unavailable', 'recorded_state' => 'unavailable', 'tasks' => []],
+        public string $executedService = '',
+        public bool $executedServiceAvailable = false,
     ) {
     }
 }

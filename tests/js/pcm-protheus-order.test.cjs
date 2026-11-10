@@ -65,6 +65,35 @@ const history = {state: 'available', equipment_code: 'MEL 80 115', page: 1, has_
     {TJ_ORDEM: '004368', reference_date: '2026-08-18', TJ_SERVICO: 'ELEPRE', service_name: 'PREVENTIVA ELETRICA', TJ_SITUACA: 'L', TJ_TERMINO: 'S'},
 ]};
 
+test('execution section preserves literal text in the page and history dialog without extra requests', async () => {
+    const text = 'Tarefa 000111 / Etapa 001247\nTroca da peça <script>literal</script>\nSegunda observação  ';
+    const payload = {...detail, executed_service: text, executed_service_available: true};
+    const h = harness(() => ok({detail: payload, history}));
+    await tick();
+    const section = all(h.targets.detail).find(el => el.tag === 'section' && el.children[0]?.textContent === 'Serviço Executado');
+    assert.equal(section.children[1].textContent, text);
+    assert.equal(section.children[1].style.whiteSpace, 'pre-wrap');
+    assert.equal(section.children[1].style.overflowWrap, 'anywhere');
+    assert.equal(all(section).some(el => el.tag === 'script'), false);
+    assert.equal(h.calls.length, 1);
+    all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Abrir OS 004368').listeners.click();
+    await tick();
+    assert.match(h.targets.selected.textContent, /Serviço Executado/);
+    assert.ok(h.targets.selected.textContent.includes(text));
+    assert.equal(h.calls.length, 2);
+});
+
+test('execution section shows empty text fallback and safely handles unavailable source', async () => {
+    for (const [payload, expected] of [
+        [{executed_service: ' \n ', executed_service_available: true}, 'Não informado'],
+        [{executed_service: '', executed_service_available: false}, 'Serviço executado temporariamente indisponível.'],
+    ]) {
+        const h = harness(() => ok({detail: {...detail, ...payload}, history}));
+        await tick();
+        assert.ok(h.targets.detail.textContent.includes(expected));
+    }
+});
+
 test('renders text safely, preserves multiple entries and loads only requested history/detail', async () => {
     const h = harness(url => ok(url.searchParams.get('part') === 'history'
         ? {history: {...history, page: 2}} : {detail, history}));

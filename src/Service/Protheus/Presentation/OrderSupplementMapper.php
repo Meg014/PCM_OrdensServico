@@ -73,6 +73,8 @@ final class OrderSupplementMapper
             materials: $materials,
             maintenance: $maintenance,
             descriptions: $this->descriptions($order['description_sources'] ?? []),
+            executedService: (string)($order['executed_service'] ?? ''),
+            executedServiceAvailable: ($order['executed_service_available'] ?? false) === true,
             taskActivities: OrderTaskActivities::present($order['task_activity_rows'] ?? [],
                 rtrim((string)($main['TJ_FILIAL'] ?? '')), rtrim((string)($order['numero'] ?? '')),
                 ($order['task_activities_available'] ?? false) === true),

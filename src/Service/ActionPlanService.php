@@ -11,6 +11,9 @@ use InvalidArgumentException;
 
 final class ActionPlanService
 {
+    public function __construct(private readonly ?ProtheusRepository $repository = null)
+    {
+    }
     public static function period(array $query): array
     {
         $dates = [];
@@ -37,11 +40,16 @@ final class ActionPlanService
         $period = self::period($query);
         $unit = ProtheusUnit::validate($query['unidade'] ?? ProtheusUnit::ALL);
         $started = hrtime(true);
-        $rows = (new ProtheusRepository())->actionPlan($period['date_start'], $period['date_end'], $unit);
+        $repository = $this->repository ?? new ProtheusRepository();
+        $rows = $repository->actionPlan($period['date_start'], $period['date_end'], $unit);
         \Cake\Log\Log::info('ActionPlan stage=query ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' rows=' . count($rows));
         $started = hrtime(true);
         $orders = $this->group($rows);
         \Cake\Log\Log::info('ActionPlan stage=group ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' orders=' . count($orders));
+        $started = hrtime(true);
+        $stages = $repository->actionPlanExecution($orders);
+        $orders = ActionPlanExecution::attach($orders, $stages);
+        \Cake\Log\Log::info('ActionPlan stage=execution ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' observations=' . count($stages));
 
         return $orders;
     }
@@ -94,7 +102,7 @@ final class ActionPlanService
             if ($order['description'] === '') {
                 $order['description'] = $this->descriptionText($order['service']);
             }
-            $order['description'] = \App\Service\Protheus\OrderDescriptions::display($order['description']);
+            if ($order['description'] === '') $order['description'] = \App\Service\Protheus\OrderDescriptions::MISSING;
         }
         unset($order);
 

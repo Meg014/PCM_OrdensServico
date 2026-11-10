@@ -46,12 +46,12 @@ final class ActionPlanObservationTest extends TestCase
         self::assertSame('', Observation::forExcel(self::SHORT . "\r\n  \0"));
     }
 
-    public function testExcelCleansOnlyExplicitExecutionAndPreservesTheSeparatelyProvidedOpening(): void
+    public function testExcelCleansOnlyOpeningAndPreservesConfirmedExecution(): void
     {
         $opening = 'Descrição de abertura de teste: substituir correia.';
         $original = self::EXECUTED . "\r\n" . self::SHORT . "\r\n" . str_repeat(' ', 50) . "\0";
         $order = ['number' => '007334', 'date' => '2026-11-06', 'sector' => 'FARELO', 'equipment' => 'ELV 80 001',
-            'mechanics' => '', 'description' => $opening, 'service' => 'CORRETIVA MECANICA', 'status' => 'Aberta',
+            'mechanics' => '', 'description' => $opening . "\r\n" . self::SHORT, 'service' => 'CORRETIVA MECANICA', 'status' => 'Aberta',
             'tasks' => '', 'executed_service' => $original];
         $stream = (new \App\Service\ActionPlanExcelReport())->write([$order]);
         $book = \PhpOffice\PhpSpreadsheet\IOFactory::load(stream_get_meta_data($stream)['uri']);
@@ -59,7 +59,7 @@ final class ActionPlanObservationTest extends TestCase
             $sheet = $book->getSheet(0);
             self::assertSame('007334', (string)$sheet->getCell('K9')->getValue());
             self::assertSame($opening, (string)$sheet->getCell('H9')->getValue());
-            self::assertSame(self::EXECUTED, (string)$sheet->getCell('M9')->getValue());
+            self::assertSame(str_replace("\0", '', $original), (string)$sheet->getCell('M9')->getValue());
             self::assertSame($original, $order['executed_service']);
         } finally { $book->disconnectWorksheets(); fclose($stream); }
     }

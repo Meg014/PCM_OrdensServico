@@ -114,7 +114,16 @@
             additional.append(node('p', `${label}: ${dateTime(m[key + '_date'], m[key + '_time'])}`, 'mb-1'));
         });
         card.append(additional);
-        target.replaceChildren(title, card, heading('Descrições e atividades registradas'));
+        const execution = node('section', undefined, 'pcm-detail-card mb-3');
+        execution.append(node('h3', 'Serviço Executado', 'h5'));
+        const executionText = String(data.executed_service ?? '');
+        const executionBody = node('p', data.executed_service_available === false
+            ? 'Serviço executado temporariamente indisponível.'
+            : (executionText.trim() ? executionText : 'Não informado'));
+        executionBody.style.whiteSpace = 'pre-wrap';
+        executionBody.style.overflowWrap = 'anywhere';
+        execution.append(executionBody);
+        target.replaceChildren(title, card, execution, heading('Descrições e atividades registradas'));
         const descriptions = data.descriptions || [];
         if (!descriptions.length) target.append(node('p', 'Não existe descrição detalhada disponível no TOTVS.', 'text-body-secondary'));
         descriptions.forEach(item => {

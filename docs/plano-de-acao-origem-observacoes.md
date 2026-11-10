@@ -1,5 +1,7 @@
 # Plano de Ação — origem da descrição e do Serviço Executado
 
+Atualização de 10/11/2026: [SERVIÇO EXECUTADO utiliza STQ010.TQ_OBSERVA](plano-de-acao-servico-executado-stq.md), fonte confirmada e validada nas cinco O.S. fornecidas. A limpeza do checklist aplica-se somente à apresentação de serviço a realizar no Excel. O restante deste documento é histórico da investigação.
+
 **Complemento posterior:** o usuário confirmou que a observação do cabeçalho é Serviço a Realizar e que a observação buscada para execução pertence à tela de etapas. A investigação específica identificou o candidato padrão STQ/TQ_OBSERVA, com leitura bloqueada na conta atual. Consulte [Observação das Etapas da O.S.](plano-de-acao-observacao-etapas.md) e os dois SQLs para a TI. As dúvidas históricas abaixo registram a investigação anterior; não foi estabelecido uso de TJ_OBSERVA como execução.
 
 Investigação local de 09/11/2026. Apenas SELECT no Protheus. Sem deploy, alteração de registros, alteração de permissões ou tentativa de contornar fontes não autorizadas.

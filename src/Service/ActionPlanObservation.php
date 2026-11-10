@@ -46,10 +46,18 @@ final class ActionPlanObservation
         return self::analyze($original)['text'];
     }
 
-    /** Receives the SQL-converted text, not guessed/hex-decoded binary. */
+    /** Opening observation only: remove the recognized checklist for the Excel presentation. */
     public static function forExcel(?string $original): string
     {
         // NUL/padding are storage artifacts, not employee wording. Keep leading/internal spaces.
         return rtrim(self::withoutChecklist($original === null ? null : str_replace("\0", '', $original)), " \t\r\n");
+    }
+
+    /** Execution is confirmed STQ text: do not remove checklists or rewrite employee wording. */
+    public static function executionForExcel(?string $original): string
+    {
+        $text = str_replace("\0", '', $original ?? '');
+        if (!mb_check_encoding($text, 'UTF-8')) throw new \DomainException('A observação da etapa não está em UTF-8 válido.');
+        return preg_match('/^[\p{Z}\s\x{FEFF}]*$/u', $text) === 1 ? '' : $text;
     }
 }

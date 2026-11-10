@@ -1,5 +1,7 @@
 # Plano de Ação — observação das Etapas da O.S.
 
+Atualização de 10/11/2026: a origem STQ010.TQ_OBSERVA foi confirmada e [integrada ao relatório em lote](plano-de-acao-servico-executado-stq.md). As limitações de permissão e a coluna vazia descritas abaixo registram a investigação anterior.
+
 Investigação local em 09/11/2026. Sem deploy, alteração de dados ou permissões. Esta etapa confirma candidatos e prepara a validação no banco; não instala um relacionamento presumido no relatório.
 
 ## Identificação na documentação oficial

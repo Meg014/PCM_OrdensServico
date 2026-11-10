@@ -70,6 +70,16 @@
         const description = node('p', descriptionText || 'Descrição da manutenção não informada.');
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
+        const execution = node('section', undefined, 'pcm-detail-card mb-3');
+        execution.append(node('h3', 'Serviço Executado', 'h5'));
+        const executionText = String(data.executed_service ?? '');
+        const executionBody = node('p', data.executed_service_available === false
+            ? 'Serviço executado temporariamente indisponível.'
+            : (executionText.trim() ? executionText : 'Não informado'));
+        executionBody.style.whiteSpace = 'pre-wrap';
+        executionBody.style.overflowWrap = 'anywhere';
+        execution.append(executionBody);
+        card.append(execution);
         if (data.original_description) {
             const original = node('details', undefined, 'mb-3');
             original.append(node('summary', 'Descrição original registrada no TOTVS'));
@@ -114,16 +124,7 @@
             additional.append(node('p', `${label}: ${dateTime(m[key + '_date'], m[key + '_time'])}`, 'mb-1'));
         });
         card.append(additional);
-        const execution = node('section', undefined, 'pcm-detail-card mb-3');
-        execution.append(node('h3', 'Serviço Executado', 'h5'));
-        const executionText = String(data.executed_service ?? '');
-        const executionBody = node('p', data.executed_service_available === false
-            ? 'Serviço executado temporariamente indisponível.'
-            : (executionText.trim() ? executionText : 'Não informado'));
-        executionBody.style.whiteSpace = 'pre-wrap';
-        executionBody.style.overflowWrap = 'anywhere';
-        execution.append(executionBody);
-        target.replaceChildren(title, card, execution, heading('Descrições e atividades registradas'));
+        target.replaceChildren(title, card, heading('Descrições e atividades registradas'));
         const descriptions = data.descriptions || [];
         if (!descriptions.length) target.append(node('p', 'Não existe descrição detalhada disponível no TOTVS.', 'text-body-secondary'));
         descriptions.forEach(item => {

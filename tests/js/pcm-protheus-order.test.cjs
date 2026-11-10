@@ -74,6 +74,9 @@ test('execution section preserves literal text in the page and history dialog wi
     assert.equal(section.children[1].textContent, text);
     assert.equal(section.children[1].style.whiteSpace, 'pre-wrap');
     assert.equal(section.children[1].style.overflowWrap, 'anywhere');
+    const card = all(h.targets.detail).find(el => el.children.includes(section));
+    assert.equal(card.children[0].textContent, 'Descrição da manutenção');
+    assert.equal(card.children[2], section);
     assert.equal(all(section).some(el => el.tag === 'script'), false);
     assert.equal(h.calls.length, 1);
     all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Abrir OS 004368').listeners.click();

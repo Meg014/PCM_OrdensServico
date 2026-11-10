@@ -1,7 +1,7 @@
 <?php
 /** @var \App\View\AppView $this */
 /** @var int $snapshotId */
-echo $this->Html->script('pcm-protheus-order', ['block' => true, 'defer' => true]);
+echo $this->Html->script('pcm-protheus-order.js?v=' . filemtime(WWW_ROOT . 'js/pcm-protheus-order.js'), ['block' => true, 'defer' => true]);
 ?>
 <section class="pcm-dashboard-section" data-protheus-order
     data-equipment-url="<?= $this->Url->build(['_name' => 'pcm-equipment', '?' => array_intersect_key($this->getRequest()->getQueryParams(), array_flip(['return_sector', 'return_filters']))]) ?>"

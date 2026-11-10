@@ -95,7 +95,7 @@ final class ActionPlanExcelReport
                 }
                 $values = ['B' => $order['sector'], 'C' => $order['equipment'],
                     'D' => $order['mechanics'], 'E' => Date::stringToExcel($order['date']),
-                    'H' => \App\Service\Protheus\OrderDescriptions::display($order['description']), 'I' => $order['mechanics'],
+                    'H' => \App\Service\Protheus\OrderDescriptions::forOrder($order['description'], $order['equipment_code'] ?? null, $order['equipment'] ?? null), 'I' => $order['mechanics'],
                     'J' => $order['service'], 'K' => $order['number'], 'N' => $order['status']];
                 $values['L'] = $order['tasks'] ?? '';
                 // Never infer execution from 'description' (also used for opening notes).

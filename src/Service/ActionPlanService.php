@@ -74,6 +74,7 @@ final class ActionPlanService
                     'number' => (string)$row['TJ_ORDEM'], 'date' => $row['reference_date'],
                     'sector' => trim((string)$row['cost_center_name']),
                     'equipment' => trim((string)$row['equipment_name']),
+                    'equipment_code' => trim((string)($row['TJ_CODBEM'] ?? '')),
                     'description' => $this->descriptionText($row['description'] ?? null),
                     'service' => trim((string)$row['service_name']),
                     'status' => $row['TJ_TERMINO'] === 'S' ? 'Finalizada' : 'Aberta',

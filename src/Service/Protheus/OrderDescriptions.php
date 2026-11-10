@@ -8,17 +8,22 @@ final class OrderDescriptions
 {
     public const MISSING = 'Não informado';
 
-    /** Only the search/listing description column; reuse the already loaded equipment name. */
+    /** Shared order presentation using equipment data already loaded by the caller. */
     public static function listing(array $order): string
     {
-        $equipment = trim((string)($order['TJ_CODBEM'] ?? ''));
+        return self::forOrder($order['descricao'] ?? null, $order['TJ_CODBEM'] ?? null, $order['equipment_name'] ?? null);
+    }
+
+    public static function forOrder(?string $original, ?string $equipmentCode, ?string $equipmentName): string
+    {
+        $equipment = trim($equipmentCode ?? '');
         foreach (['PREVELE FAB', 'PREVLUB FAB', 'PREVMEC FAB'] as $prefix) {
             if (str_starts_with(strtoupper($equipment), $prefix)) {
-                return self::display($order['equipment_name'] ?? null);
+                return self::display($equipmentName);
             }
         }
 
-        return self::display($order['descricao'] ?? null);
+        return self::display($original);
     }
 
     /** Match only the five known questions, wherever placed; other questions stay intact. */

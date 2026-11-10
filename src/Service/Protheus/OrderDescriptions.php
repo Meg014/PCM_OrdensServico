@@ -8,6 +8,19 @@ final class OrderDescriptions
 {
     public const MISSING = 'Não informado';
 
+    /** Only the search/listing description column; reuse the already loaded equipment name. */
+    public static function listing(array $order): string
+    {
+        $equipment = trim((string)($order['TJ_CODBEM'] ?? ''));
+        foreach (['PREVELE FAB', 'PREVLUB FAB', 'PREVMEC FAB'] as $prefix) {
+            if (str_starts_with(strtoupper($equipment), $prefix)) {
+                return self::display($order['equipment_name'] ?? null);
+            }
+        }
+
+        return self::display($order['descricao'] ?? null);
+    }
+
     /** Match only the five known questions, wherever placed; other questions stay intact. */
     public static function maintenance(?string $original): ?string
     {

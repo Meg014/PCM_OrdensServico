@@ -1,5 +1,5 @@
 <?php
-/** Shared OS description presentation; never used for task/entry/NC observations. */
+/** Shared OS description presentation; source records remain unchanged. */
 $text = \App\Service\Protheus\OrderDescriptions::display($description ?? null);
 ?>
 <?php if (mb_strlen($text) > 600): ?>

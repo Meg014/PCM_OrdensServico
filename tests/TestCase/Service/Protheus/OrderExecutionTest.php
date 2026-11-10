@@ -30,7 +30,7 @@ final class OrderExecutionTest extends TestCase
 
     public function testEmptyAndUnavailableSourcesRemainDistinct(): void
     {
-        self::assertSame('', $this->detail([])['executed_service']);
+        self::assertSame('Não informado', $this->detail([])['executed_service']);
         self::assertTrue($this->detail([])['executed_service_available']);
         $detail = $this->detail(null);
         self::assertSame('available', $detail['state']);

@@ -67,7 +67,7 @@ final class ActionPlanTest extends TestCase
             self::assertGreaterThan(40, $sheet->getColumnDimension('L')->getWidth());
             self::assertSame('B7:N9', $sheet->getAutoFilter()->getRange());
             self::assertSame('SERVIÇO EXECUTADO', (string)$sheet->getCell('M7')->getValue());
-            self::assertSame('', (string)$sheet->getCell('M9')->getValue());
+            self::assertSame('Não informado', (string)$sheet->getCell('M9')->getValue());
             self::assertTrue($sheet->getStyle('L9')->getAlignment()->getWrapText());
             self::assertSame('Finalizada', (string)$sheet->getCell('N9')->getValue());
         } finally { $book->disconnectWorksheets(); fclose($stream); }
@@ -357,7 +357,7 @@ final class ActionPlanTest extends TestCase
                     self::assertSame('000007', (string)$sheet->getCell('K2121')->getValue());
                     self::assertSame('Aberta', (string)$sheet->getCell('N2121')->getValue());
                     self::assertSame('', (string)$sheet->getCell('L2121')->getValue());
-                    self::assertSame('', (string)$sheet->getCell('M2121')->getValue());
+                    self::assertSame('Não informado', (string)$sheet->getCell('M2121')->getValue());
                     self::assertTrue($sheet->getStyle('L2121')->getAlignment()->getWrapText());
                     self::assertTrue($sheet->getStyle('M2121')->getAlignment()->getWrapText());
                     self::assertSame($sheet->getStyle('K10')->exportArray(), $sheet->getStyle('K2121')->exportArray());

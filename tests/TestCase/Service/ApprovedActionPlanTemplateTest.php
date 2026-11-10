@@ -94,7 +94,7 @@ final class ApprovedActionPlanTemplateTest extends TestCase
             self::assertLessThanOrEqual(409, (float)$xp->query('//s:row[@r="9"]')->item(0)->getAttribute('ht'));
             self::assertSame('000042', $xp->query('//s:c[@r="K9"]/s:is/s:t')->item(0)->textContent);
             self::assertSame('Finalizada', $xp->query('//s:c[@r="N9"]/s:is/s:t')->item(0)->textContent);
-            self::assertSame('', $xp->query('//s:c[@r="M9"]/s:is/s:t')->item(0)->textContent);
+            self::assertSame('Não informado', $xp->query('//s:c[@r="M9"]/s:is/s:t')->item(0)->textContent);
             $dates = $xp->query('//s:row[@r>=9]/s:c/s:is/s:t');
             self::assertLessThan(20, $dates->length, 'Only the new record is present');
         } finally { $zip->close(); $base->close(); fclose($stream); }

@@ -67,7 +67,7 @@
         const descriptionText = data.description == null ? '' : String(data.description)
             .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
             .replace(/(^|\s)□(?=\s|$)/g, '$1').trim();
-        const description = node('p', descriptionText || 'Descrição da manutenção não informada.');
+        const description = node('p', descriptionText || 'Não informado');
         description.style.whiteSpace = 'pre-wrap';
         card.append(description);
         const execution = node('section', undefined, 'pcm-detail-card mb-3');

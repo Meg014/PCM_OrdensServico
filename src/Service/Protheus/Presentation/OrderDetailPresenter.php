@@ -53,8 +53,8 @@ final class OrderDetailPresenter
                 },
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->description) : null,
-                'original_description' => $available ? $supplement->description : null,
-                'executed_service' => $available ? $supplement->executedService : null,
+                'original_description' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->description) : null,
+                'executed_service' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->executedService) : null,
                 'executed_service_available' => $available && $supplement->executedServiceAvailable,
                 'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
                     static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
@@ -87,6 +87,11 @@ final class OrderDetailPresenter
             }
             if (in_array('area', $fields, true)) {
                 $item['area_name'] = \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$item['area'] ?? ''] ?? $item['area'];
+            }
+            foreach (['text', 'description'] as $textField) {
+                if (array_key_exists($textField, $item) && !in_array('quantity', $fields, true)) {
+                    $item[$textField] = \App\Service\Protheus\OrderDescriptions::display($item[$textField]);
+                }
             }
             $result[] = $item;
         }

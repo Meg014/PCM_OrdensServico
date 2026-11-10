@@ -6,21 +6,24 @@ namespace App\Service\Protheus;
 /** Text from confirmed fields only; preserves internal whitespace and line breaks. */
 final class OrderDescriptions
 {
-    public const MISSING = 'Descrição da manutenção não informada.';
+    public const MISSING = 'Não informado';
 
     /** Match only the five known questions, wherever placed; other questions stay intact. */
     public static function maintenance(?string $original): ?string
     {
         if ($original === null) return null;
         $questions = [
-            'as\s+ferramentas\s+foram\s+limpas\s+antes\s+do\s+servi[cç]o',
-            'o\s+equipamento\s+foi\s+limpo\s+ap[oó]s\s+o\s+servi[cç]o',
-            'toda\s+a\s+sobra\s+de\s+material\s+foi\s+recolhida',
+            '(?:as\s+ferramentas\s+foram\s+limpas|ferramentas\s+limpas)\s+antes\s+do\s+servi[cç]o',
+            '(?:o\s+equipamento\s+foi\s+limpo|equipamento\s+limpo)\s+ap[oó]s\s+o\s+servi[cç]o',
+            '(?:toda\s+a\s+sobra\s+de\s+material\s+foi\s+recolhida|sobras\s+de\s+materiais\s+recolhidas)',
             'as\s+condi[cç][oõ]es\s+de\s+seguran[cç]a\s*(?:\(\s*prote[cç][aã]o\s*[/,;-]\s*bot[oõ]es\s*[/,;-]\s*sinaliza[cç][aã]o\s*\)\s*)?est[aã]o\s+conforme\s*\(?\s*nr\s*[-.]?\s*12\s*\)?',
             'a\s+conclus[aã]o\s+do\s+servi[cç]o\s*,?\s*e\s+as\s+condi[cç][oõ]es\s+de\s+seguran[cç]a\s+foram\s+mantidas\s+conforme\s*\(?\s*nr\s*[-.]?\s*12\s*\)?',
+            'prote[cç][oõ]es\s*[,/]\s*bot[oõ]es\s+e\s+sinaliza[cç][aã]o\s+conforme\s+nr\s*[-.]?\s*12',
+            'condi[cç][oõ]es\s+de\s+seguran[cç]a\s+mantidas\s+ap[oó]s\s+o\s+servi[cç]o',
         ];
-        $answer = '(?:\(\s*[x✓✔]?\s*\)|\[\s*[x✓✔]?\s*\]|[☐☑])\s*(?:n[aã]o\s+aplic[aá]vel|sim|n[aã]o)\b';
-        $bare = '(?:sim|n[aã]o(?:[\t ]+aplic[aá]vel)?)(?:[\t ]+(?:sim|n[aã]o(?:[\t ]+aplic[aá]vel)?))*(?=[\t ]*(?:\R|$))';
+        $label = '(?:n[aã]o\s+aplic[aá]vel|sim|n[aã]o|n\s*/\s*a)\b';
+        $answer = '(?:\(\s*[x✓✔]?\s*\)|\[\s*[x✓✔]?\s*\]|[☐☑])\s*' . $label;
+        $bare = $label . '(?:[\t ]+' . $label . ')*(?=[\t ]*(?:\R|$))';
         $pattern = '~(?<![\pL\pN])(?:\d{1,2}[.)-][\t ]*)?(?:' . implode('|', $questions) . ')'
             . '(?=\s*(?:[?!:.;]|\R|$|\(|\[|[☐☑]))[\t ]*[?!:.;]?'
             . '(?:\s*(?:' . $answer . '|' . $bare . '))*~iu';
@@ -32,7 +35,7 @@ final class OrderDescriptions
 
     public static function display(?string $original): string
     {
-        $cleaned = self::maintenance($original);
+        $cleaned = self::maintenance($original === null ? null : str_replace("\0", '', $original));
         return self::text($cleaned) === null ? self::MISSING : $cleaned;
     }
 

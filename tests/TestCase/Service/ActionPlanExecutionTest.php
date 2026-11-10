@@ -147,7 +147,7 @@ final class ActionPlanExecutionTest extends TestCase
                 self::assertSame($order['number'], (string)$sheet->getCell('K' . $row)->getValue());
                 self::assertSame(self::EXAMPLES[$order['number']], (string)$sheet->getCell('M' . $row)->getValue());
                 self::assertSame('Aberta', (string)$sheet->getCell('N' . $row)->getValue());
-                self::assertSame("Abrir equipamento.\nManter observação legítima.", (string)$sheet->getCell('H' . $row)->getValue());
+                self::assertSame("Abrir equipamento.\n\nManter observação legítima.", (string)$sheet->getCell('H' . $row)->getValue());
                 self::assertStringContainsString('ferramentas limpas', $order['description']); // Cleaned only by Excel.
             }
             self::assertTrue($sheet->getStyle('M9')->getAlignment()->getWrapText());

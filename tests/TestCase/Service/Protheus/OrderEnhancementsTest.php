@@ -79,7 +79,7 @@ final class OrderEnhancementsTest extends TestCase
             \App\Service\Protheus\Presentation\Availability::Available,
         )['protheus'];
         self::assertSame(['Ana', 'Ana', 'José', 'José'], array_column($detail['labor'], 'professional'));
-        self::assertSame(['Inspecionar motor', "Lubrificar\nrolamentos", null, null], array_column($detail['labor'], 'description'));
+        self::assertSame(['Inspecionar motor', "Lubrificar\nrolamentos", 'Não informado', 'Não informado'], array_column($detail['labor'], 'description'));
         self::assertCount(4, $detail['labor']);
         self::assertStringContainsString('CONVERT(VARCHAR(MAX), l.TL_OBSERVA) AS pcm_entry_description', ProtheusQueries::ENTRIES);
         self::assertStringContainsString('RTRIM(j.TJ_FILIAL) = :filial', ProtheusQueries::ENTRIES);

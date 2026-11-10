@@ -59,7 +59,7 @@ final class ActionPlanObservationTest extends TestCase
             $sheet = $book->getSheet(0);
             self::assertSame('007334', (string)$sheet->getCell('K9')->getValue());
             self::assertSame($opening, (string)$sheet->getCell('H9')->getValue());
-            self::assertSame(str_replace("\0", '', $original), (string)$sheet->getCell('M9')->getValue());
+            self::assertSame(self::EXECUTED, (string)$sheet->getCell('M9')->getValue());
             self::assertSame($original, $order['executed_service']);
         } finally { $book->disconnectWorksheets(); fclose($stream); }
     }
@@ -76,7 +76,7 @@ final class ActionPlanObservationTest extends TestCase
             self::assertSame($status === 'S' ? 'Finalizada' : 'Aberta', $orders[0]['status']);
             $stream = (new \App\Service\ActionPlanExcelReport())->write($orders);
             $book = \PhpOffice\PhpSpreadsheet\IOFactory::load(stream_get_meta_data($stream)['uri']);
-            try { self::assertSame('', (string)$book->getSheet(0)->getCell('M9')->getValue()); }
+            try { self::assertSame('Não informado', (string)$book->getSheet(0)->getCell('M9')->getValue()); }
             finally { $book->disconnectWorksheets(); fclose($stream); }
         }
     }

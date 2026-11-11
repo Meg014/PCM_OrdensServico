@@ -67,6 +67,13 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
 <input type="date" class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($filters[$key] ?? '') ?>" aria-describedby="origin-date-help"></div>
 <?php endforeach; ?>
+<div class="col-12 col-xl-6">
+<div class="pcm-order-total" role="status" aria-live="polite">
+<svg class="pcm-order-total-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg>
+<div><p class="pcm-order-total-label">TOTAL DE O.S. ENCONTRADAS</p>
+<strong class="pcm-order-total-value"><?= $listing['available'] ? h(number_format($listing['total'], 0, ',', '.')) : '&mdash;' ?></strong>
+<?php if (!$listing['available']): ?><small class="d-block text-body-secondary">Contagem indisponível</small><?php endif; ?>
+</div></div></div>
 <div class="col-12 text-body-secondary" id="origin-date-help">Período pela Data de origem da OS.</div>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>

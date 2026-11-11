@@ -25,7 +25,7 @@ final class OrderListingTest extends TestCase
         self::assertTrue($result['available']);
         self::assertTrue($result['has_more']);
         self::assertSame([['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'TJ_TIPO' => 'COR', 'descricao' => null]], $result['orders']);
-        self::assertCount(2, $calls);
+        self::assertCount(3, $calls);
         self::assertSame(['offset' => 1, 'fetch' => 2, 'numero' => '004368', 'filial' => '01'], $calls[0][1]);
         self::assertSame('integer', $calls[0][2]['fetch']);
         self::assertSame('string', $calls[0][2]['numero']);
@@ -245,6 +245,39 @@ final class OrderListingTest extends TestCase
         self::assertCount(1000, $result['orders']);
     }
 
+    public function testTotalUsesAllFilteredDistinctOrdersWithoutPaginationOrResourceJoins(): void
+    {
+        $row = ['TJ_FILIAL' => '01', 'TJ_ORDEM' => '004368',
+            'identity_count' => 1, 'equipment_matches' => 1, 'service_matches' => 1];
+        foreach ([
+            [[], 47],
+            [['bem' => 'BOM01'], 12],
+            [['date_start' => '2026-01-01', 'date_end' => '2026-11-11'], 31],
+            [['os' => '004368'], 1],
+            [['os' => '999999'], 0],
+            [['bem' => 'BOM01', 'unidade' => 'mill', 'area' => 'MECANI', 'centro' => '00100',
+                'date_start' => '2026-01-01', 'date_end' => '2026-11-11'], 3],
+        ] as [$filters, $total]) {
+            $calls = [];
+            $rows = array_fill(0, $total, $row);
+            $service = new OrderListingService($this->repository($rows, $calls));
+            $result = $service->load($filters + ['limite' => '1', 'page' => '2']);
+            self::assertTrue($result['available']);
+            self::assertSame($total, $result['total']);
+            self::assertLessThanOrEqual(1, count($result['orders']));
+            [$countSql, $countParams] = $calls[1];
+            $pageParams = $calls[0][1];
+            unset($pageParams['offset'], $pageParams['fetch']);
+            self::assertSame($pageParams, $countParams);
+            self::assertStringContainsString('GROUP BY j.TJ_FILIAL, j.TJ_ORDEM', $countSql);
+            foreach (['OFFSET', 'FETCH', 'STL010', 'OUTER APPLY', 'TJ_OBSERVA'] as $excluded) {
+                self::assertStringNotContainsString($excluded, $countSql);
+            }
+            self::assertTrue(ProtheusQueries::allows($countSql));
+            self::assertFalse(ProtheusQueries::allows($countSql . '; SELECT 2'));
+        }
+    }
+
     private function repository(array $rows, array &$calls, bool $fail = false): ProtheusRepository
     {
         $connection = $this->createMock(Connection::class);
@@ -262,7 +295,9 @@ final class OrderListingTest extends TestCase
                 throw new RuntimeException('SQLSTATE sensitive host user password');
             }
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($sql === \App\Service\Protheus\OrderDescriptionQueries::BATCH ? [] : $rows);
+            $statement->method('fetchAll')->willReturn(str_starts_with($sql, 'SELECT COUNT_BIG(*) AS total')
+                ? [['total' => count($rows)]]
+                : ($sql === \App\Service\Protheus\OrderDescriptionQueries::BATCH ? [] : $rows));
             $statement->expects(self::once())->method('closeCursor');
 
             return $statement;

@@ -497,3 +497,12 @@ code { color: var(--text-body); }
     .pcm-presentation-card { padding: 1rem; }
     .pcm-presentation-card strong { font-size: clamp(3.5rem, 18vw, 6rem); }
 }
+
+.pcm-order-total {
+    display: flex; align-items: center; gap: 1rem; height: 100%;
+    padding: .85rem 1.1rem; border: 1px solid var(--pcm-border, #364152);
+    border-radius: .65rem; background: var(--pcm-surface, transparent); color: var(--pcm-text);
+}
+.pcm-order-total-icon { flex-shrink: 0; color: var(--pcm-muted); }
+.pcm-order-total-label { margin: 0 0 .35rem; font-size: .75rem; letter-spacing: .06em; color: var(--pcm-muted); }
+.pcm-order-total-value { font-size: clamp(1.8rem, 3vw, 2.5rem); line-height: 1; }

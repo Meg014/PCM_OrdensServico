@@ -457,7 +457,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     }
 
     /** Current portfolio directly from SQL Server; no snapshots or resource hydration. */
-    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = '', string $equipmentName = '', string $analytical = '', string $safra = ''): array
+    public function findOrders(?string $number = null, ?string $branch = null, ?string $equipment = null, int $page = 1, int $limit = 20, string $costCenter = '', string $dateStart = '', string $dateEnd = '', bool $export = false, string $area = '', string $costCenterMode = '', string $service = '', string $type = '', string $situation = '', string $ending = '', string $historical = '', string $unit = '', string $equipmentName = '', string $analytical = '', string $safra = '', bool $includeTotal = false): array
     {
         if ($page < 1 || $limit < 1 || $page > intdiv(PHP_INT_MAX, $limit) || $limit > ($export ? StreamingXlsxReport::BATCH_SIZE : 100)) {
             throw new InvalidArgumentException('Paginação inválida.');
@@ -520,7 +520,18 @@ final class ProtheusRepository implements ProtheusReaderInterface
         }
         unset($row);
 
-        return ['orders' => array_slice($rows, 0, $limit), 'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
+        $total = null;
+        if ($includeTotal && !$export) {
+            $countParams = $params;
+            unset($countParams['offset'], $countParams['fetch']);
+            $aggregate = $this->read(ProtheusQueries::orders(
+                $number !== null, $branch !== null, $equipment !== null, $extraFilters,
+                $historical === '1', $safra === '1', true,
+            ), $countParams);
+            $total = (int)($aggregate[0]['total'] ?? 0);
+        }
+
+        return ['total' => $total, 'orders' => array_slice($rows, 0, $limit), 'page' => $page, 'limit' => $limit, 'has_more' => count($rows) > $limit];
     }
 
     public function generalEntries(array $filters, int $page, int $limit): array

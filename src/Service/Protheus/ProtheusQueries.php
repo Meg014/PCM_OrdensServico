@@ -314,7 +314,7 @@ SQL;
     }
 
     /** Eight closed variants: exact order, branch and equipment filters. */
-    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false, bool $historical = false, bool $safra = false): string
+    public static function orders(bool $number, bool $branch, bool $equipment, bool $filters = false, bool $historical = false, bool $safra = false, bool $count = false): string
     {
         $where = "j.D_E_L_E_T_ <> '*'";
         if ($number) {
@@ -349,6 +349,13 @@ SQL;
                     . ' AND ' . ProtheusAnalyticalScope::STJ_PREDICATE;
                 if ($historical) $where .= ' AND ' . ProtheusUnit::classified();
             }
+        }
+
+        if ($count) {
+            $eligible = ProtheusOperationalEligibility::notCanceled('j');
+            return "SELECT COUNT_BIG(*) AS total FROM (SELECT j.TJ_FILIAL, j.TJ_ORDEM "
+                . "FROM dbo.STJ010 j {$join} WHERE ({$where}) AND {$eligible} "
+                . 'GROUP BY j.TJ_FILIAL, j.TJ_ORDEM) distinct_orders';
         }
 
         // The general export displays the same OS observation used by the detail page.
@@ -641,7 +648,9 @@ SQL;
                     foreach ([false, true] as $historical) {
                         foreach ([false, true] as $safra) {
                             if ($sql === self::orders($number, $branch, $equipment)
-                                || $sql === self::orders($number, $branch, $equipment, true, $historical, $safra)) {
+                                || $sql === self::orders($number, $branch, $equipment, true, $historical, $safra)
+                                || $sql === self::orders($number, $branch, $equipment, false, false, false, true)
+                                || $sql === self::orders($number, $branch, $equipment, true, $historical, $safra, true)) {
                                 return true;
                             }
                         }

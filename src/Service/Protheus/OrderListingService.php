@@ -101,7 +101,7 @@ final class OrderListingService
                 }
                 return ['orders' => $repository->describeOrders($sector['orders']), 'page' => $sector['page'], 'limit' => $sector['limit'],
                     'has_more' => $sector['has_more'], 'filters' => $filters, 'available' => true,
-                    'drilldown' => ['label' => $label, 'total' => $total]];
+                    'total' => $total, 'drilldown' => ['label' => $label, 'total' => $total]];
             }
             $result = $repository->findOrders(
                 $filters['os'] === '' ? null : $filters['os'],
@@ -110,13 +110,13 @@ final class OrderListingService
                 $filters['centro'], $filters['date_start'], $filters['date_end'], $export, $filters['area'],
                 $filters['centro_modo'], $filters['servico'], $filters['tipo'], $filters['situacao'], $filters['termino'],
                 $filters['historico'], $filters['unidade'], self::equipmentNamePattern($filters['nome_bem']),
-                $filters['analitico'], $filters['safra'],
+                $filters['analitico'], $filters['safra'], !$export,
             );
             $result['orders'] = $repository->describeOrders($result['orders']);
 
             return $result + ['filters' => $filters, 'available' => true];
         } catch (Throwable) {
-            return ['orders' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false,
+            return ['total' => null, 'orders' => [], 'page' => $page, 'limit' => $limit, 'has_more' => false,
                 'filters' => $filters, 'available' => false];
         }
     }

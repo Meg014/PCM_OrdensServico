@@ -7,7 +7,7 @@ use App\Service\Import\TotvsValueNormalizer;
 
 final class WorkOrderStatusResolver
 {
-    public const VERSION = 4;
+    public const VERSION = 5;
     public const CANCELLED = 'CANCELADA';
     public const COMPLETED = 'FECHADA';
     public const OPEN = 'EM ABERTO';
@@ -18,10 +18,10 @@ final class WorkOrderStatusResolver
 
     public function resolve(mixed $situation, mixed $finished): string
     {
-        if (in_array($this->normalizer->control($situation), ['cancelada', 'cancelado'], true)) {
+        if (in_array($this->normalizer->control($situation), ['cancelada', 'cancelado', 'c'], true)) {
             return self::CANCELLED;
         }
-        if ($this->normalizer->control($finished) === 'sim') {
+        if (in_array($this->normalizer->control($finished), ['sim', 's'], true)) {
             return self::COMPLETED;
         }
 

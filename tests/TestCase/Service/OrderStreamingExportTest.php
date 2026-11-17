@@ -43,7 +43,9 @@ final class OrderStreamingExportTest extends TestCase
         ]));
         self::assertSame(['20260925', '13:40'], $columns['actual_end'][3]([
             'TJ_DTMRFIM' => '20260925', 'TJ_HOMRFIM' => '13:40',
+            'TJ_DTPRFIM' => '20250101', 'TJ_HOPRFIM' => '08:00',
         ]));
+        self::assertSame(['', ''], $columns['actual_end'][3](['TJ_DTPRFIM' => '20260925']));
     }
 
     public function testEquipmentAndSectorSchemasRemainUnchanged(): void
@@ -87,7 +89,7 @@ final class OrderStreamingExportTest extends TestCase
         self::assertSame('005464', $sheet->getCell('A6')->getFormattedValue());
         self::assertSame('23/09/2026', $sheet->getCell('L6')->getFormattedValue());
         self::assertSame('Data/Hora de início', $sheet->getCell('M5')->getFormattedValue());
-        self::assertSame('Data/Hora de fechamento', $sheet->getCell('N5')->getFormattedValue());
+        self::assertSame('Fim real da manutenção', $sheet->getCell('N5')->getFormattedValue());
         $book->disconnectWorksheets();
         fclose($result['stream']);
     }

@@ -23,11 +23,11 @@ foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label
 <div class="row g-3<?= $largeCards ? ' pcm-kpi-grid-large' : '' ?>" aria-label="Indicadores do snapshot atual">
     <?php foreach ($cards as $card) : ?>
         <div class="col-12 col-sm-6 col-xl-6">
-            <a href="<?= h($this->Url->build($cardRoute + ['?' => $card['filters'], '#' => 'orders'])) ?>" class="text-decoration-none pcm-kpi-card pcm-kpi-<?= h($card['tone']) ?>">
+            <a href="<?= $this->Url->build($cardRoute + ['?' => $card['filters'], '#' => 'orders']) ?>" class="text-decoration-none pcm-kpi-card pcm-kpi-<?= h($card['tone']) ?>">
                 <div>
                     <p class="pcm-kpi-label"><?= h($card['label']) ?></p>
                     <p class="pcm-kpi-value"><?= h($card['value']) ?></p>
-                    <?php if (isset($comparison['delta'][$card['key']])) : ?>
+                    <?php if ($card['value'] !== '—' && isset($comparison['delta'][$card['key']])) : ?>
                         <?php $delta = (float)$comparison['delta'][$card['key']]; ?>
                         <p class="pcm-kpi-delta"><?= $delta > 0 ? '+' : '' ?><?= h(number_format($delta, 0, ',', '.')) ?> vs relatório anterior</p>
                     <?php endif; ?>
@@ -46,7 +46,7 @@ foreach (['safra' => 'Safra', 'offseason' => 'Entressafra'] as $season => $label
         ] as [$key, $label, $code]
 ) : ?>
         <div class="col-12 col-sm-4">
-            <a href="<?= h($this->Url->build($cardRoute + ['?' => \App\Service\PcmIndicatorService::drilldownFilters($filters, $key), '#' => 'orders'])) ?>" class="text-decoration-none pcm-maintenance-type-card pcm-maintenance-type-<?= h(strtolower($code)) ?>">
+            <a href="<?= $this->Url->build($cardRoute + ['?' => \App\Service\PcmIndicatorService::drilldownFilters($filters, $key), '#' => 'orders']) ?>" class="text-decoration-none pcm-maintenance-type-card pcm-maintenance-type-<?= h(strtolower($code)) ?>">
                 <div>
                     <p><?= h($label) ?></p>
                     <small>O.S. em aberto · Tipo Manut. <?= h($code) ?></small>

@@ -27,6 +27,7 @@ WITH scoped AS (
         j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
         CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
         TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_date,
+        {{INDICATOR_DATE}} AS indicator_date,
         CASE WHEN LEN(RTRIM(j.TJ_DTORIGI)) = 8 AND RTRIM(j.TJ_DTORIGI) NOT LIKE '%[^0-9]%'
             THEN TRY_CONVERT(date, j.TJ_DTORIGI, 112) END AS origin_date,
         j.TJ_HOMPINI, j.TJ_DTPRINI, j.TJ_HOPRINI,
@@ -35,10 +36,6 @@ WITH scoped AS (
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*'{{AREA_SCOPE}}
-      AND
-SQL
-        . ProtheusAnalyticalScope::STJ_PREDICATE . <<<'SQL'
-
       AND (
 SQL
         . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
@@ -90,9 +87,9 @@ SQL;
     ): string
     {
         return str_replace(
-            ['{{AREA_SCOPE}}', '{{UNIT_SCOPE}}', '{{ELIGIBILITY_SCOPE}}'],
+            ['{{AREA_SCOPE}}', '{{UNIT_SCOPE}}', '{{ELIGIBILITY_SCOPE}}', '{{INDICATOR_DATE}}'],
             [$area ? ' AND j.TJ_CODAREA = CAST(:area AS VARCHAR(100))' : '',
-                ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit'), $eligibility],
+                ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit'), $eligibility, \App\Service\PcmPeriod::sqlDate()],
             self::BASE,
         );
     }
@@ -288,8 +285,8 @@ CROSS JOIN (SELECT CAST(:date_start AS VARCHAR(10)) AS start_date, CAST(:date_en
 CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type AS VARCHAR(100)) AS type,
     CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,
     CAST(:card_season AS VARCHAR(20)) AS season) card
-WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
-    AND (d.end_date = '' OR planned_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
+WHERE (d.start_date = '' OR indicator_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
+    AND (d.end_date = '' OR indicator_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
     AND (card.status = '' OR filtered.status = card.status)
     AND (card.type = '' OR TJ_TIPO = card.type)
     AND (card.service1 = '' OR TJ_SERVICO IN (card.service1, card.service2))
@@ -344,8 +341,8 @@ CROSS JOIN (SELECT CAST(:card_status AS VARCHAR(20)) AS status, CAST(:card_type 
     CAST(:card_service1 AS VARCHAR(100)) AS service1, CAST(:card_service2 AS VARCHAR(100)) AS service2,
     CAST(:card_season AS VARCHAR(20)) AS season, CAST(:entry_type AS VARCHAR(10)) AS entry_type,
     CAST(:professional AS VARCHAR(100)) AS professional) choice
-WHERE (d.start_date = '' OR planned_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
-    AND (d.end_date = '' OR planned_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
+WHERE (d.start_date = '' OR indicator_date >= CONVERT(date, NULLIF(d.start_date, ''), 23))
+    AND (d.end_date = '' OR indicator_date <= CONVERT(date, NULLIF(d.end_date, ''), 23))
     AND (choice.status = '' OR filtered.status = choice.status)
     AND (choice.type = '' OR filtered.TJ_TIPO = choice.type)
     AND (choice.service1 = '' OR filtered.TJ_SERVICO IN (choice.service1, choice.service2))

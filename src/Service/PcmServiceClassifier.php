@@ -8,12 +8,7 @@ use Normalizer;
 
 final class PcmServiceClassifier
 {
-    /** Official Entressafra services. Classification is exact by normalized branch + code. */
-    public const OFFSEASON_SERVICES = [
-        '01' => ['2425CA', '2425CI', '2425EL', '2425IN', '2425ME', '2425US', '2627ME',
-            'ESCAL', 'ESCALD', 'ESCIVI', 'ESDEST', 'ESELET', 'ESINST', 'ESMECA', 'ESOPER', 'ESTRAT', 'ESUSIN'],
-    ];
-
+    public const OFFSEASON_TOKEN = 'ENTRESSAFRA';
     public const CARD_CLASSES = ['emergency' => 'EMERGENCIAL', 'scheduled' => 'PROGRAMADA',
         'offseason' => 'ENTRESSAFRA'];
     public const LABELS = [
@@ -26,6 +21,9 @@ final class PcmServiceClassifier
     /** Classifies snapshot values without rewriting the TOTVS payload or dimension records. */
     public function classify(?string $code, ?string $name, ?string $branch = null): string
     {
+        if ($this->isOffseasonCandidate($name)) {
+            return 'ENTRESSAFRA';
+        }
         $code = $this->normalize($code);
         if ($code === 'COREME') {
             return 'EMERGENCIAL';
@@ -41,16 +39,13 @@ final class PcmServiceClassifier
             return 'PROGRAMADA';
         }
 
-        $branch = $this->normalize($branch);
-
-        return in_array($code, self::OFFSEASON_SERVICES[$branch] ?? [], true)
-            ? 'ENTRESSAFRA' : 'OUTROS';
+        return 'OUTROS';
     }
 
-    /** Discovery-only signal; it must never add a live Protheus service to the official population. */
+    /** Official season rule: only the original service name determines Entressafra. */
     public function isOffseasonCandidate(?string $name): bool
     {
-        return str_contains($this->normalize($name), 'ENTRESSAFRA');
+        return str_contains($this->normalize($name), self::OFFSEASON_TOKEN);
     }
 
     /** Emergency/scheduled corrective maintenance are subclasses of Tipo Manut. COR. */

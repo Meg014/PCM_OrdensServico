@@ -32,7 +32,13 @@ final class PcmControllerTest extends TestCase
         $this->assertResponseOk();
         $sector = (string)$this->_response->getBody();
 
-        self::assertStringContainsString('Elétrica e Instrumentação', $sector);
+        self::assertStringContainsString('Elétrica/Instrumentação', $sector);
+        self::assertStringNotContainsString('Concluídas aguardam', $sector);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($sector);
+        $cards = (new \DOMXPath($dom))->query('//*[contains(concat(" ", normalize-space(@class), " "), " pcm-season-card ")]//strong');
+        self::assertSame(4, $cards->length);
+        foreach ($cards as $card) self::assertNotSame('—', trim($card->textContent));
         foreach (['card=offseason', 'backlog_age=over_60'] as $selection) {
             $url = $this->hrefContaining($sector, $selection);
             self::assertStringStartsWith('/pcm/setor/ELETRI?', $url);

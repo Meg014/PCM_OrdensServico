@@ -95,7 +95,7 @@ final class ProtheusSectorTest extends TestCase
         self::assertCount(6, $calls);
         foreach ($calls as [$sql, $params]) {
             self::assertSame('2026-01-01', $params['sector_start']);
-            self::assertStringContainsString('n.planned_date >= TRY_CONVERT', $sql);
+            self::assertStringContainsString('n.indicator_date >= TRY_CONVERT', $sql);
             self::assertSame('factory', $params['unit']);
             self::assertSame('BEM01', $params['equipment']);
             self::assertStringContainsString("mapped_unit.[value] COLLATE DATABASE_DEFAULT = f.unit", $sql);
@@ -315,7 +315,7 @@ final class ProtheusSectorTest extends TestCase
         self::assertStringContainsString('GROUP BY TJ_FILIAL, TJ_CODBEM, equipment_name', $sql);
         self::assertStringContainsString('COUNT_BIG(*) AS quantity', $sql);
         self::assertStringContainsString('ORDER BY quantity DESC, TJ_FILIAL, TJ_CODBEM, equipment_name', $sql);
-        self::assertStringContainsString("CONVERT(date, '20250101', 112)", $sql);
+        self::assertStringNotContainsString("CONVERT(date, '20250101', 112)", $sql);
         self::assertStringContainsString("THEN 'generic' ELSE 'equipment'", $sql);
         self::assertStringContainsString("dimension = 'equipment' AND position <= 10", $sql);
         self::assertStringContainsString("f.status = '' OR n.status = f.status", $sql);

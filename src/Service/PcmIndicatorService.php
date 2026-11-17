@@ -53,7 +53,7 @@ final class PcmIndicatorService
         $seasons = ['safra_open' => 0, 'safra_completed' => 0, 'offseason_open' => 0, 'offseason_completed' => 0];
         if ($query !== null) {
             if ($maintenanceAreaId !== null) {
-                $query->where(['maintenance_area_id' => $maintenanceAreaId]);
+                $this->currentSnapshot->restrictAreaId($query, $maintenanceAreaId);
             }
             $query->find('filtered', filters: $filters);
             $fields = ['branch_code', 'treated_status', 'maintenance_type', 'service_code', 'service_name'];

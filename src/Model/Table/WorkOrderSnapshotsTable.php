@@ -19,8 +19,18 @@ class WorkOrderSnapshotsTable extends Table
             'maintenance_type' => 'maintenance_type', 'area' => 'maintenance_area_code'];
         foreach ($map as $key => $column) {
             if (isset($filters[$key])) {
-                $query->where([$this->aliasField($column) => $filters[$key]]);
+                if ($key === 'area' && in_array($filters[$key], ['ELETRI', 'INSTRU'], true)) {
+                    $query->where([$this->aliasField($column) . ' IN' => ['ELETRI', 'INSTRU']]);
+                } else {
+                    $query->where([$this->aliasField($column) => $filters[$key]]);
+                }
             }
+        }
+        if (!empty($filters['date_start'])) {
+            $query->where([\App\Service\PcmPeriod::snapshotDate() . ' >=' => $filters['date_start'] . ' 00:00:00']);
+        }
+        if (!empty($filters['date_end'])) {
+            $query->where([\App\Service\PcmPeriod::snapshotDate() . ' <' => (new \DateTimeImmutable($filters['date_end']))->modify('+1 day')->format('Y-m-d')]);
         }
         if (isset($filters['q'])) {
             $term = '%' . $filters['q'] . '%';
@@ -52,7 +62,10 @@ class WorkOrderSnapshotsTable extends Table
     private function operationalOpenConditions(): array
     {
         return [
-            $this->aliasField('maintenance_planned_start') . ' >=' => self::OPERATIONAL_START,
+            'OR' => [
+                $this->aliasField('maintenance_planned_start') . ' >=' => self::OPERATIONAL_START,
+                $this->aliasField('service_name') . ' LIKE' => '%' . PcmServiceClassifier::OFFSEASON_TOKEN . '%',
+            ],
             $this->aliasField('treated_status') => 'EM ABERTO',
         ];
     }

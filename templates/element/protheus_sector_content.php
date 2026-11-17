@@ -37,7 +37,7 @@ if ($sector['filters']['backlog_age'] !== '') {
 </div></section>
 <section class="pcm-dashboard-section"><h2>Backlog de O.S. normais</h2>
 <p class="text-body-secondary">Não inclui os checklists das rotas de manutenção.</p>
-<p class="text-body-secondary">Abertas liberadas do setor, conforme os filtros manuais. Idade desde a origem da O.S. até <?= h($sector['backlog']['as_of']) ?>, respeitando o período de início planejado. O período planejado filtra toda a carteira apresentada.</p>
+<p class="text-body-secondary">Abertas liberadas do setor, conforme os filtros manuais. Idade desde a origem da O.S. até <?= h($sector['backlog']['as_of']) ?>. Quando informado, o período usa origem nas abertas e TJ_DTPRFIM nas fechadas.</p>
 <div class="row g-3">
 <?php foreach (['all' => 'Total de O.S. em aberto'] + \App\Service\Protheus\ProtheusSectorService::BACKLOG_AGES as $key => $label): ?>
 <?php $quantity = $key === 'all' ? $sector['backlog']['total'] : $sector['backlog']['ages'][$key];
@@ -97,12 +97,12 @@ if (in_array($key, ['unknown', 'future'], true) && $quantity === 0) continue; ?>
 <?= h((\App\Service\Protheus\ProtheusSectorService::CATEGORIES + ['all' => 'Total operacional', 'safra' => 'Safra', 'offseason' => 'Entressafra'])[$sector['filters']['card']] ?? 'Status') ?>
 <?= h($sector['filters']['card_status']) ?>.
 <?= $this->Html->link('Limpar filtro do card', $cardUrl('', ''), ['class' => 'alert-link']) ?>
-<small class="d-block">O detalhamento respeita os mesmos filtros de unidade, equipamento e início planejado aplicados à carteira.</small></p>
+<small class="d-block">O detalhamento respeita os filtros da carteira. Com período informado: fechadas pela data geral TJ_DTPRFIM; abertas por origem.</small></p>
 <?php endif; ?>
 <div class="pcm-panel"><div class="pcm-sector-table-scroll" role="region" aria-label="Ordens de Serviço — rolagem horizontal" tabindex="0"><table class="table pcm-orders-table align-middle">
 <thead><tr><?php foreach (array_merge(['OS', 'Equipamento', 'Serviço', 'Centro de custo', 'Tipo', 'Início planejado', 'Início real', 'Status'], $sector['filters']['backlog_age'] !== '' ? ['Origem / idade'] : []) as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
 <?php foreach ($sector['orders'] as $row): ?><tr>
-<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $sector['filters']['unit']] + $returnContext]) ?></td>
+<td><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $sector['filters']['unit']] + $returnContext]) ?><?= $this->element('order_audit_flags', ['order' => $row]) ?></td>
 <td><?php if (trim((string)$row['TJ_CODBEM']) !== ''): ?><?= $this->Html->link($value($row['TJ_CODBEM']) . ' — ' . $value($row['equipment_name']), ['_name' => 'pcm-equipment', '?' => ['bem' => $row['TJ_CODBEM'], 'filial' => $row['TJ_FILIAL'], 'unit' => $sector['filters']['unit']] + $returnContext]) ?><?php else: ?>—<?php endif; ?></td>
 <td><?= h($value($row['TJ_SERVICO'])) ?><br><?= h($value($row['service_name'])) ?></td>
 <td><?= h($value($row['TJ_CCUSTO'])) ?><?= $this->element('protheus_unit_label', ['costCenter' => $row['TJ_CCUSTO'] ?? null]) ?></td><td><?= h($value($row['TJ_TIPO'])) ?></td>

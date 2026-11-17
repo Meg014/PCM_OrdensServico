@@ -22,6 +22,8 @@ if (!isset($defaultDatabaseDrivers[$defaultDatabaseDriverName])) {
 $defaultDatabaseIsPostgres = $defaultDatabaseDrivers[$defaultDatabaseDriverName] === Postgres::class;
 
 return [
+    // With no official start configured, closed TV cards use the current operational year.
+    'Pcm' => ['currentCycleStart' => env('PCM_CURRENT_CYCLE_START', null)],
     /*
      * Debug Level:
      *

@@ -76,7 +76,7 @@ final class SectorDashboardService
             return null;
         }
         if ($areaId !== null) {
-            $query->where(['maintenance_area_id' => $areaId]);
+            $this->current->restrictAreaId($query, $areaId);
         }
         $query->find('filtered', filters: $filters);
         if ($operational) {
@@ -106,14 +106,6 @@ final class SectorDashboardService
     public function detailQuery(?int $areaId, array $filters): ?SelectQuery
     {
         $query = $this->query($areaId, $filters);
-        if (isset($filters['date_start'])) {
-            $query?->where(['WorkOrderSnapshots.maintenance_planned_start >=' => $filters['date_start'] . ' 00:00:00']);
-        }
-        if (isset($filters['date_end'])) {
-            $nextDay = (new \DateTimeImmutable($filters['date_end']))->modify('+1 day')->format('Y-m-d');
-            $query?->where(['WorkOrderSnapshots.maintenance_planned_start <' => $nextDay . ' 00:00:00']);
-        }
-
         return $query?->select([
             'id', 'work_order_id', 'source_order_number', 'equipment_code', 'equipment_name',
             'service_code', 'service_name', 'maintenance_area_code', 'cost_center_code',

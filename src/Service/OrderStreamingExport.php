@@ -24,6 +24,7 @@ final class OrderStreamingExport
         'status' => 'Status', 'service' => 'Serviço', 'service_name' => 'Nome do serviço',
         'maintenance_type' => 'Tipo de manutenção', 'q' => 'Busca textual', 'date_start' => 'Data inicial',
         'date_end' => 'Data final', 'card' => 'Indicador', 'card_status' => 'Status do indicador',
+        'period_start' => 'Início do período do dashboard', 'period_end' => 'Fim do período do dashboard',
         'backlog_age' => 'Faixa de backlog', 'entry_type' => 'Tipo de apontamento', 'professional' => 'Profissional',
     ];
 
@@ -41,7 +42,7 @@ final class OrderStreamingExport
         };
         if ($first['not_found'] ?? false) throw new \OutOfBoundsException('Equipamento não encontrado no Protheus.');
         $columns = $this->orderColumns($context);
-        $filterText = $this->filters($first['filters']);
+        $filterText = $this->filters($first['filters'], $context === 'sector');
         $tableRow = $filterText === '' ? 5 : 6;
         $spec = ['title' => $context === 'equipment' ? 'HISTÓRICO DE MANUTENÇÃO DO EQUIPAMENTO' : 'RELATÓRIO DE ORDENS DE SERVIÇO',
             'scope' => 'Setor/Área: ' . ($first['name'] ?? ($context === 'orders' ? 'Todos os setores' : 'Conforme área de cada OS')),
@@ -62,7 +63,7 @@ final class OrderStreamingExport
     {
         $service = new OrderEntryExportService();
         $first = $area === null ? $service->loadGeneral($query, 1) : $service->load($area, $query, 1);
-        $filterText = $this->filters($first['filters']);
+        $filterText = $this->filters($first['filters'], $area !== null);
         $tableRow = $filterText === '' ? 6 : 7;
         $scope = $area === null ? 'Abrangência: Todos os setores' : 'Setor/Área: ' . ($first['name'] ?? $area);
         $spec = ['title' => 'RELATÓRIO DE APONTAMENTOS DE ORDENS DE SERVIÇO', 'scope' => $scope,
@@ -86,7 +87,7 @@ final class OrderStreamingExport
         return ($safe ?: 'OS') . '_' . $generated->setTimezone(new DateTimeZone('America/Sao_Paulo'))->format('Y-m-d_His') . '.xlsx';
     }
 
-    private function filters(array $filters): string
+    private function filters(array $filters, bool $indicatorPeriod = false): string
     {
         $parts = [];
         foreach ($filters as $key => $value) {
@@ -94,6 +95,11 @@ final class OrderStreamingExport
             $value = trim((string)$value);
             if (in_array(mb_strtolower($value), ['', 'all', 'todos', 'todas'], true)) continue;
             $parts[] = self::FILTER_LABELS[$key] . ': ' . $value;
+        }
+        if (!empty($filters['date_start']) || !empty($filters['date_end']) || !empty($filters['period_start'])) {
+            $indicatorPeriod = $indicatorPeriod || !empty($filters['period_start']) || !empty($filters['card']);
+            $parts[] = $indicatorPeriod ? 'Período dos indicadores: fechadas pela data geral TJ_DTPRFIM; abertas por origem'
+                : 'Período de emissão: Data de origem da O.S.';
         }
         return $parts === [] ? '' : 'Filtros: ' . implode(' | ', $parts);
     }
@@ -122,8 +128,8 @@ final class OrderStreamingExport
                 'N' => 'NÃO',
                 default => '',
             };
-            $actualStart = static fn (array $row): array => [$row['TJ_DTMRINI'] ?? '', $row['TJ_HOMRINI'] ?? ''];
-            $actualEnd = static fn (array $row): array => [$row['TJ_DTMRFIM'] ?? '', $row['TJ_HOMRFIM'] ?? ''];
+            $actualStart = static fn (array $row): array => \App\Service\Protheus\OrderDates::pair($row, 'actual_start');
+            $actualEnd = static fn (array $row): array => \App\Service\Protheus\OrderDates::pair($row, 'actual_end');
 
             return [
                 'TJ_ORDEM' => ['Número da OS', 'text'],
@@ -139,7 +145,7 @@ final class OrderStreamingExport
                 'finished_label' => ['Finalizada', 'text', 14, $finished],
                 'TJ_DTORIGI' => ['Data de origem', 'date', 18],
                 'actual_start' => ['Data/Hora de início', 'datetime', 22, $actualStart],
-                'actual_end' => ['Data/Hora de fechamento', 'datetime', 22, $actualEnd],
+                'actual_end' => ['Fim real da manutenção', 'datetime', 22, $actualEnd],
             ] + $this->unitColumns();
         }
 

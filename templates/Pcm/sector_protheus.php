@@ -40,7 +40,7 @@ $equipmentScopeEmpty = $sector['available'] && !$sector['orders']
 <?php endforeach; ?>
 <div class="pcm-sector-filter-actions"><button class="btn pcm-primary-action">Aplicar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-sector', 'code' => $sector['code']], ['class' => 'btn pcm-secondary-action']) ?></div>
-<?= $this->Form->end() ?><p data-sector-draft-notice class="text-body-secondary small mt-2" hidden></p><small class="text-body-secondary">Período pelo início planejado, aplicado a todos os componentes da carteira.</small></section>
+<?= $this->Form->end() ?><p data-sector-draft-notice class="text-body-secondary small mt-2" hidden></p><small class="text-body-secondary">Sem período: todas as fechadas não canceladas. Com período: fechadas pela data geral TJ_DTPRFIM; abertas por Data de origem.</small></section>
 <?php if ($equipmentScopeEmpty && $sector['filters']['equipment'] !== '' && $sector['filters']['unit'] !== ''): ?>
 <p class="alert alert-info">Nenhuma O.S. deste equipamento atende à unidade e aos demais filtros.
 <?= $this->Html->link('Remover filtro de equipamento', ['_name' => 'pcm-sector', 'code' => $sector['code'], '?' => array_replace($sectorNavigationFilters, ['equipment' => '', 'equipment_q' => '', 'filial' => '', 'page' => 1])], ['class' => 'alert-link']) ?></p>

@@ -19,7 +19,7 @@ $statusName = static function (array $row): string {
     $situation = rtrim((string)($row['TJ_SITUACA'] ?? ''));
     $ending = rtrim((string)($row['TJ_TERMINO'] ?? ''));
     if ($situation === 'L' && $ending === 'N') return 'Aberta';
-    if ($situation === 'L' && $ending === 'S') return 'Fechada';
+    if (\App\Service\Protheus\ProtheusOperationalEligibility::isClosed($situation, $ending)) return 'Fechada';
     return ['C' => 'Cancelada', 'P' => 'Pendente'][$situation] ?? '—';
 };
 $navigationFilters = array_filter($filters, static fn ($value): bool => $value !== '');
@@ -55,10 +55,13 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div id="equipment-options" role="listbox" aria-label="Equipamentos encontrados" class="list-group position-absolute bg-white shadow w-100" style="z-index:10;max-height:20rem;overflow:auto" hidden></div>
 <small id="equipment-message" class="text-body-secondary" role="status" aria-live="polite">Selecione uma sugestão para filtrar o equipamento exato; sem seleção, a busca usa trechos do código ou nome.</small>
 </div>
-<?php foreach (['servico', 'tipo', 'situacao', 'termino', 'historico', 'safra', 'analitico', 'card', 'card_status',
-    'backlog_age', 'q', 'status', 'service_name'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
+<?php foreach (['servico', 'tipo', 'termino', 'historico', 'safra', 'analitico', 'card', 'card_status',
+    'backlog_age', 'q', 'status', 'service_name', 'period_start', 'period_end'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
     'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $filters['unidade'] ?? '', 'class' => 'form-select']) ?></div>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('situacao', ['label' => 'Situação', 'empty' => 'Não canceladas',
+    'options' => ['L' => 'Liberadas', 'P' => 'Pendentes', 'C' => 'Canceladas — histórico'],
+    'value' => $filters['situacao'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($areaName($area)) ?></option><?php endforeach; ?>
@@ -71,10 +74,12 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div class="pcm-order-total" role="status" aria-live="polite">
 <svg class="pcm-order-total-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg>
 <div><p class="pcm-order-total-label">TOTAL DE O.S. ENCONTRADAS</p>
-<strong class="pcm-order-total-value"><?= $listing['available'] ? h(number_format($listing['total'], 0, ',', '.')) : '&mdash;' ?></strong>
-<?php if (!$listing['available']): ?><small class="d-block text-body-secondary">Contagem indisponível</small><?php endif; ?>
+<strong class="pcm-order-total-value"><?= $listing['available'] && isset($listing['total']) ? h(number_format($listing['total'], 0, ',', '.')) : '&mdash;' ?></strong>
+<?php if (!$listing['available'] || !isset($listing['total'])): ?><small class="d-block text-body-secondary">Contagem indisponível</small><?php endif; ?>
 </div></div></div>
 <div class="col-12 text-body-secondary" id="origin-date-help">Período pela Data de origem da OS.</div>
+<?php if (!empty($filters['period_start'])): ?><p class="text-body-secondary">Recorte do dashboard: <?= h($filters['period_start']) ?> a <?= h($filters['period_end']) ?>. Fechadas pela data geral TJ_DTPRFIM; abertas por origem. O filtro de emissão abaixo usa somente origem.</p><?php endif; ?>
+<?php if (($filters['situacao'] ?? '') === 'C'): ?><p class="text-body-secondary">Consulta histórica de canceladas. Estas O.S. não entram nos indicadores de abertas ou fechadas.</p><?php endif; ?>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
 <span class="text-body-secondary ms-2">O.S. e centro de custo por código exato.</span></div>
@@ -90,11 +95,11 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <table class="table pcm-orders-table pcm-order-listing align-middle"><thead><tr><th class="pcm-order-number">O.S.</th><th class="pcm-order-description">Descrição</th><?php foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?></td>
+<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row, 'hideFutureDate' => true]) ?></td>
 <td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
-<td><?= h($protheusDate($row['TJ_DTMRINI'] ?? null)) ?></td>
-<td><?= h($protheusDate($row['TJ_DTMRFIM'] ?? null)) ?></td>
+<td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_start')[0])) ?></td>
+<td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_end')[0])) ?></td>
 <td class="pcm-order-text"><?= h($display($row['TJ_CODBEM'])) ?><br><?= h($display($row['equipment_name'])) ?></td>
 <td class="pcm-order-text"><?= h($display($row['TJ_SERVICO'])) ?><br><?= h($display($row['service_name'])) ?></td>
 <td><?= h($statusName($row)) ?></td>

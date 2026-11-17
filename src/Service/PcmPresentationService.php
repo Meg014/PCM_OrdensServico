@@ -15,8 +15,10 @@ final class PcmPresentationService
     /**
      * @return array{import_id:?int,report_date:?string,updated_at:?string,screens:list<array<string,int|string>>}
      */
-    public function payload(): array
+    public function payload(array $filters = []): array
     {
+        $period = PcmPeriod::fromFilters($filters);
+        $filters = $period === null ? [] : array_intersect_key($period, array_flip(['date_start', 'date_end']));
         $import = $this->current->currentImport();
         if ($import === null) {
             return ['import_id' => null, 'report_date' => null, 'updated_at' => null, 'screens' => [
@@ -25,17 +27,19 @@ final class PcmPresentationService
         }
 
         $indicators = new PcmIndicatorService($this->current);
-        $screens = [$this->screen('general', 'PCM - VISÃO GERAL', $indicators->calculate())];
+        $screens = [$this->screen('general', 'PCM - VISÃO GERAL', $indicators->calculate(null, $filters))];
         foreach ($this->orderedPresentationAreas($this->current->areas()) as $presentationArea) {
             $area = $presentationArea['area'];
             $screens[] = $this->screen(
-                (string)$area->source_code,
+                MaintenanceAreasTable::presentationCode($area->source_code),
                 'PCM - ' . $presentationArea['label'],
-                $indicators->calculate((int)$area->id),
+                $indicators->calculate(null, ['area' => MaintenanceAreasTable::presentationCode($area->source_code)] + $filters),
             );
         }
 
         return [
+            'period' => $period,
+            'period_mode' => $period === null ? 'unbounded' : 'manual',
             'import_id' => (int)$import->id,
             'report_date' => $import->report_date->format('Y-m-d'),
             'updated_at' => $import->finished_at->format(DATE_ATOM),
@@ -48,7 +52,7 @@ final class PcmPresentationService
     {
         $areasByCode = [];
         foreach ($areas as $area) {
-            $code = strtoupper(trim((string)$area->source_code));
+            $code = MaintenanceAreasTable::presentationCode($area->source_code);
             if ($code !== '') {
                 $areasByCode[$code] = $area;
             }
@@ -57,7 +61,7 @@ final class PcmPresentationService
         foreach (MaintenanceAreasTable::FRIENDLY_NAMES as $code => $friendlyName) {
             if (isset($areasByCode[$code])) {
                 $area = $areasByCode[$code];
-                $label = mb_strtoupper((string)$area->display_name);
+                $label = mb_strtoupper($friendlyName);
                 $ordered[] = compact('area', 'label');
                 unset($areasByCode[$code]);
             }

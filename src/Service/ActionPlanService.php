@@ -77,7 +77,7 @@ final class ActionPlanService
                     'equipment_code' => trim((string)($row['TJ_CODBEM'] ?? '')),
                     'description' => $this->descriptionText($row['description'] ?? null),
                     'service' => trim((string)$row['service_name']),
-                    'status' => $row['TJ_TERMINO'] === 'S' ? 'Finalizada' : 'Aberta',
+                    'status' => \App\Service\Protheus\ProtheusOperationalEligibility::isClosed($row['TJ_SITUACA'] ?? null, $row['TJ_TERMINO']) ? 'Finalizada' : 'Aberta',
                     'mechanics' => '',
                 ];
             }

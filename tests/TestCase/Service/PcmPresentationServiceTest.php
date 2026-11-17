@@ -33,7 +33,7 @@ final class PcmPresentationServiceTest extends TestCase
         $this->assertSame(self::$ids['currentImportId'], $payload['import_id']);
         $this->assertSame(['general', 'ELETRI', 'MECANI'], array_column($payload['screens'], 'key'));
         $this->assertSame(
-            ['PCM - VISÃO GERAL', 'PCM - ELÉTRICA', 'PCM - MECÂNICA'],
+            ['PCM - VISÃO GERAL', 'PCM - ELÉTRICA/INSTRUMENTAÇÃO', 'PCM - MECÂNICA'],
             array_column($payload['screens'], 'title'),
         );
         $this->assertSame(['open' => 158, 'completed' => 371], array_intersect_key(

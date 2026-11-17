@@ -14,7 +14,7 @@ final class ProtheusDashboardService
 {
     public const CARDS = ['safra_open', 'safra_completed', 'offseason_open', 'offseason_completed',
         'preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'];
-    public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino', 'unidade'];
+    public const FILTERS = ['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino', 'unidade', 'date_start', 'date_end'];
 
     public function __construct(private ?ProtheusRepository $repository = null, private readonly ?\Closure $diagnostic = null)
     {
@@ -31,7 +31,8 @@ final class ProtheusDashboardService
             $filters[$key] = trim($value);
         }
         $filters['unidade'] = ProtheusUnit::validate($filters['unidade']);
-        $payload = ['available' => false, 'source' => 'Protheus', 'queried_at' => null,
+        $period = \App\Service\PcmPeriod::fromFilters($filters);
+        $payload = ['period' => $period, 'period_mode' => $period === null ? 'unbounded' : 'manual', 'historical' => false, 'available' => false, 'source' => 'Protheus', 'queried_at' => null,
             'filters' => $filters, 'record_count' => null, 'groups' => [],
             'indicators' => array_fill_keys(self::CARDS, null), 'screens' => [], 'analysis' => null, 'detail' => null];
         $stage = 'management';
@@ -51,7 +52,7 @@ final class ProtheusDashboardService
                 if ($eligible > 0 && ((int)$row['service_matches'] !== 1 || $row['service_name'] === null)) {
                     throw new RuntimeException('Serviço indisponível ou ambíguo.');
                 }
-                $area = (string)$row['TJ_CODAREA'];
+                $area = MaintenanceAreasTable::presentationCode($row['TJ_CODAREA']);
                 $areaKey = trim($area) === '' ? null : 'area:' . $area;
                 if ($areaKey !== null) {
                     $screens[$areaKey] ??= ['key' => $areaKey,

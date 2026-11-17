@@ -10,20 +10,28 @@ class MaintenanceAreasTable extends Table
 {
     /** Canonical user-facing names for known TOTVS maintenance area codes. */
     public const FRIENDLY_NAMES = [
-        'ELETRI' => 'Elétrica e Instrumentação',
+        'ELETRI' => 'Elétrica/Instrumentação',
         'CALD' => 'Caldeira',
         'FAB' => 'Fábrica',
-        'TRATA' => 'Tratamento de Caldo',
+        'TRATA' => 'Trat. de Caldo',
         'MECANI' => 'Mecânica',
         'CALDEI' => 'Caldeiraria',
         'USINAG' => 'Usinagem',
-        'INSTRU' => 'Instrumentação',
+        'INSTRU' => 'Elétrica/Instrumentação',
         'DESTIL' => 'Destilaria',
-        'OPERAC' => 'Operação',
-        'TERCEI' => 'Terceiros',
+        'OPERAC' => 'Operacional',
+        'TERCEI' => 'Terceiro',
         'LABORA' => 'Laboratório',
         'MOEND' => 'Moenda',
     ];
+
+    /** Presentation grouping never changes the original maintenance area. */
+    public static function presentationCode(?string $code): string
+    {
+        $code = strtoupper(trim($code ?? ''));
+
+        return $code === 'INSTRU' ? 'ELETRI' : $code;
+    }
 
     /** Configures the maintenance areas repository. */
     public function initialize(array $config): void

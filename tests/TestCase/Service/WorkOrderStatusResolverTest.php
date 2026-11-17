@@ -30,4 +30,13 @@ final class WorkOrderStatusResolverTest extends TestCase
     {
         $this->assertSame('EM ABERTO', $this->resolver->resolve('Liberado', 'Não'));
     }
+
+    public function testProtheusCodesFollowEndingSWithCancellationPrecedenceWithoutDates(): void
+    {
+        foreach (['L', 'P', null] as $situation) {
+            $this->assertSame('FECHADA', $this->resolver->resolve($situation, 'S'));
+        }
+        $this->assertSame('CANCELADA', $this->resolver->resolve('C', 'S'));
+        $this->assertSame('EM ABERTO', $this->resolver->resolve('L', 'N'));
+    }
 }

@@ -14,10 +14,10 @@ final class ProtheusAnalyticalScopeTest extends TestCase
     public function testAnalyticalQueriesShareCutoffButOrdinaryOrdersRemainUnbounded(): void
     {
         self::assertSame('2025-01-01', ProtheusAnalyticalScope::START_DATE);
-        foreach ([ProtheusQueries::dashboardAnalysis(), ProtheusSectorQueries::aggregates(),
-            ProtheusSectorQueries::equipmentRanking(), ProtheusSectorQueries::historicalRankings(),
-            ProtheusSectorQueries::backlog()] as $sql) {
-            self::assertStringContainsString("CONVERT(date, '20250101', 112)", $sql);
+        self::assertStringContainsString("CONVERT(date, '20250101', 112)", ProtheusQueries::dashboardAnalysis());
+        foreach ([ProtheusSectorQueries::aggregates(), ProtheusSectorQueries::equipmentRanking(),
+            ProtheusSectorQueries::historicalRankings(), ProtheusSectorQueries::backlog()] as $sql) {
+            self::assertStringNotContainsString("CONVERT(date, '20250101', 112)", $sql);
         }
         self::assertStringNotContainsString("CONVERT(date, '20250101', 112)", ProtheusQueries::orders(false, false, false));
         self::assertStringNotContainsString("CONVERT(date, '20250101', 112)", ProtheusQueries::management());

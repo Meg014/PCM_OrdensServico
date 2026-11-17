@@ -26,6 +26,15 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private string $sectorStage = 'connection';
     private ?string $equipmentSubstring = null;
     private ?array $sectorPeriod = null;
+    private ?array $plannedPeriod = null;
+
+    public function withPlannedPeriod(array $filters): self
+    {
+        $copy = clone $this;
+        $copy->plannedPeriod = \App\Service\PcmPeriod::fromFilters($filters);
+
+        return $copy;
+    }
 
     /** An isolated listing/export scope; existing dashboard repository instances stay unchanged. */
     public function withEquipmentSubstring(string $term): self
@@ -62,6 +71,52 @@ final class ProtheusRepository implements ProtheusReaderInterface
     public function health(): bool
     {
         return (int)$this->read(ProtheusQueries::HEALTH)[0]['connection_ok'] === 1;
+    }
+
+    public function reconciliation(array $filters, string $asOf): array
+    {
+        $params = array_fill_keys(['filial', 'area', 'bem', 'servico', 'centro', 'tipo', 'situacao', 'termino', 'unidade'], '');
+        $params = array_replace($params, array_intersect_key($filters, $params));
+        $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
+        $period = \App\Service\PcmPeriod::fromFilters($filters);
+        if ($period !== null) $params += ['dashboard_start' => $period['date_start'], 'dashboard_end' => $period['date_end']];
+
+        $result = ['totals' => $this->read(PcmReconciliationQueries::totals($period !== null, ($filters['period_mode'] ?? '') === 'default_completed'), $params),
+            'quality' => $this->read(PcmReconciliationQueries::QUALITY, ['as_of' => $asOf])];
+        if ($period !== null) {
+            $issuedParams = array_diff_key($params, array_flip(['cutoff', 'dashboard_start', 'dashboard_end']));
+            $issuedParams += ['centro_modo' => '', 'date_start' => $period['date_start'],
+                'date_end' => $period['date_end'], 'nome_bem' => '', 'analitico' => ''];
+            $branch = $params['filial'] !== '';
+            $equipment = $params['bem'] !== '';
+            if (!$branch) unset($issuedParams['filial']);
+            if (!$equipment) unset($issuedParams['bem']);
+            $issued = $this->read(ProtheusQueries::orders(false, $branch, $equipment, true, false, false, true), $issuedParams);
+            $result['issued_count'] = (int)$issued[0]['total'];
+        }
+
+        return $result;
+    }
+
+    public function completionFields(): array
+    {
+        return $this->read(PcmReconciliationQueries::COMPLETION_FIELDS);
+    }
+
+    public function closedStatusTotals(): array
+    {
+        return $this->read(PcmReconciliationQueries::CLOSED_BY_AREA);
+    }
+
+    public function missingCompletionAudit(): array
+    {
+        $orders = $this->read(MissingCompletionAuditQueries::ORDERS);
+        $identities = array_map(static fn(array $row): array => ['branch' => $row['TJ_FILIAL'], 'number' => $row['TJ_ORDEM']], $orders);
+
+        return ['orders' => $orders, 'execution' => $this->actionPlanExecution($identities),
+            'columns' => $this->read(MissingCompletionAuditQueries::COLUMNS),
+            'comparison' => $this->read(MissingCompletionAuditQueries::COMPARISON),
+            'history_metadata' => $this->read(ActionPlanObservationQueries::HISTORY_METADATA)];
     }
 
     public function actionPlan(string $start, string $end, string $unit = ProtheusUnit::ALL): array
@@ -428,7 +483,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if ($management) {
             $params['cutoff'] = str_replace('-', '', WorkOrderSnapshotsTable::OPERATIONAL_START);
         }
-        $rows = $this->read($management ? ProtheusQueries::management($unitFilter) : ProtheusQueries::dashboardAnalysis(), $params);
+        $sql = $management ? ProtheusQueries::management($unitFilter) : ProtheusQueries::dashboardAnalysis();
+        $period = \App\Service\PcmPeriod::fromFilters($filters);
+        if ($period !== null) {
+            $sql = SectorPresentationScope::dashboardPeriod($sql, ($filters['period_mode'] ?? '') === 'default_completed');
+            $params += ['dashboard_start' => $period['date_start'], 'dashboard_end' => $period['date_end']];
+        }
+        $rows = $this->read($sql, $params);
         if ($management && count($rows) > 2000) {
             throw new RuntimeException('Limite de grupos excedido; resultado incompleto.');
         }
@@ -500,8 +561,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
                 $params['offseason_services'] = $this->historicalOffseasonServices();
             }
         }
+        $ordersQuery = static function (...$arguments) use ($situation): string {
+            $sql = ProtheusQueries::orders(...$arguments);
+
+            return $situation === 'C' ? ProtheusQueries::canceledHistory($sql) : $sql;
+        };
         $rows = $this->read(
-            ProtheusQueries::orders(
+            $ordersQuery(
                 $number !== null,
                 $branch !== null,
                 $equipment !== null,
@@ -524,7 +590,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if ($includeTotal && !$export) {
             $countParams = $params;
             unset($countParams['offset'], $countParams['fetch']);
-            $aggregate = $this->read(ProtheusQueries::orders(
+            $aggregate = $this->read($ordersQuery(
                 $number !== null, $branch !== null, $equipment !== null, $extraFilters,
                 $historical === '1', $safra === '1', true,
             ), $countParams);
@@ -544,7 +610,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
         }
         $filters['offseason_services'] = (($filters['historico'] ?? '') === '1' || ($filters['safra'] ?? '') === '1')
             ? $this->historicalOffseasonServices() : '[]';
-        $rows = $this->read(ProtheusQueries::generalEntries(), $filters + [
+        $sql = ($filters['situacao'] ?? '') === 'C' ? ProtheusQueries::canceledHistory(ProtheusQueries::generalEntries()) : ProtheusQueries::generalEntries();
+        $rows = $this->read($sql, $filters + [
             'offset' => ($page - 1) * $limit, 'fetch' => $limit + 1,
         ], ['offset' => 'integer', 'fetch' => 'integer']);
         foreach ($rows as &$row) {
@@ -773,6 +840,14 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->plannedPeriod !== null) {
+            $scoped = SectorPresentationScope::dashboardPeriod($sql);
+            if ($scoped !== $sql) {
+                $sql = $scoped;
+                $params += ['dashboard_start' => $this->plannedPeriod['date_start'],
+                    'dashboard_end' => $this->plannedPeriod['date_end']];
+            }
+        }
         if ($this->sectorPeriod !== null && $this->sectorPeriod !== ['', '']) {
             $scoped = SectorPresentationScope::period($sql);
             if ($scoped !== $sql) {

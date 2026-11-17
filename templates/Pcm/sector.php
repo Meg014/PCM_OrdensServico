@@ -17,7 +17,7 @@ $this->Html->script('pcm-history', ['block' => true]);
 <?php foreach (['date_start' => 'Data inicial', 'date_end' => 'Data final'] as $field => $label): ?>
 <div class="col-md-6"><?= $this->Form->control($field, ['type' => 'date', 'label' => $label, 'value' => $filters[$field] ?? '']) ?></div>
 <?php endforeach; ?>
-<p class="text-body-secondary">Período de criação da O.S. (P. In. Man.). As datas filtram apenas o detalhamento; os indicadores mantêm suas regras atuais.</p>
+<p class="text-body-secondary">Sem período: todas as fechadas não canceladas. Com período: indicadores e detalhamento usam a data geral TJ_DTPRFIM nas fechadas e Data de origem nas abertas.</p>
 </div>
 <div class="mt-3"><?= $this->Form->control('season', ['label' => 'Safra / Entressafra', 'empty' => 'Todas', 'options' => ['safra' => 'Safra', 'offseason' => 'Entressafra'], 'value' => $filters['season'] ?? '']) ?></div>
 <div class="mt-3"><?= $this->Form->control('classification', ['label' => 'Classificação do serviço', 'empty' => 'Todas', 'options' => \App\Service\PcmServiceClassifier::LABELS, 'value' => $filters['classification'] ?? '']) ?></div>

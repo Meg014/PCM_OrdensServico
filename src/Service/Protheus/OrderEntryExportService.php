@@ -73,7 +73,7 @@ final class OrderEntryExportService
     {
         $filters = [];
         foreach (['os', 'filial', 'bem', 'nome_bem', 'equipment_q', 'bem_filial', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
-            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'safra', 'analitico', 'unidade',
+            'situacao', 'termino', 'date_start', 'date_end', 'period_start', 'period_end', 'historico', 'safra', 'analitico', 'unidade',
             'card', 'card_status', 'backlog_age', 'q', 'status', 'service_name', 'entry_type', 'professional'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100) || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
@@ -127,7 +127,10 @@ final class OrderEntryExportService
             'historico' => $filters['historico'], 'safra' => $filters['safra'],
             'analitico' => $filters['analitico'], 'unidade' => $filters['unidade']];
         try {
-            $data = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->generalEntries($params, $page, $limit);
+            $repository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withPlannedPeriod([
+                'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
+            ]);
+            $data = $repository->generalEntries($params, $page, $limit);
             return ['available' => true, 'filters' => $filters] + $data;
         } catch (Throwable) {
             return ['available' => false, 'filters' => $filters, 'entries' => [], 'has_more' => false];

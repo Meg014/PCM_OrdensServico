@@ -78,17 +78,24 @@ final class CurrentSnapshotService
         };
         $query = $this->snapshots->find('forImport', reportImportId: (int)$import->id)->find($scope);
         if ($areaCode !== null) {
-            $query->innerJoinWith(
-                'MaintenanceAreas',
-                fn(SelectQuery $areas): SelectQuery => $areas
-                    ->where(['MaintenanceAreas.source_code' => $areaCode]),
-            );
+            $query->find('filtered', filters: ['area' => $areaCode]);
         }
         if ($status !== null) {
             $query->where(['WorkOrderSnapshots.treated_status' => $status]);
         }
 
         return $query;
+    }
+
+    /** Keeps electrical/instrumentation drilldowns identical to TV grouping. */
+    public function restrictAreaId(SelectQuery $query, int $areaId): void
+    {
+        $area = $this->areas->find()->where(['id' => $areaId])->first();
+        if ($area !== null && in_array($area->source_code, ['ELETRI', 'INSTRU'], true)) {
+            $query->find('filtered', filters: ['area' => 'ELETRI']);
+        } else {
+            $query->where(['maintenance_area_id' => $areaId]);
+        }
     }
 
     /**

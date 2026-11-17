@@ -222,6 +222,15 @@ final class ProtheusOrderAccessTest extends TestCase
             'record_count' => null, 'groups' => [], 'queried_at' => null,
             'indicators' => array_fill_keys(\App\Service\Protheus\ProtheusDashboardService::CARDS, null)]]);
         $html = $view->render('protheus_dashboard', false);
+        self::assertStringNotContainsString('&amp;amp;', $html);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html);
+        $xpath = new \DOMXPath($dom);
+        $refreshUrl = $xpath->query('//*[@data-protheus-dashboard]')->item(0)->getAttribute('data-url');
+        parse_str((string)parse_url($refreshUrl, PHP_URL_QUERY), $refreshFilters);
+        foreach (\App\Service\Protheus\ProtheusDashboardService::FILTERS as $filter) {
+            self::assertArrayHasKey($filter, $refreshFilters);
+        }
         self::assertStringContainsString('/pcm/apresentacao/data', $html);
         self::assertSame(10, substr_count($html, 'data-dashboard-card='));
         foreach (['preventive', 'corrective', 'improvement', 'emergency', 'scheduled', 'opportunity'] as $key) {
@@ -230,7 +239,7 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('Safra — O.S. em aberto', $html);
         self::assertStringContainsString('Entressafra — O.S. fechadas', $html);
         self::assertStringNotContainsString('Eficiência', $html);
-        self::assertStringNotContainsString('Concluídas', $html);
+        self::assertStringNotContainsString('Concluídas aguardam', $html);
         self::assertStringNotContainsString('Fonte: Protheus', $html);
         self::assertStringNotContainsString('Filtros da consulta Protheus', $html);
         self::assertStringNotContainsString('ANÁLISE GERAL', $html);
@@ -320,6 +329,26 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('Fonte: Protheus', $html);
     }
 
+    public function test005810ListingUsesMaintenanceDatesAndPreservesClosedStatus(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $row = array_fill_keys(['equipment_name', 'TJ_CODBEM', 'TJ_SERVICO', 'service_name', 'TJ_CCUSTO', 'TJ_TIPO'], '');
+        $row += ['TJ_ORDEM' => '005810', 'TJ_FILIAL' => '01', 'TJ_CODAREA' => 'MECANI',
+            'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'S', 'TJ_DTMRINI' => '20261028',
+            'TJ_HOMRINI' => '07:30', 'TJ_DTMRFIM' => '20261028', 'TJ_HOMRFIM' => '17:00', 'TJ_DTPRFIM' => ''];
+        $view->set('listing', ['filters' => ['os' => '005810', 'filial' => '01', 'unidade' => ''],
+            'page' => 1, 'limit' => 20, 'total' => 1, 'has_more' => false, 'available' => true, 'orders' => [$row]]);
+        $view->set('areas', ['MECANI']);
+        $html = $view->render('orders', false);
+        self::assertSame(2, substr_count($html, '<td>28/10/2026</td>'));
+        self::assertStringContainsString('<td>Fechada</td>', $html);
+        self::assertStringContainsString('/pcm/protheus/os/005810?filial=01', $html);
+    }
+
     public function testListingEscapesSourceValuesAndKeepsFallbackExplicit(): void
     {
         Router::reload();
@@ -330,7 +359,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $row = array_fill_keys(['equipment_name', 'TJ_CODBEM', 'TJ_SERVICO',
             'service_name', 'TJ_CODAREA', 'TJ_CCUSTO', 'TJ_TIPO', 'TJ_SITUACA', 'TJ_TERMINO'], '<script>alert(1)</script>');
         $row += ['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'origin_date' => '2026-09-23',
-            'descricao' => '<script>alert(2)</script>', 'TJ_DTMRINI' => '', 'TJ_DTMRFIM' => '20260924'];
+            'descricao' => '<script>alert(2)</script>', 'TJ_DTMRINI' => '', 'TJ_DTMRFIM' => '20260924', 'TJ_DTPRFIM' => '20250101'];
         $listing = ['filters' => ['os' => '004368', 'filial' => '01', 'bem' => '',
             'historico' => '1', 'unidade' => 'factory', 'nome_bem' => 'BOMBA'],
             'page' => 1, 'limit' => 20, 'has_more' => true, 'available' => true, 'orders' => [$row]];
@@ -339,7 +368,7 @@ final class ProtheusOrderAccessTest extends TestCase
         $html = $view->render('orders', false);
         self::assertStringContainsString('Exportar apontamentos', $html);
         self::assertStringContainsString('/pcm/ordens/apontamentos/excel', $html);
-        self::assertStringContainsString('<option value="ELETRI">Elétrica e Instrumentação</option>', $html);
+        self::assertStringContainsString('<option value="ELETRI">Elétrica/Instrumentação</option>', $html);
         self::assertStringContainsString('/pcm/protheus/os/004368?filial=01', $html);
         self::assertStringContainsString('23/09/2026', $html);
         self::assertStringContainsString('24/09/2026', $html);

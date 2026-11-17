@@ -291,7 +291,7 @@ final class PcmController extends AppController
     public function presentationLegacy(): void
     {
         $snapshot = new CurrentSnapshotService();
-        $payload = (new PcmPresentationService($snapshot))->payload();
+        $payload = (new PcmPresentationService($snapshot))->payload($this->request->getQueryParams());
         $lastUpdatedAt = $snapshot->lastSuccessfulImportAt();
         $navigationAreas = [];
 
@@ -307,7 +307,7 @@ final class PcmController extends AppController
 
     public function presentationLegacyData(): Response
     {
-        $payload = (new PcmPresentationService())->payload();
+        $payload = (new PcmPresentationService())->payload($this->request->getQueryParams());
 
         return $this->response
             ->withType('application/json')

@@ -63,12 +63,12 @@ automated upgrades, so you have to do any updates manually.
 
 ## Operação e configuração
 
-### Carteira atual e regra de STATUS do PCM (v4)
+### Carteira atual e regra de STATUS do PCM (v5)
 
 O relatório diário do TOTVS representa a carteira operacional atual. Cada novo relatório substitui o anterior para fins de indicadores e dashboards. Arquivos antigos podem ser preservados para auditoria, mas não são acumulados na carteira atual.
 
-- Se `Situação` indicar Cancelado/Cancelada: `CANCELADA`.
-- Senão, se `Término = Sim`: `FECHADA`.
+- Se `Situação` indicar Cancelado/Cancelada ou código `C`: `CANCELADA`.
+- Senão, se `Término = Sim` ou código `S`: `FECHADA`, sem exigir data.
 - Senão: `EM ABERTO`.
 
 Os campos importados permanecem inalterados. `P. In. Man.` e `P. Fim Man.`, com suas horas, representam planejamento/registro. `Real. Início` e `Real. Fim` representam a execução real. `R. In. Man.` e `R. Fim Man.` permanecem disponíveis como dados adicionais do TOTVS. Nenhum campo temporal participa da regra de STATUS. Canceladas ficam fora dos KPIs operacionais, mas permanecem disponíveis para auditoria.

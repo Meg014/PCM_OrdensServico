@@ -8,6 +8,14 @@ final class ProtheusQueries
 {
     public const HEALTH = 'SELECT 1 AS connection_ok';
 
+    private const CANCELED_HISTORY = "(j.TJ_SITUACA = 'C' /* historical consultation */)";
+
+    /** Explicit historical consultation; never used by operational indicators. */
+    public static function canceledHistory(string $sql): string
+    {
+        return str_replace(ProtheusOperationalEligibility::notCanceled('j'), self::CANCELED_HISTORY, $sql);
+    }
+
     /** Fixed aggregate-only audit used to verify the analytical boundary against Protheus. */
     public static function analyticalAudit(): string
     {
@@ -85,7 +93,10 @@ SQL;
     public const MANAGEMENT = <<<'SQL'
 WITH base AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_SERVICO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
-           j.TJ_DTMPINI,
+           j.TJ_DTMPINI, CASE WHEN (
+SQL
+        . ProtheusOperationalEligibility::OFFSEASON_NAME . <<<'SQL'
+) THEN 1 ELSE 0 END AS offseason_active,
            COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:filial AS VARCHAR(100)) AS filial, CAST(:area AS VARCHAR(100)) AS area,
@@ -110,14 +121,15 @@ SQL
         MAX(identity_count) AS identity_count,
         SUM(CAST(CASE WHEN (
 SQL
-        . ProtheusOperationalEligibility::ELIGIBLE_OPEN . <<<'SQL'
+        . ProtheusOperationalEligibility::ELIGIBLE_OPEN_COUNTS . <<<'SQL'
 ) THEN 1 ELSE 0 END AS BIGINT)) AS open_count,
         SUM(CAST(CASE WHEN (
 SQL
         . ProtheusOperationalEligibility::CLOSED . <<<'SQL'
 ) THEN 1 ELSE 0 END AS BIGINT)) AS closed_count,
-        SUM(CAST(CASE WHEN TJ_SITUACA IS NULL OR TJ_SITUACA NOT IN ('C', 'L', 'P')
-            OR TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S') THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
+        SUM(CAST(CASE WHEN TJ_TERMINO IS NULL OR TJ_TERMINO NOT IN ('N', 'S')
+            OR (TJ_TERMINO = 'N' AND (TJ_SITUACA IS NULL OR TJ_SITUACA NOT IN ('C', 'L', 'P')))
+            THEN 1 ELSE 0 END AS BIGINT)) AS unconfirmed_count
     FROM base GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO, TJ_TIPO
 )
 SELECT TOP (2001) c.TJ_FILIAL, c.TJ_CODAREA, c.TJ_SERVICO, c.TJ_TIPO, c.quantity,
@@ -519,10 +531,7 @@ SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
     j.TJ_DTPRINI, j.TJ_HOPRINI, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
     CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS pcm_descricao
 FROM dbo.STJ010 j
-WHERE RTRIM(j.TJ_ORDEM) = :numero AND j.D_E_L_E_T_ <> '*' AND
-SQL
-        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
-
+WHERE RTRIM(j.TJ_ORDEM) = :numero AND j.D_E_L_E_T_ <> '*'
 SQL;
 
     public const ORDER_BRANCH = self::ORDER . ' AND RTRIM(j.TJ_FILIAL) = :filial';
@@ -531,10 +540,7 @@ SQL;
 SELECT TOP (2) j.TJ_ORDEM, j.TJ_FILIAL, j.TJ_CODBEM
 FROM dbo.STJ010 j
 WHERE j.TJ_ORDEM = CAST(:numero AS VARCHAR(100))
-    AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*' AND
-SQL
-        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
-
+    AND j.TJ_FILIAL = CAST(:filial AS VARCHAR(100)) AND j.D_E_L_E_T_ <> '*'
 SQL;
 
     public const EQUIPMENT = <<<'SQL'
@@ -553,10 +559,7 @@ SQL;
 SELECT l.*, CONVERT(VARCHAR(MAX), l.TL_OBSERVA) AS pcm_entry_description
 FROM dbo.STL010 l
 INNER JOIN dbo.STJ010 j ON RTRIM(j.TJ_ORDEM) = RTRIM(l.TL_ORDEM)
-    AND RTRIM(j.TJ_FILIAL) = RTRIM(l.TL_FILIAL) AND j.D_E_L_E_T_ <> '*' AND
-SQL
-        . ProtheusOperationalEligibility::NOT_CANCELED . <<<'SQL'
-
+    AND RTRIM(j.TJ_FILIAL) = RTRIM(l.TL_FILIAL) AND j.D_E_L_E_T_ <> '*'
 WHERE RTRIM(j.TJ_ORDEM) = :numero AND RTRIM(j.TJ_FILIAL) = :filial
     AND l.D_E_L_E_T_ <> '*'
 ORDER BY l.TL_DTINICI, l.TL_HOINICI, l.R_E_C_N_O_
@@ -581,6 +584,16 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if (in_array($sql, [MissingCompletionAuditQueries::ORDERS, MissingCompletionAuditQueries::COLUMNS,
+            MissingCompletionAuditQueries::COMPARISON], true)) return true;
+        if (in_array($sql, [PcmReconciliationQueries::totals(), PcmReconciliationQueries::totals(false),
+            PcmReconciliationQueries::totals(true, true), PcmReconciliationQueries::QUALITY, PcmReconciliationQueries::COMPLETION_FIELDS,
+            PcmReconciliationQueries::CLOSED_BY_AREA], true)) return true;
+        if (str_contains($sql, self::CANCELED_HISTORY)) {
+            $base = str_replace(self::CANCELED_HISTORY, ProtheusOperationalEligibility::notCanceled('j'), $sql);
+
+            return self::canceledHistory($base) === $sql && self::allows($base);
+        }
         if ($sql === ActionPlanExecutionQuery::SQL) return true;
         if (in_array($sql, [ActionPlanStageQueries::PERMISSIONS, ActionPlanStageQueries::METADATA], true)) return true;
         if (in_array($sql, [ActionPlanObservationQueries::SOURCES, ActionPlanObservationQueries::HISTORY_METADATA, ActionPlanObservationQueries::HEADER], true)) return true;
@@ -591,6 +604,11 @@ SQL;
             foreach ([false, true] as $stages) {
                 if ($sql === OrderTaskQueries::recorded($tasks, $stages)) return true;
             }
+        }
+        $withoutDashboardPeriod = SectorPresentationScope::withoutDashboardPeriod($sql);
+        if ($withoutDashboardPeriod !== $sql) {
+            return (SectorPresentationScope::dashboardPeriod($withoutDashboardPeriod) === $sql
+                || SectorPresentationScope::dashboardPeriod($withoutDashboardPeriod, true) === $sql) && self::allows($withoutDashboardPeriod);
         }
         $withoutAreas = SectorPresentationScope::withoutAreas($sql);
         if ($withoutAreas !== $sql) return SectorPresentationScope::areas($withoutAreas) === $sql && self::allows($withoutAreas);

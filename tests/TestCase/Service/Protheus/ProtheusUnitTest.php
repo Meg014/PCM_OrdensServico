@@ -45,7 +45,7 @@ final class ProtheusUnitTest extends TestCase
         self::assertTrue(ProtheusUnit::metadata('4101030')['offseason']);
         $classifier = new \App\Service\PcmServiceClassifier();
         self::assertSame('OUTROS', $classifier->classify('PREVEN', 'PREVENTIVA', '01'));
-        self::assertSame('ENTRESSAFRA', $classifier->classify('2425EL', 'SERVIÇO', '01'));
+        self::assertSame('OUTROS', $classifier->classify('2425EL', 'SERVIÇO', '01'));
     }
 
     public function testActualSqlMatchesPhpForEveryOfficialCodeAndAlias(): void

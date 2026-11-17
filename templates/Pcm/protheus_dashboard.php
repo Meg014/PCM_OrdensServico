@@ -8,6 +8,7 @@ $orderContextFilters = static fn (array $dashboardFilters): array => array_filte
         'bem' => $dashboardFilters['bem'] ?? '', 'servico' => $dashboardFilters['servico'] ?? '',
         'tipo' => $dashboardFilters['tipo'] ?? '', 'situacao' => $dashboardFilters['situacao'] ?? '',
         'termino' => $dashboardFilters['termino'] ?? '', 'unidade' => $dashboardFilters['unidade'] ?? '',
+        'period_start' => $dashboardFilters['date_start'] ?? '', 'period_end' => $dashboardFilters['date_end'] ?? '',
         'historico' => '1',
     ], static fn ($value) => $value !== '');
 $costCenterFilters = static function (array $dashboardFilters, array $costCenter) use ($orderContextFilters): array {
@@ -29,7 +30,7 @@ $equipmentFilters = static function (array $dashboardFilters, array $equipment) 
 ?>
 <section class="<?= $presentation ? 'p-4' : '' ?>" data-protheus-dashboard data-presentation="<?= $presentation ? 'true' : 'false' ?>"
  data-orders-url="<?= h($this->Url->build(['_name' => 'pcm-orders'])) ?>"
- data-url="<?= h($this->Url->build(['_name' => $presentation ? 'pcm-presentation-data' : 'pcm-data', '?' => $payload['filters']])) ?>">
+ data-url="<?= $this->Url->build(['_name' => $presentation ? 'pcm-presentation-data' : 'pcm-data', '?' => $payload['filters']]) ?>">
 <header class="pcm-page-header"><div><?php if (!$presentation): ?><p class="pcm-eyebrow">PCM | PROTHEUS</p><?php endif; ?>
 <h1 data-dashboard-title><?= $presentation ? 'PCM - VISÃO GERAL' : 'Visão Geral' ?></h1>
 <?php if (!$presentation): ?><span class="badge text-bg-secondary">Fonte: Protheus</span><?php endif; ?>
@@ -52,11 +53,17 @@ $equipmentFilters = static function (array $dashboardFilters, array $equipment) 
 <?= $this->Html->link($presentation ? 'Sair da apresentação' : 'Modo Apresentação', ['_name' => $presentation ? 'pcm' : 'pcm-presentation', '?' => $payload['filters']], ['class' => 'btn btn-outline-primary']) ?>
 
 </div><?php endif; ?></header>
+<p class="text-body-secondary" data-dashboard-period>
+<?= ($payload['period'] ?? null) === null ? 'Sem filtro de período: todas as fechadas não canceladas do conjunto consultado.'
+    : h('Período manual: ' . $payload['period']['date_start'] . ' a ' . $payload['period']['date_end']
+        . ' · Fechadas por data geral TJ_DTPRFIM; abertas por origem.') ?>
+</p>
 <p data-dashboard-notice role="status" aria-live="polite" class="text-body-secondary"></p>
 <?php if (!$presentation): ?>
-<p class="text-body-secondary">Safra/Entressafra seguem a classificação de serviços do PCM.
-Abertas: término N, situação diferente de C e início planejado desde 01/01/2026.
-Fechadas: término S, sem corte de data. Combinações conflitantes aguardam validação.</p>
+<p class="text-body-secondary">Entressafra: Nome Serviço contém ENTRESSAFRA; demais serviços: Safra.
+Abertas: situação L e término N. Entressafra sem corte de ano; Safra mantém início planejado desde 01/01/2026.
+Fechadas: término S, excluindo canceladas, sem exigir data quando não há filtro.
+Com período informado, fechadas usam TJ_DTPRFIM e abertas usam Data de origem. Datas vazias não atendem a um intervalo informado.</p>
 <details class="pcm-panel p-3 mb-3"><summary>Filtros da consulta Protheus</summary>
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-2 mt-2']) ?>
 <?php if ($payload['filters']['filial'] !== ''): ?><?= $this->Form->hidden('filial', ['value' => $payload['filters']['filial']]) ?><?php endif; ?>
@@ -64,6 +71,10 @@ Fechadas: término S, sem corte de data. Combinações conflitantes aguardam val
     'centro' => 'Centro de custo', 'tipo' => 'TJ_TIPO (bruto)', 'situacao' => 'Situação (bruta)', 'termino' => 'Término (bruto)'] as $key => $label): ?>
 <div class="col-sm-6 col-lg-3"><label class="form-label" for="dashboard-<?= h($key) ?>"><?= h($label) ?></label>
 <input class="form-control" id="dashboard-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($payload['filters'][$key]) ?>" maxlength="100"></div>
+<?php endforeach; ?>
+<?php foreach (['date_start' => 'Início do período', 'date_end' => 'Fim do período'] as $key => $label): ?>
+<div class="col-sm-6 col-lg-3"><label class="form-label" for="dashboard-<?= h($key) ?>"><?= h($label) ?></label>
+<input type="date" class="form-control" id="dashboard-<?= h($key) ?>" name="<?= h($key) ?>" value="<?= h($payload['filters'][$key] ?? '') ?>"></div>
 <?php endforeach; ?>
 <div class="col-12"><button type="submit" class="btn btn-primary">Aplicar códigos exatos</button>
 <small>Vazio: sem filtro. A atualização automática preserva estes filtros.</small></div>

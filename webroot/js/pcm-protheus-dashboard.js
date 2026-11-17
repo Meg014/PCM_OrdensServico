@@ -27,7 +27,10 @@
     const screen = () => {
         if (!payload) return;
         const current = payload.screens[index];
-        cards.forEach(card => { card.textContent = format.format(current[card.dataset.dashboardCard]); });
+        cards.forEach(card => {
+            const value = current[card.dataset.dashboardCard];
+            card.textContent = value === null ? '—' : format.format(value);
+        });
         if (root.dataset.presentation === 'true') {
             title.textContent = current.title;
             if (position) position.textContent = `Tela ${index + 1} de ${payload.screens.length}`;
@@ -39,6 +42,7 @@
         for (const item of next.screens) {
             if (typeof item.key !== 'string' || typeof item.title !== 'string') throw new Error('Invalid screen');
             for (const card of cards) {
+                if (next.historical && /^(safra|offseason)_(open|completed)$/.test(card.dataset.dashboardCard) && item[card.dataset.dashboardCard] === null) continue;
                 if (!Number.isSafeInteger(item[card.dataset.dashboardCard]) || item[card.dataset.dashboardCard] < 0) throw new Error('Invalid count');
             }
         }
@@ -51,6 +55,10 @@
         if (count) count.textContent = format.format(next.record_count);
         updated.textContent = `Dados atualizados em: ${date}` + (root.dataset.presentation === 'true' ? '' : ' · consulta ao Protheus');
         notice.textContent = '';
+        const period = root.querySelector('[data-dashboard-period]');
+        if (period) period.textContent = next.period
+            ? `Período manual: ${next.period.date_start} a ${next.period.date_end} · Fechadas por TJ_DTPRFIM; abertas por origem.`
+            : 'Sem filtro de período: todas as fechadas não canceladas do conjunto consultado.';
     };
     const renderAnalysis = analysis => {
         if (!analysis || typeof analysis !== 'object' || !Number.isSafeInteger(analysis.total) || analysis.total < 0) throw new Error('Invalid analysis');
@@ -69,7 +77,7 @@
                     link.className = 'pcm-ranking-link';
                     const query = new URLSearchParams();
                     const names = {filial: 'filial', area: 'area', bem: 'bem', servico: 'servico', tipo: 'tipo',
-                        situacao: 'situacao', termino: 'termino', unidade: 'unidade'};
+                        situacao: 'situacao', termino: 'termino', unidade: 'unidade', date_start: 'period_start', date_end: 'period_end'};
                     for (const [source, target] of Object.entries(names)) if (payload.filters?.[source]) query.set(target, payload.filters[source]);
                     query.set('historico', '1');
                     if (key === 'equipment') { query.set('filial', item.branch); query.set('bem', item.code); }

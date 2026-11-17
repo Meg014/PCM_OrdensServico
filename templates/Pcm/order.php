@@ -1,5 +1,6 @@
 <?php $this->assign('title', 'O.S. ' . $snapshot->source_order_number); ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | ORDEM DE SERVIÇO</p><h1>O.S. <?= h($snapshot->source_order_number) ?></h1><p class="pcm-updated"><?= $this->element('pcm_updated_at', compact('lastUpdatedAt')) ?></p></div><div><?= $this->Html->link('Voltar ao setor', ['_name' => 'pcm-sector', 'code' => $snapshot->maintenance_area_code], ['class' => 'btn btn-outline-secondary']) ?></div></header>
+<?= $this->element('order_audit_flags', ['order' => $snapshot]) ?>
 <div class="row g-4">
 <?php $blocks = [
     'Identificação e classificação' => ['Área Manut.' => $this->MaintenanceArea->name($snapshot->maintenance_area_code),

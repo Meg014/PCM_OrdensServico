@@ -129,16 +129,15 @@ final class PcmOperationalRevisionTest extends TestCase
     public function testServiceNormalizationAndStableCodePrecedence(): void
     {
         $classifier = new PcmServiceClassifier();
-        $this->assertSame('EMERGENCIAL', $classifier->classify(' coreme ', 'ENTRESSAFRA'));
+        $this->assertSame('EMERGENCIAL', $classifier->classify(' coreme ', 'CORRETIVA EMERGENCIAL'));
         $this->assertSame('PROGRAMADA', $classifier->classify('corpro', 'Corretiva Emergencial'));
         $this->assertSame('EMERGENCIAL', $classifier->classify(null, 'manutenção CORRÉTIVA  EMERGENCIAL'));
-        $this->assertSame('OUTROS', $classifier->classify('9999XX', 'Plano de éntrêssafra 2027', '01'));
+        $this->assertSame('ENTRESSAFRA', $classifier->classify('9999XX', 'Plano de éntrêssafra 2027', '01'));
         $this->assertSame('OUTROS', $classifier->classify('2425ME', 'Serviço comum'));
-        foreach (PcmServiceClassifier::OFFSEASON_SERVICES['01'] as $code) {
-            $this->assertSame('ENTRESSAFRA', $classifier->classify($code, 'DESCRIÇÃO ALTERADA', '01'));
-            $this->assertSame('OUTROS', $classifier->classify($code, 'ENTRESSAFRA', '02'));
+        foreach (['2425ME', 'ENTRES', 'NOVOES', 'COREME', 'CORPRO'] as $code) {
+            $this->assertSame('OUTROS', $classifier->classify($code, 'TESTE', '01') === 'ENTRESSAFRA' ? 'ENTRESSAFRA' : 'OUTROS');
+            $this->assertSame('ENTRESSAFRA', $classifier->classify($code, 'ENTRESSAFRA', '02'));
         }
-        $this->assertSame('OUTROS', $classifier->classify('NOVOES', 'ENTRESSAFRA NOVA', '01'));
         $this->assertTrue($classifier->isOffseasonCandidate('Entressafra nova'));
         $this->assertFalse($classifier->isOffseasonCandidate('Serviço normal'));
         $this->assertSame('OUTROS', $classifier->classify(null, 'Inspeção emergencial'));
@@ -158,7 +157,7 @@ final class PcmOperationalRevisionTest extends TestCase
             'classification' => 'EMERGENCIAL', 'status' => 'EM ABERTO',
         ])?->count());
         $this->assertSame('OUTROS', (new PcmServiceClassifier())->classifySnapshot('MEL', 'CORPRO', 'Programada'));
-        $this->assertSame('ENTRESSAFRA', (new PcmServiceClassifier())->classifySnapshot('PRE', 'ESMECA', 'DESCRIÇÃO ALTERADA', '01'));
+        $this->assertSame('OUTROS', (new PcmServiceClassifier())->classifySnapshot('PRE', 'ESMECA', 'DESCRIÇÃO ALTERADA', '01'));
     }
 
     public function testOpenCutoffSeasonsAndEveryDrilldown(): void
@@ -172,7 +171,10 @@ final class PcmOperationalRevisionTest extends TestCase
                 $connection->update('work_order_snapshots', ['maintenance_planned_start' => $date], ['source_order_number' => (string)$number]);
             }
         }
-        $this->assertSame($before, (new PcmIndicatorService())->calculate());
+        $after = (new PcmIndicatorService())->calculate();
+        $this->assertSame($before['offseason_open'] + 9, $after['offseason_open']);
+        $this->assertSame($before['safra_open'], $after['safra_open']);
+        $this->assertSame($before['completed'], $after['completed']);
         $this->assertSame(7, $before['safra_open']);
         $this->assertSame(1, $before['safra_completed']);
         $this->assertSame(1, $before['offseason_open']);
@@ -187,7 +189,7 @@ final class PcmOperationalRevisionTest extends TestCase
         }
         $this->insertRow($this->currentId, $this->areaId, 200, 'Liberada', 'Sim', 'MEL', 'ESMECA', 'Descrição alterada');
         $connection->update('work_order_snapshots', ['maintenance_planned_start' => '2027-01-01'], ['source_order_number' => '200']);
-        $this->assertSame(2, (new PcmIndicatorService())->calculate()['offseason_completed']);
+        $this->assertSame(1, (new PcmIndicatorService())->calculate()['offseason_completed']);
         $this->assertSame(25, $connection->execute('SELECT COUNT(*) FROM work_order_snapshots')->fetchColumn(0));
     }
 
@@ -226,7 +228,7 @@ final class PcmOperationalRevisionTest extends TestCase
                     ], ['source_order_number' => (string)$number]);
                     if ($status === 'FECHADA') {
                         $expectedClosed[] = (string)$number;
-                    } elseif ($status === 'EM ABERTO' && $date !== null && $date >= '2026-01-01') {
+                    } elseif ($status === 'EM ABERTO' && ($season === 'Entressafra' || ($date !== null && $date >= '2026-01-01'))) {
                         $expectedOpen[] = (string)$number;
                     }
                 }
@@ -243,8 +245,8 @@ final class PcmOperationalRevisionTest extends TestCase
             $this->assertEqualsCanonicalizing($expected, $actual);
         }
         $counts = (new PcmIndicatorService())->calculate();
-        foreach (['safra_open' => 2, 'offseason_open' => 2, 'safra_completed' => 5,
-            'offseason_completed' => 5, 'open' => 4, 'completed' => 10, 'preventive' => 4,
+        foreach (['safra_open' => 2, 'offseason_open' => 5, 'safra_completed' => 5,
+            'offseason_completed' => 5, 'open' => 7, 'completed' => 10, 'preventive' => 7,
             'corrective' => 0, 'improvement' => 0, 'emergency' => 0, 'scheduled' => 0] as $key => $delta) {
             $this->assertSame($before[$key] + $delta, $counts[$key], $key);
         }

@@ -18,7 +18,7 @@ final class OrderListingService
         if ($export) $query = array_replace($query, ['page' => $exportPage ?? 1, 'limite' => \App\Service\StreamingXlsxReport::BATCH_SIZE]);
         $filters = [];
         foreach (['os', 'filial', 'bem', 'nome_bem', 'equipment_q', 'bem_filial', 'centro', 'centro_modo', 'area', 'servico', 'tipo',
-            'situacao', 'termino', 'date_start', 'date_end', 'historico', 'safra', 'analitico', 'unidade',
+            'situacao', 'termino', 'date_start', 'date_end', 'period_start', 'period_end', 'historico', 'safra', 'analitico', 'unidade',
             'card', 'card_status', 'backlog_age', 'q', 'status', 'service_name'] as $key) {
             $value = $query[$key] ?? '';
             if (!is_string($value) || strlen($value) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100)) {
@@ -26,6 +26,9 @@ final class OrderListingService
             }
             $filters[$key] = trim($value);
         }
+        $plannedPeriod = \App\Service\PcmPeriod::fromFilters([
+            'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
+        ]);
         $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
@@ -77,6 +80,7 @@ final class OrderListingService
         }
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 8, areaScope: $this->areaScope);
+            if ($plannedPeriod !== null) $repository = $repository->withPlannedPeriod($plannedPeriod);
             if ($drilldown) {
                 if ($filters['nome_bem'] !== '') $repository = $repository->withEquipmentSubstring($filters['nome_bem']);
                 $sector = (new ProtheusSectorService($repository))->load($filters['area'], [

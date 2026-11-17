@@ -13,11 +13,14 @@ class OrderDateFiltersTest extends TestCase
 {
     use PcmSnapshotFixture;
 
+    private int $currentImportId;
+
     protected function setUp(): void
     {
         parent::setUp();
         self::connection()->begin();
         $ids = self::seedValidatedSnapshot();
+        $this->currentImportId = $ids['currentImportId'];
         foreach (
             ['4001' => '2026-09-01 00:00:00', '4002' => '2026-09-30 23:59:59',
             '4003' => '2026-10-01 00:00:00', '4004' => null, '4005' => '2025-12-31 12:00:00',
@@ -25,7 +28,7 @@ class OrderDateFiltersTest extends TestCase
         ) {
             self::connection()->update(
                 'work_order_snapshots',
-                ['maintenance_planned_start' => $date],
+                ['maintenance_planned_start' => $date, 'general_actual_end' => $date, 'origin_date' => $date === null ? null : substr($date, 0, 10)],
                 ['report_import_id' => $ids['currentImportId'], 'source_order_number' => $number],
             );
         }
@@ -81,10 +84,9 @@ class OrderDateFiltersTest extends TestCase
         $this->assertNotContains('4372', $numbers); // Open in 2025 remains excluded.
         $this->assertNotContains('4530', $numbers); // Cancelled remains excluded.
         $service = new SectorDashboardService();
-        $this->assertSame(
-            $service->dashboard(null, [])['indicators'],
-            $service->dashboard(null, ['date_start' => '2026-09-01', 'date_end' => '2026-09-30'])['indicators'],
-        );
+        $period = ['date_start' => '2026-09-01', 'date_end' => '2026-09-30'];
+        $this->assertSame(2, $service->dashboard(null, $period)['indicators']['total']);
+        $this->assertSame($service->detailQuery(null, $period)->count(), $service->dashboard(null, $period)['indicators']['total']);
     }
 
     public function testInvalidDateRejected(): void
@@ -102,8 +104,8 @@ class OrderDateFiltersTest extends TestCase
     public function testFriendlyNamesPreserveCodesAndCustomNames(): void
     {
         foreach (
-            ['MECANI' => 'Mecânica', 'ELETRI' => 'Elétrica e Instrumentação', 'CALDEI' => 'Caldeiraria',
-            'INSTRU' => 'Instrumentação', 'OPERAC' => 'Operação', 'TERCEI' => 'Terceiros', 'USINAG' => 'Usinagem',
+            ['MECANI' => 'Mecânica', 'ELETRI' => 'Elétrica/Instrumentação', 'CALDEI' => 'Caldeiraria',
+            'INSTRU' => 'Elétrica/Instrumentação', 'OPERAC' => 'Operacional', 'TERCEI' => 'Terceiro', 'USINAG' => 'Usinagem',
             'LABORA' => 'Laboratório', 'MOEND' => 'Moenda'] as $code => $name
         ) {
             $area = new MaintenanceArea(['source_code' => $code, 'display_name' => $code]);
@@ -111,8 +113,41 @@ class OrderDateFiltersTest extends TestCase
             $this->assertSame($code, $area->source_code);
         }
         $area = new MaintenanceArea(['source_code' => 'MECANI', 'display_name' => 'Mecânica Industrial']);
-        $this->assertSame('Mecânica Industrial', $area->display_name);
+        $this->assertSame('Mecânica', $area->display_name);
         $options = (new SectorDashboardService())->dashboard(null, [])['options']['area'];
         $this->assertSame('Mecânica', array_column($options, 'label', 'value')['MECANI']);
+    }
+
+    public function testCompletedUsesOnlyRealEndWithInclusiveLastDayAndNoFallback(): void
+    {
+        foreach ([
+            '4001' => ['origin_date' => '2024-01-01', 'maintenance_planned_start' => '2024-02-01',
+                'general_actual_end' => '2026-09-30 23:59:59', 'maintenance_actual_end' => '2025-01-01'],
+            '4002' => ['origin_date' => '2026-09-10', 'maintenance_planned_start' => '2026-09-10',
+                'general_actual_end' => '2026-10-01 00:00:00'],
+            '4003' => ['origin_date' => '2026-09-10', 'maintenance_planned_start' => '2026-09-10',
+                'general_actual_end' => null, 'maintenance_actual_end' => '2026-09-15'],
+        ] as $number => $data) {
+            self::connection()->update('work_order_snapshots', $data,
+                ['report_import_id' => $this->currentImportId, 'source_order_number' => $number]);
+        }
+        $filters = ['date_start' => '2026-09-01', 'date_end' => '2026-09-30', 'q' => '400', 'status' => 'FECHADA'];
+        $this->assertSame(['4001'], $this->numbers($filters));
+        $service = new SectorDashboardService();
+        $counts = $service->dashboard(null, $service->filters($filters))['indicators'];
+        $this->assertSame(1, $counts['completed']);
+        $this->assertSame(1, $counts['safra_completed'] + $counts['offseason_completed']);
+    }
+
+    public function testOpenCohortUsesOriginAndNeverConclusionOrPlanning(): void
+    {
+        foreach (['4001' => '2026-09-10', '4002' => '2026-10-01'] as $number => $origin) {
+            self::connection()->update('work_order_snapshots', [
+                'treated_status' => 'EM ABERTO', 'origin_date' => $origin,
+                'maintenance_planned_start' => '2026-09-01', 'general_actual_end' => '2026-10-01',
+            ], ['report_import_id' => $this->currentImportId, 'source_order_number' => $number]);
+        }
+        $filters = ['date_start' => '2026-09-01', 'date_end' => '2026-09-30', 'q' => '400', 'status' => 'EM ABERTO'];
+        $this->assertSame(['4001'], $this->numbers($filters));
     }
 }

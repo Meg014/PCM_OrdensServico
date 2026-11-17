@@ -19,6 +19,6 @@ class MaintenanceAreaHelper extends Helper
                 ->combine('source_code', 'display_name')->toArray();
         }
 
-        return $this->names[$code] ?? MaintenanceAreasTable::FRIENDLY_NAMES[$code] ?? ($code ?: '—');
+        return MaintenanceAreasTable::FRIENDLY_NAMES[strtoupper(trim($code ?? ''))] ?? $this->names[$code] ?? ($code ?: '—');
     }
 }

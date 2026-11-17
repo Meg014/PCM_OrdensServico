@@ -51,15 +51,7 @@ final class OrderSupplementMapper
             'unit_name' => \App\Service\Protheus\ProtheusUnit::label($this->text($main['TJ_CCUSTO'] ?? null)),
             'cost_center_source_unit' => \App\Service\Protheus\ProtheusUnit::sourceGroup($this->text($main['TJ_CCUSTO'] ?? null)),
         ];
-        foreach (['planned_start' => ['TJ_DTMPINI', 'TJ_HOMPINI'],
-            'planned_end' => ['TJ_DTMPFIM', 'TJ_HOMPFIM'],
-            'actual_start' => ['TJ_DTMRINI', 'TJ_HOMRINI'],
-            'actual_end' => ['TJ_DTMRFIM', 'TJ_HOMRFIM'],
-            'general_planned_start' => ['TJ_DTPPINI', 'TJ_HOPPINI'],
-            'general_planned_end' => ['TJ_DTPPFIM', 'TJ_HOPPFIM'],
-            'general_actual_start' => ['TJ_DTPRINI', 'TJ_HOPRINI'],
-            'general_actual_end' => ['TJ_DTPRFIM', 'TJ_HOPRFIM'],
-        ] as $label => [$date, $time]) {
+        foreach (\App\Service\Protheus\OrderDates::FIELDS as $label => [$date, $time]) {
             $maintenance[$label . '_date'] = $this->date($main[$date] ?? null);
             $maintenance[$label . '_time'] = $this->time($main[$time] ?? null);
         }

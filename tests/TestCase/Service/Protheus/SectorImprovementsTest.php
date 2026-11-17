@@ -56,8 +56,8 @@ final class SectorImprovementsTest extends TestCase
             $sql = \App\Service\Protheus\EquipmentLookupQueries::withSubstring(SectorPresentationScope::period(SectorPresentationScope::areas($base)));
             self::assertTrue(ProtheusQueries::allows($sql));
             self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM dbo.STJ010'));
-            self::assertStringContainsString('n.planned_date >= TRY_CONVERT', $sql);
-            self::assertStringContainsString('n.planned_date <= TRY_CONVERT', $sql);
+            self::assertStringContainsString('n.indicator_date >= TRY_CONVERT', $sql);
+            self::assertStringContainsString('n.indicator_date <= TRY_CONVERT', $sql);
         }
     }
 

@@ -13,6 +13,9 @@ class MaintenanceArea extends Entity
     protected function _getDisplayName(?string $value): string
     {
         $code = (string)($this->_fields['source_code'] ?? '');
+        if (isset(\App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[strtoupper(trim($code))])) {
+            return \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[strtoupper(trim($code))];
+        }
         if (trim((string)$value) !== '' && strtoupper(trim($value)) !== strtoupper($code)) {
             return $value;
         }

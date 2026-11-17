@@ -39,7 +39,10 @@ WITH orders AS (
         FROM dbo.STL010 l
         WHERE l.TL_FILIAL = j.TJ_FILIAL AND l.TL_ORDEM = j.TJ_ORDEM AND l.D_E_L_E_T_ <> '*'
     ) a
-    WHERE j.TJ_SITUACA = 'L' AND j.TJ_TERMINO IN ('N', 'S')
+    WHERE (
+SQL
+        . ProtheusOperationalEligibility::OPEN . ') OR (' . ProtheusOperationalEligibility::CLOSED . <<<'SQL'
+)
 ), filtered AS (
     SELECT j.* FROM referenced j CROSS JOIN (SELECT CAST(:unidade AS varchar(10)) unidade) f
     WHERE j.reference_date >= CONVERT(date, :date_start, 23)

@@ -14,19 +14,19 @@ use RuntimeException;
 
 final class ProtheusDashboardTest extends TestCase
 {
-    public function testLiveSeasonalCardsUseOfficialBranchAndCodeInsteadOfDescription(): void
+    public function testLiveSeasonalCardsUseOnlyServiceName(): void
     {
         $calls = [];
         $rows = [$this->row('ELEPRE', 'PREVENTIVA ELETRICA', 2, 3),
             $this->row('X', 'Manutenção ENTRESSAFRA', 4, 5),
             $this->row('COREME', 'ENTRESSAFRA', 1, 0),
             $this->row('CORPRO', 'ENTRESSAFRA', 1, 0)];
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['filial' => '01', 'bem' => "X'; DELETE--"]);
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['filial' => '01', 'bem' => "X'; DELETE--", 'date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
-        self::assertSame(8, $result['indicators']['safra_open']);
-        self::assertSame(8, $result['indicators']['safra_completed']);
-        self::assertSame(0, $result['indicators']['offseason_open']);
-        self::assertSame(0, $result['indicators']['offseason_completed']);
+        self::assertSame(2, $result['indicators']['safra_open']);
+        self::assertSame(3, $result['indicators']['safra_completed']);
+        self::assertSame(6, $result['indicators']['offseason_open']);
+        self::assertSame(5, $result['indicators']['offseason_completed']);
         foreach (['preventive', 'corrective', 'improvement'] as $key) self::assertSame(0, $result['indicators'][$key]);
         foreach (['emergency', 'scheduled'] as $key) self::assertSame(1, $result['indicators'][$key]);
         self::assertCount(2, $result['screens']);
@@ -63,7 +63,7 @@ final class ProtheusDashboardTest extends TestCase
             $row['TJ_TIPO'] = $type;
             $rows[] = $row;
         }
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
         foreach ([$result['indicators'], $result['screens'][1]] as $counts) {
             self::assertSame(5, $counts['corrective']);
@@ -82,9 +82,10 @@ final class ProtheusDashboardTest extends TestCase
         self::assertTrue(ProtheusQueries::allows($sql));
         self::assertFalse(ProtheusQueries::allows($sql . '; DELETE FROM STJ010'));
         foreach (['TOP (2001)', "TJ_SITUACA = 'L' AND TJ_TERMINO = 'N'", '>= CONVERT(date, :cutoff, 112)',
-            "TJ_SITUACA = 'L' AND TJ_TERMINO = 'S'", "NULLIF(TJ_DTMPINI, '')", 'GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO',
+            \App\Service\Protheus\ProtheusOperationalEligibility::CLOSED, "NULLIF(TJ_DTMPINI, '')", 'GROUP BY TJ_FILIAL, TJ_CODAREA, TJ_SERVICO',
             's.T4_FILIAL = c.TJ_FILIAL', "s.T4_FILIAL = ''"] as $expected) self::assertStringContainsString($expected, $sql);
-        self::assertSame(3, substr_count($sql, "D_E_L_E_T_ <> '*'"));
+        self::assertSame(5, substr_count($sql, "D_E_L_E_T_ <> '*'"));
+        self::assertStringContainsString('offseason_active = 1', $sql);
         self::assertStringNotContainsString('STL010', $sql);
         self::assertStringNotContainsString('SELECT *', $sql);
     }
@@ -97,7 +98,7 @@ final class ProtheusDashboardTest extends TestCase
             $this->row('X', 'MANUTENCAO CORRETIVA EMERGENCIAL', 7, 0),
             $this->row('Y', 'MANUTENCAO CORRETIVA PROGRAMADA', 8, 0),
             $this->row('COREME', 'FORA DO ESCOPO DE ABERTAS', 0, 9)];
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
         self::assertSame(2, $result['indicators']['emergency']);
         self::assertSame(3, $result['indicators']['scheduled']);
@@ -110,7 +111,7 @@ final class ProtheusDashboardTest extends TestCase
             $row = $this->row('X', 'ENTRESSAFRA', 1, 0);
             if ($problem !== null) $row[$problem] = $problem === 'service_name' ? null : 2;
             $calls = [];
-            $result = (new ProtheusDashboardService($this->repository($problem === null ? null : [$row], $calls)))->load();
+            $result = (new ProtheusDashboardService($this->repository($problem === null ? null : [$row], $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
             self::assertFalse($result['available']);
             self::assertNull($result['record_count']);
             self::assertNull($result['queried_at']);
@@ -123,11 +124,11 @@ final class ProtheusDashboardTest extends TestCase
     public function testEmptyAndTruncatedAggregateAreDifferent(): void
     {
         $calls = [];
-        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
         self::assertSame(0, $result['indicators']['safra_open']);
         $rows = array_fill(0, 2001, $this->row('X', 'SERVICO', 1, 0));
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertFalse($result['available']);
     }
 
@@ -219,11 +220,29 @@ final class ProtheusDashboardTest extends TestCase
     public function testPresentationDoesNotQueryOrReturnDetailedAnalysis(): void
     {
         $calls = [];
-        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load([], false);
+        $result = (new ProtheusDashboardService($this->repository([], $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17'], false);
         self::assertTrue($result['available']);
         self::assertNull($result['analysis']);
         self::assertCount(1, $calls);
-        self::assertSame(ProtheusQueries::MANAGEMENT, $calls[0][0]);
+        self::assertSame(ProtheusQueries::MANAGEMENT, \App\Service\Protheus\SectorPresentationScope::withoutDashboardPeriod($calls[0][0]));
+    }
+
+    public function testNoPeriodShowsAllClosedCountsWithoutChangingOpenPortfolio(): void
+    {
+        $calls = [];
+        $result = (new ProtheusDashboardService($this->repository([
+            $this->row('ESMECA', 'ENTRESSAFRA', 5, 100),
+        ], $calls)))->load([], false);
+        self::assertTrue($result['available']);
+        self::assertFalse($result['historical']);
+        self::assertSame('unbounded', $result['period_mode']);
+        self::assertSame('', $result['filters']['date_start']);
+        self::assertNull($result['period']);
+        self::assertSame(5, $result['indicators']['offseason_open']);
+        self::assertSame(100, $result['indicators']['offseason_completed']);
+        self::assertSame(0, $result['screens'][0]['safra_completed']);
+        self::assertArrayNotHasKey('dashboard_start', $calls[0][1]);
+        self::assertStringNotContainsString('TJ_DTPRFIM', $calls[0][0]);
     }
 
     public function testRemovedCostCenterRankingRowsAreIgnored(): void
@@ -243,7 +262,7 @@ final class ProtheusDashboardTest extends TestCase
             ['dimension' => 'status', 'code' => 'open', 'branch' => '', 'quantity' => 3,
                 'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0],
         ];
-        $result = (new ProtheusDashboardService($this->repository([], $calls, $analysis)))->load();
+        $result = (new ProtheusDashboardService($this->repository([], $calls, $analysis)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
         self::assertSame([], $result['analysis']['costCenters']);
     }
@@ -261,21 +280,21 @@ final class ProtheusDashboardTest extends TestCase
         $nullArea['TJ_CODAREA'] = null;
         $rows[] = $nullArea;
 
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load([], false);
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17'], false);
 
         self::assertTrue($result['available']);
         self::assertSame(10, $result['indicators']['safra_open']);
         self::assertSame(
             [
                 'general', 'area:ELETRI', 'area:MECANI', 'area:CALDEI',
-                'area:USINAG', 'area:INSTRU', 'area:DESTIL', 'area:OUTRA',
+                'area:USINAG', 'area:DESTIL', 'area:OUTRA',
             ],
             array_column($result['screens'], 'key'),
         );
         self::assertSame(
             [
-                'PCM - VISÃO GERAL', 'PCM - ELÉTRICA E INSTRUMENTAÇÃO', 'PCM - MECÂNICA', 'PCM - CALDEIRARIA',
-                'PCM - USINAGEM', 'PCM - INSTRUMENTAÇÃO', 'PCM - DESTILARIA', 'PCM - OUTRA',
+                'PCM - VISÃO GERAL', 'PCM - ELÉTRICA/INSTRUMENTAÇÃO', 'PCM - MECÂNICA', 'PCM - CALDEIRARIA',
+                'PCM - USINAGEM', 'PCM - DESTILARIA', 'PCM - OUTRA',
             ],
             array_column($result['screens'], 'title'),
         );
@@ -287,7 +306,7 @@ final class ProtheusDashboardTest extends TestCase
         $calls = [];
         $incomplete = [['dimension' => 'total', 'code' => '', 'branch' => '', 'quantity' => 1,
             'identity_count' => 1, 'equipment_name' => null, 'equipment_matches' => 0]];
-        $result = (new ProtheusDashboardService($this->repository([], $calls, $incomplete)))->load();
+        $result = (new ProtheusDashboardService($this->repository([], $calls, $incomplete)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertFalse($result['available']);
         self::assertNull($result['analysis']);
     }
@@ -307,7 +326,7 @@ final class ProtheusDashboardTest extends TestCase
             $this->row('MECOP', 'CÓDIGO ANTIGO', 10, 0),
             $this->row('X', 'PARADAS POR OPORTUNIDADE', 9, 0),
             $this->row('MECOPO', 'CANCELADA OU FORA DO CORTE', 0, 0)];
-        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load();
+        $result = (new ProtheusDashboardService($this->repository($rows, $calls)))->load(['date_start' => '2026-01-01', 'date_end' => '2026-11-17']);
         self::assertTrue($result['available']);
         self::assertSame(15, $result['indicators']['opportunity']);
         self::assertSame(15, $result['screens'][1]['opportunity']);
@@ -328,7 +347,7 @@ final class ProtheusDashboardTest extends TestCase
             $calls[] = [$sql, $params, $types];
             if ($rows === null) throw new RuntimeException('SQLSTATE host user password');
             $statement = $this->createMock(StatementInterface::class);
-            $statement->method('fetchAll')->willReturn($sql === ProtheusQueries::dashboardAnalysis() ? $analysisRows : $rows);
+            $statement->method('fetchAll')->willReturn(\App\Service\Protheus\SectorPresentationScope::withoutDashboardPeriod($sql) === ProtheusQueries::dashboardAnalysis() ? $analysisRows : $rows);
             $statement->expects(self::once())->method('closeCursor');
             return $statement;
         });

@@ -12,7 +12,7 @@ $firstScreen = $payload['screens'][0];
 <section
     class="pcm-presentation"
     data-pcm-presentation
-    data-presentation-url="<?= h($this->Url->build(['_name' => 'pcm-presentation-legacy-data'])) ?>"
+    data-presentation-url="<?= $this->Url->build(['_name' => 'pcm-presentation-legacy-data', '?' => ($payload['period_mode'] ?? '') === 'manual' ? array_intersect_key($payload['period'], array_flip(['date_start', 'date_end'])) : []]) ?>"
     <?php if (!$isTv): ?>data-exit-url="<?= h($this->Url->build(['_name' => 'pcm'])) ?>"<?php endif; ?>
 >
     <header class="pcm-presentation-header">
@@ -28,13 +28,14 @@ $firstScreen = $payload['screens'][0];
         <?= $this->Form->postLink('Logout', '/logout', ['class' => 'btn btn-sm btn-outline-secondary']) ?>
         <?php endif; ?>
     </header>
+    <p class="text-body-secondary"><?= empty($payload['period']) ? 'Sem filtro de período: todas as fechadas não canceladas do conjunto consultado.' : h('Período manual: ' . $payload['period']['date_start'] . ' a ' . $payload['period']['date_end'] . ' · Fechadas por data geral TJ_DTPRFIM; abertas por origem.') ?></p>
 
     <div class="pcm-presentation-cards" aria-live="polite">
         <?php foreach (['safra' => 'SAFRA', 'offseason' => 'ENTRESSAFRA'] as $season => $label): ?>
         <?php foreach (['open' => 'O.S. EM ABERTO', 'completed' => 'O.S. FECHADAS'] as $status => $statusLabel): $key = $season . '_' . $status; ?>
         <article class="pcm-presentation-card pcm-presentation-<?= h($status) ?>">
             <p><?= h($label . ' — ' . $statusLabel) ?></p>
-            <strong data-presentation-<?= h($key) ?>><?= number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong>
+            <strong data-presentation-<?= h($key) ?>><?= $firstScreen[$key] === null ? '—' : number_format((int)$firstScreen[$key], 0, ',', '.') ?></strong>
         </article>
         <?php endforeach; endforeach; ?>
     </div>

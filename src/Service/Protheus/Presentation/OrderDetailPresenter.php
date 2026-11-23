@@ -38,8 +38,9 @@ final class OrderDetailPresenter
             $availability = Availability::Unavailable;
         }
         $available = $availability === Availability::Available;
-        $executionIdentity = $available ? $supplement->maintenance + ['branch' => $supplement->branch] : [];
-        $checklist = $available && \App\Service\Protheus\RouteChecklist::isOrder($executionIdentity);
+        $executionIdentity = $available ? $supplement->maintenance + ['branch' => $supplement->branch, 'original_description' => $supplement->description] : [];
+        if (($executionIdentity['ending'] ?? null) === null) unset($executionIdentity['ending']);
+        $execution = $available ? \App\Service\Protheus\ExecutedServicePresentation::resolve($supplement->executedService, $executionIdentity) : null;
 
         return [
             'pcm' => $pcm,
@@ -56,16 +57,26 @@ final class OrderDetailPresenter
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? \App\Service\Protheus\OrderDescriptions::forOrder($supplement->description,
                     $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
-                'original_description' => $available ? \App\Service\Protheus\OrderDescriptions::forOrder($supplement->description,
-                    $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
-                'executed_service' => $available ? \App\Service\Protheus\ExecutedServicePresentation::display($supplement->executedService, $executionIdentity) : null,
-                'executed_service_available' => $available && ($checklist || $supplement->executedServiceAvailable),
+                'original_description' => $available ? $supplement->description : null,
+                'executed_service' => $execution['text'] ?? null,
+                'executed_service_source' => $execution['source'] ?? null,
+                'executed_service_source_label' => $execution['source_label'] ?? null,
+                'executed_service_derived' => $execution['derived'] ?? false,
+                'executed_service_available' => $available && ($supplement->executedServiceAvailable || ($execution['derived'] ?? false)),
+                'execution_history' => $available && $supplement->executedServiceAvailable ? $supplement->executedService : null,
+                'order_status' => $execution['status'] ?? null,
+                'cancellation' => ($execution['status'] ?? '') === 'CANCELADA' ? ($supplement->cancellation ?: [
+                    'reason' => null, 'message' => 'Motivo do cancelamento não informado no TOTVS.',
+                    'user' => null, 'date' => null, 'time' => null,
+                    'source' => 'Sem campos de cancelamento confirmados na fonte atual',
+                ]) : null,
                 'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
                     static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
                 )), ['text', 'source']) : [],
                 'task_activities' => $available ? $supplement->taskActivities : OrderTaskActivities::present([], '', '', false),
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
                     'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center', 'unit_name', 'cost_center_source_unit',
+                    'initial_user', 'ending_user', 'update_user', 'situation', 'ending',
                     'planned_start_date', 'planned_start_time', 'planned_end_date', 'planned_end_time',
                     'actual_start_date', 'actual_start_time', 'actual_end_date', 'actual_end_time',
                     'general_planned_start_date', 'general_planned_start_time', 'general_planned_end_date', 'general_planned_end_time',

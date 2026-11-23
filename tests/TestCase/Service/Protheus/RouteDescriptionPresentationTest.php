@@ -60,7 +60,7 @@ final class RouteDescriptionPresentationTest extends TestCase
                 $row = $i + 9;
                 self::assertSame($i === 3 ? 'Trocar correia' : 'ROTA 07 - RECEPÇÃO', (string)$sheet->getCell('H' . $row)->getValue());
                 self::assertSame($order['tasks'], (string)$sheet->getCell('L' . $row)->getValue());
-                self::assertSame('Execução independente', (string)$sheet->getCell('M' . $row)->getValue());
+                self::assertSame('SERVIÇO EM ANDAMENTO', (string)$sheet->getCell('M' . $row)->getValue());
                 self::assertSame('Aberta', (string)$sheet->getCell('N' . $row)->getValue());
                 self::assertSame('Trocar correia', $order['description']);
             }

@@ -13,6 +13,7 @@ use DateTimeZone;
 final class OrderStreamingExport
 {
     private const FILTER_LABELS = [
+        'initial_user' => 'Usuário de início (TJ_USUAINI)', 'order_status' => 'Situação',
         'os' => 'Número da OS', 'filial' => 'Filial', 'bem' => 'Equipamento', 'equipment' => 'Equipamento',
         'nome_bem' => 'Nome do equipamento',
         'equipment_q' => 'Bem / Equipamento', 'bem_filial' => 'Filial do equipamento',
@@ -55,6 +56,7 @@ final class OrderStreamingExport
                 'equipment' => (new EquipmentHistoryService())->load($query, true, $page),
                 default => (new OrderListingService())->load($query, true, $page),
             };
+            if ($data['available'] && $context !== 'orders') $data['orders'] = (new \App\Service\Protheus\ProtheusRepository())->summarizeOrders($data['orders']);
             return ['available' => $data['available'], 'rows' => $data['orders'], 'has_more' => $data['has_more']];
         });
     }
@@ -77,6 +79,7 @@ final class OrderStreamingExport
                 $service = new OrderEntryExportService();
                 $data = $area === null ? $service->loadGeneral($query, $page) : $service->load($area, $query, $page);
             }
+            if ($data['available']) $data['entries'] = (new \App\Service\Protheus\ProtheusRepository())->summarizeOrders($data['entries']);
             return ['available' => $data['available'], 'rows' => $data['entries'], 'has_more' => $data['has_more']];
         });
     }
@@ -107,6 +110,17 @@ final class OrderStreamingExport
     private function unitColumns(): array
     {
         return [
+            'audit_status' => ['Situação normalizada da O.S.', 'text', 24, static fn($r) => $r['execution_summary']['status'] ?? 'DESCONHECIDA'],
+            'executed_summary' => ['Serviço Executado', 'text', 48, static fn($r) => $r['execution_summary']['text'] ?? 'Não informado'],
+            'execution_source' => ['Origem do Serviço Executado', 'text', 48, static fn($r) => $r['execution_summary']['source_label'] ?? 'Indisponível'],
+            'executed_service_original' => ['Apontamento original de execução (STQ)', 'text', 48],
+            'TJ_USUAINI' => ['Usuário de início (TOTVS)', 'text'],
+            'TJ_USUAFIM' => ['Usuário de fim (TOTVS)', 'text'],
+            'TJ_USUARIO' => ['Usuário de alteração (TOTVS)', 'text'],
+            'audit_closure_date' => ['Data real de fim (manutenção — TOTVS)', 'date', 24, static fn($r) => $r['TJ_DTMRFIM'] ?? null],
+            'audit_closure_time' => ['Hora real de fim (manutenção — TOTVS)', 'time', 24, static fn($r) => $r['TJ_HOMRFIM'] ?? null],
+            'audit_general_closure_date' => ['Data real de fim (geral — TOTVS)', 'date', 24, static fn($r) => $r['TJ_DTPRFIM'] ?? null],
+            'cancellation_reason' => ['Motivo de cancelamento', 'text', 48, static fn($r) => ($r['TJ_SITUACA'] ?? '') === 'C' ? ($r['cancellation']['reason'] ?? 'Motivo do cancelamento não informado no TOTVS.') : ''],
             'cost_center_unit_name' => ['Unidade da O.S.', 'text', 24, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::label($row['TJ_CCUSTO'] ?? null)],
             'cost_center_source_unit' => ['Classificação do centro de custo', 'text', 30, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::sourceGroup($row['TJ_CCUSTO'] ?? null)],
         ];

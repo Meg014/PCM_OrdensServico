@@ -156,6 +156,7 @@ final class ActionPlanExcelReport
             if ($orders !== []) {
                 $xml = $this->statusColors($zip, $xml, $last);
             }
+            $xml = ExcelAuditComments::attach($zip, $xml, $orders);
             if (!$zip->addFromString('xl/worksheets/sheet1.xml', $xml)) {
                 throw new DomainException('Não foi possível concluir o Excel.');
             }

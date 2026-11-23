@@ -24,8 +24,8 @@ final class OrderListingTest extends TestCase
         $result = $service->load(['os' => '004368', 'filial' => '01', 'page' => '2', 'limite' => '1']);
         self::assertTrue($result['available']);
         self::assertTrue($result['has_more']);
-        self::assertSame([['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'TJ_TIPO' => 'COR', 'descricao' => null]], $result['orders']);
-        self::assertCount(3, $calls);
+        self::assertSame([['TJ_ORDEM' => '004368', 'TJ_FILIAL' => '01', 'TJ_TIPO' => 'COR', 'descricao' => null]], array_map(static fn($r) => array_diff_key($r, array_flip(['original_description', 'executed_service_original', 'execution_summary'])), $result['orders']));
+        self::assertCount(5, $calls);
         self::assertSame(['offset' => 1, 'fetch' => 2, 'numero' => '004368', 'filial' => '01'], $calls[0][1]);
         self::assertSame('integer', $calls[0][2]['fetch']);
         self::assertSame('string', $calls[0][2]['numero']);
@@ -232,7 +232,7 @@ final class OrderListingTest extends TestCase
         $result = (new OrderListingService($this->repository($rows, $calls)))->load($filters + ['page' => 8, 'limite' => 1], true);
         self::assertTrue($result['available']);
         self::assertCount(483, $result['orders']);
-        self::assertCount(2, $calls);
+        self::assertCount(4, $calls);
         self::assertSame(0, $calls[0][1]['offset']);
         self::assertSame(1001, $calls[0][1]['fetch']);
         self::assertFalse($result['has_more']);
@@ -297,7 +297,7 @@ final class OrderListingTest extends TestCase
             $statement = $this->createMock(StatementInterface::class);
             $statement->method('fetchAll')->willReturn(str_starts_with($sql, 'SELECT COUNT_BIG(*) AS total')
                 ? [['total' => count($rows)]]
-                : ($sql === \App\Service\Protheus\OrderDescriptionQueries::BATCH ? [] : $rows));
+                : (in_array(\App\Service\Protheus\OrderAuditSelection::remove($sql), [\App\Service\Protheus\OrderDescriptionQueries::BATCH, \App\Service\Protheus\OrderAuditQueries::BATCH, \App\Service\Protheus\ActionPlanExecutionQuery::SQL], true) ? [] : $rows));
             $statement->expects(self::once())->method('closeCursor');
 
             return $statement;

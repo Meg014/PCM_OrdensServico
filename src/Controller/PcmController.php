@@ -223,10 +223,11 @@ final class PcmController extends AppController
             $listing = $service->load($this->request->getQueryParams());
             $areas = $listing['available'] ? $service->areas() : [];
             $checklistServices = $listing['available'] ? $service->checklistServices() : [];
+            $initialUsers = $listing['available'] ? $service->initialUsers() : [];
         } catch (InvalidArgumentException) {
             throw new BadRequestException('Filtros ou paginação inválidos.');
         }
-        $this->set(['listing' => $listing, 'areas' => $areas, 'checklistServices' => $checklistServices, 'navigationAreas' => []]);
+        $this->set(['listing' => $listing, 'areas' => $areas, 'checklistServices' => $checklistServices, 'initialUsers' => $initialUsers, 'navigationAreas' => []]);
         $this->response = $this->response->withHeader('Cache-Control', 'no-store');
     }
 

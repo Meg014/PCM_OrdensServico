@@ -27,6 +27,49 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private ?string $equipmentSubstring = null;
     private ?array $sectorPeriod = null;
     private ?array $plannedPeriod = null;
+    private array $auditSelection = [];
+
+    public function withAuditSelection(array $query): self
+    {
+        $copy = clone $this;
+        $copy->auditSelection = OrderAuditSelection::normalize($query);
+        return $copy;
+    }
+
+    public function initialUsers(): array
+    {
+        return $this->read(OrderAuditQueries::USERS);
+    }
+
+    /** Two bounded reads per batch; STQ originals and summary provenance stay separate. */
+    public function summarizeOrders(array $orders): array
+    {
+        if ($orders === []) return [];
+        $identities = []; $selected = [];
+        foreach ($orders as $row) {
+            $key = json_encode([(string)$row['TJ_FILIAL'], (string)$row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            $identities[$key] = ['branch' => (string)$row['TJ_FILIAL'], 'number' => (string)$row['TJ_ORDEM']];
+            $selected[$key] = $row;
+        }
+        foreach ($this->read(OrderAuditQueries::BATCH, ['identities' => json_encode(array_values($identities), JSON_THROW_ON_ERROR)]) as $row) {
+            $key = json_encode([(string)$row['TJ_FILIAL'], (string)$row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            if (isset($selected[$key])) $selected[$key] = array_replace($selected[$key], $row);
+        }
+        $executions = \App\Service\ActionPlanExecution::attach(array_values($identities), $this->actionPlanExecution(array_values($identities)));
+        foreach ($executions as $execution) {
+            $key = json_encode([$execution['branch'], $execution['number']], JSON_THROW_ON_ERROR);
+            $selected[$key]['executed_service_original'] = $execution['executed_service'];
+            $selected[$key]['execution_summary'] = ExecutedServicePresentation::resolve($execution['executed_service'],
+                $selected[$key] + ['original_description' => $selected[$key]['descricao'] ?? null]);
+            if (isset($selected[$key]['status'])) $selected[$key]['status'] = $selected[$key]['execution_summary']['status'];
+        }
+        foreach ($orders as &$row) {
+            $key = json_encode([(string)$row['TJ_FILIAL'], (string)$row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
+            $row = array_replace($row, $selected[$key]);
+        }
+        unset($row);
+        return $orders;
+    }
     private ?string $checklistService = null;
 
     public function withChecklistFilter(array $filters): self
@@ -189,6 +232,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
         foreach ($orders as &$order) {
             $key = json_encode([(string)$order['TJ_FILIAL'], (string)$order['TJ_ORDEM']], JSON_THROW_ON_ERROR);
             $source = $sources[$key] ?? [];
+            $order['original_description'] = $source['original'] ?? ($order['descricao'] ?? null);
             $order['descricao'] = OrderDescriptions::best($source['original'] ?? ($order['descricao'] ?? null),
                 $source['entries'] ?? [], $source['service'] ?? null);
         }
@@ -855,6 +899,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->auditSelection !== [] && ($this->auditSelection['order_status'] !== '' || $this->auditSelection['initial_user'] !== '')) {
+            $scoped = OrderAuditSelection::apply($sql, $this->auditSelection['order_status'], $this->auditSelection['initial_user'] !== '');
+            if ($scoped !== $sql) {
+                $sql = $scoped;
+                if ($this->auditSelection['initial_user'] !== '') $params['audit_initial_user'] = $this->auditSelection['initial_user'];
+            }
+        }
         if ($this->checklistService !== null) {
             $scoped = ChecklistServiceFilter::apply($sql);
             if ($scoped !== $sql) {

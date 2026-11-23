@@ -67,7 +67,7 @@ final class ActionPlanTest extends TestCase
             self::assertGreaterThan(40, $sheet->getColumnDimension('L')->getWidth());
             self::assertSame('B7:N9', $sheet->getAutoFilter()->getRange());
             self::assertSame('SERVIÇO EXECUTADO', (string)$sheet->getCell('M7')->getValue());
-            self::assertSame('Não informado', (string)$sheet->getCell('M9')->getValue());
+            self::assertSame('Planejado', (string)$sheet->getCell('M9')->getValue());
             self::assertTrue($sheet->getStyle('L9')->getAlignment()->getWrapText());
             self::assertSame('Finalizada', (string)$sheet->getCell('N9')->getValue());
         } finally { $book->disconnectWorksheets(); fclose($stream); }
@@ -183,10 +183,10 @@ final class ActionPlanTest extends TestCase
         self::assertTrue($original->open($this->template()) === true);
         self::assertTrue($output->open($path) === true);
         try {
-            self::assertSame($original->numFiles, $output->numFiles);
+            self::assertSame($original->numFiles + 2, $output->numFiles); // Provenance comments and their VML shapes.
             for ($i = 0; $i < $original->numFiles; $i++) {
                 $part = $original->getNameIndex($i);
-                if (!in_array($part, ['xl/worksheets/sheet1.xml', 'xl/styles.xml', 'xl/workbook.xml'], true)) {
+                if (!in_array($part, ['xl/worksheets/sheet1.xml', 'xl/styles.xml', 'xl/workbook.xml', '[Content_Types].xml', 'xl/worksheets/_rels/sheet1.xml.rels'], true)) {
                     self::assertSame($original->getFromName($part), $output->getFromName($part), $part);
                 }
             }

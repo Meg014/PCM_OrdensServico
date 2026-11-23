@@ -18,7 +18,7 @@ $areaName = static fn ($code) => \App\Model\Table\MaintenanceAreasTable::FRIENDL
 $statusName = static function (array $row): string {
     $situation = rtrim((string)($row['TJ_SITUACA'] ?? ''));
     $ending = rtrim((string)($row['TJ_TERMINO'] ?? ''));
-    if ($situation === 'L' && $ending === 'N') return 'Aberta';
+    if ($situation !== 'C' && $ending !== 'S') return 'Aberta';
     if (\App\Service\Protheus\ProtheusOperationalEligibility::isClosed($situation, $ending)) return 'Fechada';
     return ['C' => 'Cancelada', 'P' => 'Pendente'][$situation] ?? '—';
 };
@@ -69,9 +69,11 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
     'backlog_age', 'q', 'status', 'service_name', 'period_start', 'period_end'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
     'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $filters['unidade'] ?? '', 'class' => 'form-select']) ?></div>
-<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('situacao', ['label' => 'Situação', 'empty' => 'Não canceladas',
-    'options' => ['L' => 'Liberadas', 'P' => 'Pendentes', 'C' => 'Canceladas — histórico'],
-    'value' => $filters['situacao'] ?? '', 'class' => 'form-select']) ?></div>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('order_status', ['label' => 'Situação',
+    'options' => ['all' => 'Todas', 'open' => 'Abertas', 'closed' => 'Fechadas', 'cancelled' => 'Canceladas'],
+    'value' => ($filters['order_status'] ?? '') ?: 'all', 'class' => 'form-select']) ?></div>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('initial_user', ['label' => 'Usuário de início (TOTVS)',
+    'empty' => 'Todos', 'options' => $initialUsers ?? [], 'value' => $filters['initial_user'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($areaName($area)) ?></option><?php endforeach; ?>
@@ -106,7 +108,11 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
 <tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row]) ?></td>
-<td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?></td>
+<td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?>
+<?php if (isset($row['execution_summary'])): ?><details class="mt-2"><summary>Serviço Executado</summary>
+<p class="mb-1"><?= h($row['execution_summary']['text']) ?></p><small class="text-body-secondary"><?= h($row['execution_summary']['source_label']) ?></small>
+<?php if (($row['TJ_SITUACA'] ?? '') === 'C'): ?><p>Motivo do cancelamento não informado no TOTVS.</p><?php endif; ?>
+</details><?php endif; ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_start')[0])) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_end')[0])) ?></td>

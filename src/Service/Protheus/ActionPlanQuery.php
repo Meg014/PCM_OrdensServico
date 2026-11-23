@@ -26,6 +26,7 @@ SQL;
 WITH orders AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
         j.TJ_SITUACA, j.TJ_TERMINO, j.TJ_DTORIGI, j.TJ_OBSERVA,
+        j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO, j.TJ_DTMRFIM, j.TJ_HOMRFIM, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
         COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) identity_count
     FROM dbo.STJ010 j
     WHERE j.D_E_L_E_T_ <> '*'
@@ -39,10 +40,10 @@ WITH orders AS (
         FROM dbo.STL010 l
         WHERE l.TL_FILIAL = j.TJ_FILIAL AND l.TL_ORDEM = j.TJ_ORDEM AND l.D_E_L_E_T_ <> '*'
     ) a
-    WHERE (
+    WHERE
 SQL
-        . ProtheusOperationalEligibility::OPEN . ') OR (' . ProtheusOperationalEligibility::CLOSED . <<<'SQL'
-)
+        . ProtheusOperationalEligibility::notCanceled('j') . <<<'SQL'
+
 ), filtered AS (
     SELECT j.* FROM referenced j CROSS JOIN (SELECT CAST(:unidade AS varchar(10)) unidade) f
     WHERE j.reference_date >= CONVERT(date, :date_start, 23)
@@ -52,6 +53,7 @@ SQL
 
 )
 SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
+    j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO, j.TJ_DTMRFIM, j.TJ_HOMRFIM, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
     CONVERT(varchar(10), j.reference_date, 23) reference_date,
     CONVERT(varchar(max), j.TJ_OBSERVA) description,
     c.name cost_center_name, c.matches cost_center_matches,

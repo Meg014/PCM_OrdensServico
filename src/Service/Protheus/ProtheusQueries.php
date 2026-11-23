@@ -387,7 +387,7 @@ WITH filtered AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
         j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
         CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao, {$date} AS reference_date,
-        CASE WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
+        CASE WHEN j.TJ_SITUACA = 'C' THEN 'CANCELADA' WHEN j.TJ_TERMINO = 'S' THEN 'FECHADA' ELSE 'EM ABERTO' END AS status,
         COUNT_BIG(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) AS identity_count
     FROM dbo.STJ010 j
     CROSS JOIN (SELECT CAST(:numero AS VARCHAR(100)) numero, CAST(:filial AS VARCHAR(100)) filial,
@@ -524,6 +524,7 @@ SQL;
 
     public const ORDER = <<<'SQL'
 SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.TJ_CCUSTO,
+    j.TJ_SITUACA, j.TJ_TERMINO, j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO,
     j.TJ_DTORIGI, j.TJ_PLANO, j.TJ_SEQRELA,
     j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
     j.TJ_DTMRINI, j.TJ_HOMRINI, j.TJ_DTMRFIM, j.TJ_HOMRFIM,
@@ -584,6 +585,9 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        $withoutAudit = OrderAuditSelection::remove($sql);
+        if ($withoutAudit !== $sql) return self::allows($withoutAudit);
+        if (in_array($sql, [OrderAuditQueries::METADATA, OrderAuditQueries::USERS, OrderAuditQueries::USER_SAMPLE, OrderAuditQueries::BATCH], true)) return true;
         if ($sql === ChecklistServiceFilter::options()) return true;
         $withoutChecklist = ChecklistServiceFilter::remove($sql);
         if ($withoutChecklist !== $sql) {

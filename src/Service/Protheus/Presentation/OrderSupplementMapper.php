@@ -42,6 +42,11 @@ final class OrderSupplementMapper
 
         $main = $order['dados_principais'] ?? [];
         $maintenance = [
+            'situation' => $this->text($main['TJ_SITUACA'] ?? null),
+            'ending' => $this->text($main['TJ_TERMINO'] ?? null),
+            'initial_user' => $this->text($main['TJ_USUAINI'] ?? null),
+            'ending_user' => $this->text($main['TJ_USUAFIM'] ?? null),
+            'update_user' => $this->text($main['TJ_USUARIO'] ?? null),
             'equipment_code' => $this->text($main['TJ_CODBEM'] ?? null),
             'equipment_name' => $this->text($order['equipamento']['T9_NOME'] ?? null),
             'service_code' => $this->text($main['TJ_SERVICO'] ?? null),
@@ -67,6 +72,7 @@ final class OrderSupplementMapper
             descriptions: $this->descriptions($order['description_sources'] ?? []),
             executedService: (string)($order['executed_service'] ?? ''),
             executedServiceAvailable: ($order['executed_service_available'] ?? false) === true,
+            cancellation: $order['cancellation'] ?? [],
             taskActivities: OrderTaskActivities::present($order['task_activity_rows'] ?? [],
                 rtrim((string)($main['TJ_FILIAL'] ?? '')), rtrim((string)($order['numero'] ?? '')),
                 ($order['task_activities_available'] ?? false) === true),

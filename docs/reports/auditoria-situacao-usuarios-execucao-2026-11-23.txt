@@ -1,0 +1,120 @@
+PCM — Situação, usuários e serviço executado para auditoria
+Conferência: 23/11/2026. Integração somente leitura.
+
+REGRAS
+Cancelada prevalece sobre término S. Não cancelada com término S é fechada.
+Demais registros são abertos, inclusive pendentes sem término. Os critérios
+operacionais dos cards de backlog não foram alterados.
+O filtro da consulta geral oferece Todas, Abertas, Fechadas e Canceladas.
+Filtros antigos de situação permanecem compatíveis com links existentes.
+Paginação, contagem e exportações usam o mesmo escopo no SQL, antes de paginar.
+
+Serviço Executado é resolvido em ExecutedServicePresentation::resolve():
+- Aberta comum: SERVIÇO EM ANDAMENTO.
+- Aberta checklist: CHECKLIST EM ANDAMENTO.
+- Fechada com texto de execução válido: texto original, inclusive checklist.
+- Fechada comum sem execução: descrição original, com origem explícita.
+- Fechada checklist sem execução: CHECKLIST EXECUTADO, marcado como derivado.
+- Cancelada: execução real quando existente, ou Sem serviço executado registrado.
+Não se infere conclusão pela presença de apontamentos parciais.
+Situação desconhecida não autoriza padronizar checklist como executado.
+
+FONTES
+STJ010: TJ_FILIAL + TJ_ORDEM (identidade, preservando zeros), TJ_SITUACA,
+TJ_TERMINO, TJ_OBSERVA (descrição original), TJ_SERVICO, TJ_CODBEM, TJ_CODAREA,
+TJ_CCUSTO, TJ_USUAINI, TJ_USUAFIM e TJ_USUARIO.
+TJ_USUAINI: usuário de início, conforme título Usuário Ini. do CSV fornecido.
+TJ_USUARIO: usuário de alteração, conforme título Usuário Alt. do CSV.
+TJ_USUAFIM: usuário de fim; não é reinterpretado como usuário de cancelamento.
+O nome já está armazenado nesses campos. Não foi inventada relação com SYS_USR.
+Não há comprovação, na fonte consultada, de que usuário de início seja autor
+imutável da criação. O filtro se chama Usuário de início (TOTVS).
+
+STQ010.TQ_OBSERVA: texto real de execução, convertido de binário para texto.
+Identidade da observação preserva filial, O.S., plano, tarefa, sequências,
+etapa e R_E_C_N_O_. A consulta existente mantém registros não excluídos.
+STL010: apontamentos, profissionais, datas, horas, materiais e quantidades.
+ST4010: cadastro de serviços. ST9010: cadastro de bens.
+Datas/horas de fim: TJ_DTMRFIM/TJ_HOMRFIM e TJ_DTPRFIM/TJ_HOPRFIM.
+Datas de planejamento não substituem os campos reais de encerramento.
+
+CANCELAMENTO E LIMITAÇÕES
+Não foram encontrados campos próprios de motivo, usuário, data ou hora de
+cancelamento na STJ010 visível. TJ_MOTREPR refere-se à reprogramação: não foi
+usado como motivo de cancelamento. TJ_OBSERVA não foi usado como motivo.
+Mensagem apresentada: Motivo do cancelamento não informado no TOTVS.
+Dados confirmados de cancelamento podem ser transportados separadamente pelo
+adaptador; o teste com motivo usa uma fonte simulada, não um registro real.
+Não há campo confirmado de justificativa específica de encerramento.
+SYS_USR e dicionário SX3 não apareceram nos metadados acessíveis. Para mapear
+eventos de cancelamento/encerramento com autoria e instante, será necessário
+confirmar o dicionário e a trilha de auditoria/histórico habilitada com o
+administrador do Protheus. Uma tabela de histórico não pode ser nomeada com
+segurança com a visibilidade atual; STJ020/STJ060 não foram tratados como logs.
+Carimbos de alteração não foram reinterpretados como eventos de cancelamento.
+
+RASTREABILIDADE E EXPORTAÇÕES
+Texto resumido, código de origem, descrição da origem e indicador derivado
+ficam separados do texto original de execução. O detalhe permite consultar os
+apontamentos originais mesmo quando o resumo é EM ANDAMENTO.
+Exportações gerais acrescentam origem, texto original, usuários e campos reais
+de fim. Arquivos continuam processados por lotes, sem teto total arbitrário.
+Plano de Ação preserva uma aba, layout e colunas, inclusive K (O.S.), L
+(Tarefas Apontadas), M (Serviço Executado) e N (Status). Notas de M informam
+origem, filial, número e metadados de fim disponíveis; cancelamento, quando
+selecionado explicitamente, tem nota própria, sem usar a descrição como motivo.
+O Plano aceita filtros opcionais order_status e initial_user. Por padrão,
+canceladas ficam fora do Plano; pendentes não terminadas são abertas.
+Nenhum texto derivado é gravado no TOTVS ou convertido em apontamento real.
+
+CONFERÊNCIA DIRETA NO PROTHEUS
+Todas: 7.861; abertas: 1.763; fechadas: 5.082; canceladas: 1.016.
+A soma das três situações coincide com Todas.
+Detalhe da cancelada 006371 preservou CANCELADA e informou ausência de motivo.
+Foram identificados oito usuários de início.
+Filtro combinado de usuário + área + período: 1.689 O.S.; Excel consultado em
+dois lotes de 1.000 e 689 registros, sem perda. Primeiro lote de apontamentos:
+1.000 registros. Todos os usuários de início conferidos com o filtro.
+Scripts de diagnóstico: tmp/inspect-order-audit.php e
+tmp/validate-order-audit-live.php (SELECT somente; resultados dependem da data).
+
+TESTES
+Suíte Protheus: 156 testes; controllers de acesso/detalhes: 14 testes.
+Plano de Ação e exportações: 37 testes (com sobreposição de casos Protheus).
+Validações de auditoria/datas: 15 testes. Interface JS: nove testes.
+Cobertura: abertas comuns/checklist, fechadas com/sem execução, canceladas,
+motivo simulado e ausente, cancelamento prevalecendo sobre término S, usuário
+de início diferente de alteração, filtros combinados, SQL allowlist, lotes,
+zeros à esquerda, fallback, origem nas notas do Excel e preservação do modelo.
+Aviso preexistente do ambiente: extensão openssl carregada duas vezes.
+
+ARQUIVOS DE IMPLEMENTAÇÃO
+src/Controller/PcmController.php
+src/Service/ActionPlanExcelReport.php
+src/Service/ActionPlanService.php
+src/Service/ExcelAuditComments.php (novo)
+src/Service/OrderStreamingExport.php
+src/Service/Protheus/ActionPlanQuery.php
+src/Service/Protheus/ExecutedServicePresentation.php
+src/Service/Protheus/OrderAuditQueries.php (novo)
+src/Service/Protheus/OrderAuditSelection.php (novo)
+src/Service/Protheus/OrderEntryExportService.php
+src/Service/Protheus/OrderListingService.php
+src/Service/Protheus/Presentation/OrderDetailPresenter.php
+src/Service/Protheus/Presentation/OrderSupplement.php
+src/Service/Protheus/Presentation/OrderSupplementMapper.php
+src/Service/Protheus/ProtheusQueries.php
+src/Service/Protheus/ProtheusRepository.php
+templates/Pcm/orders.php
+webroot/js/pcm-protheus-order.js
+
+ARQUIVOS DE TESTE
+tests/TestCase/Service/ActionPlanObservationTest.php
+tests/TestCase/Service/ActionPlanTest.php
+tests/TestCase/Service/OrderStreamingExportTest.php
+tests/TestCase/Service/Protheus/ExecutedServicePresentationTest.php
+tests/TestCase/Service/Protheus/OrderAuditPresentationTest.php (novo)
+tests/TestCase/Service/Protheus/OrderDescriptionPresentationTest.php
+tests/TestCase/Service/Protheus/OrderListingTest.php
+tests/TestCase/Service/Protheus/RouteDescriptionPresentationTest.php
+tests/js/pcm-protheus-order.test.cjs

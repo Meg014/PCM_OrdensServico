@@ -97,6 +97,21 @@ test('execution section shows empty text fallback and safely handles unavailable
     }
 });
 
+test('audit summary keeps original partial notes, users and provenance separate', async () => {
+    const payload = {...detail, executed_service: 'CHECKLIST EM ANDAMENTO', executed_service_available: true,
+        executed_service_source_label: 'Texto derivado da situação da O.S.', execution_history: 'Apontamento parcial <b>original</b>',
+        order_status: 'EM ABERTO', maintenance: {...detail.maintenance, initial_user: 'Inicio', update_user: 'Alteracao'}};
+    const h = harness(() => ok({detail: payload, history}));
+    await tick();
+    assert.ok(h.targets.detail.textContent.includes('CHECKLIST EM ANDAMENTO'));
+    assert.ok(h.targets.detail.textContent.includes('Texto derivado da situação'));
+    assert.ok(h.targets.detail.textContent.includes('Apontamento parcial <b>original</b>'));
+    assert.ok(h.targets.detail.textContent.includes('Inicio'));
+    assert.ok(h.targets.detail.textContent.includes('Alteracao'));
+    assert.equal(all(h.targets.detail).some(el => el.tag === 'b'), false);
+    assert.equal(h.calls.length, 1);
+});
+
 test('renders text safely, preserves multiple entries and loads only requested history/detail', async () => {
     const h = harness(url => ok(url.searchParams.get('part') === 'history'
         ? {history: {...history, page: 2}} : {detail, history}));

@@ -79,6 +79,20 @@
         executionBody.style.whiteSpace = 'pre-wrap';
         executionBody.style.overflowWrap = 'anywhere';
         execution.append(executionBody);
+        if (data.executed_service_source_label) execution.append(node('small', data.executed_service_source_label, 'text-body-secondary d-block'));
+        if (data.execution_history && data.execution_history !== data.executed_service) {
+            const historyText = node('details', undefined, 'mt-2');
+            historyText.append(node('summary', 'Apontamentos originais de execução no TOTVS'));
+            const originalExecution = node('p', data.execution_history);
+            originalExecution.style.whiteSpace = 'pre-wrap';
+            historyText.append(originalExecution);
+            execution.append(historyText);
+        }
+        if (data.cancellation) {
+            execution.append(node('p', data.cancellation.reason || data.cancellation.message, 'mt-2'));
+            const cancellationContext = [data.cancellation.user, data.cancellation.date, data.cancellation.time].filter(Boolean);
+            if (cancellationContext.length) execution.append(node('small', cancellationContext.join(' · '), 'text-body-secondary d-block'));
+        }
         card.append(execution);
         if (data.original_description) {
             const original = node('details', undefined, 'mb-3');
@@ -91,6 +105,10 @@
         }
         const list = node('dl');
         const fields = [
+            ['Situação da O.S.', value(data.order_status)],
+            ['Usuário de início (TJ_USUAINI)', value(m.initial_user)],
+            ['Usuário de fim (TJ_USUAFIM)', value(m.ending_user)],
+            ['Usuário de alteração (TJ_USUARIO)', value(m.update_user)],
             ['Data de origem', date(data.origin_date)],
             ['Equipamento', codeName(m.equipment_code, m.equipment_name)],
             ['Serviço', codeName(m.service_code, m.service_name)],

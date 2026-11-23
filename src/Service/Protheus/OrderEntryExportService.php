@@ -80,6 +80,7 @@ final class OrderEntryExportService
             $filters[$key] = trim($value);
         }
         $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
+        $filters += OrderAuditSelection::normalize($query);
         $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
@@ -105,7 +106,7 @@ final class OrderEntryExportService
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
         if ($filters['card'] !== '' || $filters['backlog_age'] !== '') {
             if ($filters['area'] === '') throw new InvalidArgumentException('Setor do drill-down inválido.');
-            $scopedRepository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withChecklistFilter($filters);
+            $scopedRepository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withChecklistFilter($filters)->withAuditSelection($filters);
             $service = $filters['nome_bem'] === '' ? new self($scopedRepository) : new self(
                 $scopedRepository->withEquipmentSubstring($filters['nome_bem']),
             );
@@ -132,7 +133,7 @@ final class OrderEntryExportService
             $repository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withPlannedPeriod([
                 'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
             ]);
-            $repository = $repository->withChecklistFilter($filters);
+            $repository = $repository->withChecklistFilter($filters)->withAuditSelection($filters);
             $data = $repository->generalEntries($params, $page, $limit);
             return ['available' => true, 'filters' => $filters] + $data;
         } catch (Throwable) {

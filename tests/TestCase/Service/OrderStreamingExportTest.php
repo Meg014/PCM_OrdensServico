@@ -20,6 +20,8 @@ final class OrderStreamingExportTest extends TestCase
             'TJ_ORDEM', 'descricao', 'TJ_CODBEM', 'equipment_name', 'TJ_SERVICO', 'service_name',
             'TJ_TIPO', 'TJ_CODAREA', 'TJ_CCUSTO', 'situation_label', 'finished_label',
             'TJ_DTORIGI', 'actual_start', 'actual_end',
+            'audit_status', 'executed_summary', 'execution_source', 'executed_service_original',
+            'TJ_USUAINI', 'TJ_USUAFIM', 'TJ_USUARIO', 'audit_closure_date', 'audit_closure_time', 'audit_general_closure_date', 'cancellation_reason',
             'cost_center_unit_name', 'cost_center_source_unit',
         ], array_keys($columns));
         self::assertArrayNotHasKey('TJ_FILIAL', $columns);

@@ -21,11 +21,11 @@ final class ExecutedServicePresentationTest extends TestCase
     {
         return [
             ['PREVMEC FAB 01', 'MECANI', '', ExecutedServicePresentation::CHECKLIST],
-            ['PREVLUB FAB 02', 'MECANI', 'ROTA DE LUBRIFICAÇÃO', ExecutedServicePresentation::CHECKLIST],
-            ['PREVELE FAB 01', 'INSTRU', "Conexões reapertadas.\nTexto original  ", ExecutedServicePresentation::CHECKLIST],
+            ['PREVLUB FAB 02', 'MECANI', 'ROTA DE LUBRIFICAÇÃO', 'ROTA DE LUBRIFICAÇÃO'],
+            ['PREVELE FAB 01', 'INSTRU', "Conexões reapertadas.\nTexto original  ", "Conexões reapertadas.\nTexto original  "],
             ['BOMBA 01', 'MECANI', 'FOI FEITA A LIMPEZA NA UTE NOVA', 'FOI FEITA A LIMPEZA NA UTE NOVA'],
             ['BOMBA 02', 'MECANI', 'FOI FEITA A ATUALIZAÇÃO DO PATRIMÔNIO', 'FOI FEITA A ATUALIZAÇÃO DO PATRIMÔNIO'],
-            ['BOMBA 03', 'MECANI', '', OrderDescriptions::MISSING],
+            ['BOMBA 03', 'MECANI', '', 'Descrição original'],
         ];
     }
 
@@ -35,8 +35,8 @@ final class ExecutedServicePresentationTest extends TestCase
         foreach ($this->scenarios() as $i => [$equipment, $area, $text, $expected]) {
             $number = '00000' . $i;
             $main = ['TJ_FILIAL' => '01', 'TJ_ORDEM' => $number, 'TJ_CODBEM' => $equipment,
-                'TJ_CODAREA' => $area, 'TJ_SERVICO' => 'PREELE', 'TJ_CCUSTO' => '5101006', 'TJ_TERMINO' => 'N'];
-            $source = ['numero' => $number, 'dados_principais' => $main, 'executed_service' => $text, 'executed_service_available' => true,
+                'TJ_CODAREA' => $area, 'TJ_SERVICO' => 'PREELE', 'TJ_CCUSTO' => '5101006', 'TJ_TERMINO' => 'S'];
+            $source = ['numero' => $number, 'dados_principais' => $main, 'executed_service' => $text, 'executed_service_available' => true, 'original_description' => 'Descrição original',
                 'mao_de_obra' => [['apontamento' => ['TL_TIPOREG' => 'M', 'pcm_entry_description' => $text]]]];
             $before = $source;
             $supplement = (new OrderSupplementMapper())->map($source);
@@ -87,7 +87,7 @@ final class ExecutedServicePresentationTest extends TestCase
     public function testAuditedServiceIdentitiesAreRecognizedWithoutAreaAndWithoutNotes(): void
     {
         foreach (require ROOT . '/resources/data/action-plan-factory-routes.php' as $route) {
-            $order = ['branch' => $route['branch'], 'equipment_code' => $route['equipment'],
+            $order = ['TJ_TERMINO' => 'S', 'branch' => $route['branch'], 'equipment_code' => $route['equipment'],
                 'cost_center' => $route['cost_center'], 'service_code' => $route['service']];
             self::assertSame(ExecutedServicePresentation::CHECKLIST, ExecutedServicePresentation::display(null, $order));
             $order['service_code'] = 'OUTRO';
@@ -99,13 +99,13 @@ final class ExecutedServicePresentationTest extends TestCase
     {
         foreach (['PREVMEC FAB 01' => true, 'BOMBA 01' => false] as $equipment => $checklist) {
             $source = ['numero' => '000001', 'dados_principais' => ['TJ_FILIAL' => '01',
-                'TJ_CODBEM' => $equipment, 'TJ_CODAREA' => 'MECANI'], 'executed_service_available' => false];
+                'TJ_CODBEM' => $equipment, 'TJ_CODAREA' => 'MECANI', 'TJ_TERMINO' => 'N'], 'executed_service_available' => false];
             $supplement = (new OrderSupplementMapper())->map($source);
             $presenter = new OrderDetailPresenter();
             $snapshot = ['source_order_number' => '000001', 'branch_code' => '01'];
             $detail = $presenter->present($snapshot, $supplement, Availability::Available)['protheus'];
-            self::assertSame($checklist, $detail['executed_service_available']);
-            self::assertSame($checklist ? ExecutedServicePresentation::CHECKLIST : OrderDescriptions::MISSING, $detail['executed_service']);
+            self::assertTrue($detail['executed_service_available']);
+            self::assertSame($checklist ? 'CHECKLIST EM ANDAMENTO' : 'SERVIÇO EM ANDAMENTO', $detail['executed_service']);
             $unavailable = $presenter->present($snapshot, $supplement, Availability::Unavailable)['protheus'];
             self::assertNull($unavailable['executed_service']);
             self::assertFalse($unavailable['executed_service_available']);

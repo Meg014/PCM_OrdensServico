@@ -41,6 +41,7 @@ final class ActionPlanService
         $unit = ProtheusUnit::validate($query['unidade'] ?? ProtheusUnit::ALL);
         $started = hrtime(true);
         $repository = $this->repository ?? new ProtheusRepository();
+        if (isset($query['order_status']) || isset($query['initial_user'])) $repository = $repository->withAuditSelection($query);
         $rows = $repository->actionPlan($period['date_start'], $period['date_end'], $unit);
         \Cake\Log\Log::info('ActionPlan stage=query ms=' . round((hrtime(true) - $started) / 1e6, 1) . ' rows=' . count($rows));
         $started = hrtime(true);
@@ -78,9 +79,13 @@ final class ActionPlanService
                     'maintenance_area_code' => trim((string)($row['TJ_CODAREA'] ?? '')),
                     'cost_center_code' => trim((string)($row['TJ_CCUSTO'] ?? '')),
                     'service_code' => trim((string)($row['TJ_SERVICO'] ?? '')),
+                    'TJ_SITUACA' => $row['TJ_SITUACA'] ?? null,
+                    'TJ_TERMINO' => $row['TJ_TERMINO'] ?? null,
+                    'original_description' => $row['description'] ?? null,
+                    'closure_metadata' => array_intersect_key($row, array_flip(['TJ_USUAINI', 'TJ_USUAFIM', 'TJ_USUARIO', 'TJ_DTMRFIM', 'TJ_HOMRFIM', 'TJ_DTPRFIM', 'TJ_HOPRFIM'])),
                     'description' => $this->descriptionText($row['description'] ?? null),
                     'service' => trim((string)$row['service_name']),
-                    'status' => \App\Service\Protheus\ProtheusOperationalEligibility::isClosed($row['TJ_SITUACA'] ?? null, $row['TJ_TERMINO']) ? 'Finalizada' : 'Aberta',
+                    'status' => trim((string)($row['TJ_SITUACA'] ?? '')) === 'C' ? 'Cancelada' : (\App\Service\Protheus\ProtheusOperationalEligibility::isClosed($row['TJ_SITUACA'] ?? null, $row['TJ_TERMINO']) ? 'Finalizada' : 'Aberta'),
                     'mechanics' => '',
                 ];
             }

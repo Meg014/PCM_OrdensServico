@@ -27,6 +27,7 @@ final class OrderListingService
             $filters[$key] = trim($value);
         }
         $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
+        $filters += OrderAuditSelection::normalize($query);
         $plannedPeriod = \App\Service\PcmPeriod::fromFilters([
             'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
         ]);
@@ -81,7 +82,7 @@ final class OrderListingService
         }
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 8, areaScope: $this->areaScope);
-            $repository = $repository->withChecklistFilter($filters);
+            $repository = $repository->withChecklistFilter($filters)->withAuditSelection($filters);
             if ($plannedPeriod !== null) $repository = $repository->withPlannedPeriod($plannedPeriod);
             if ($drilldown) {
                 if ($filters['nome_bem'] !== '') $repository = $repository->withEquipmentSubstring($filters['nome_bem']);
@@ -105,7 +106,7 @@ final class OrderListingService
                     $label = ($filters['card'] === 'safra' ? 'Safra' : 'Entressafra') . ' · '
                         . ($state === 'open' ? 'Em aberto' : 'Fechadas');
                 }
-                return ['orders' => $repository->describeOrders($sector['orders']), 'page' => $sector['page'], 'limit' => $sector['limit'],
+                return ['orders' => $repository->summarizeOrders($repository->describeOrders($sector['orders'])), 'page' => $sector['page'], 'limit' => $sector['limit'],
                     'has_more' => $sector['has_more'], 'filters' => $filters, 'available' => true,
                     'total' => $total, 'drilldown' => ['label' => $label, 'total' => $total]];
             }
@@ -118,7 +119,7 @@ final class OrderListingService
                 $filters['historico'], $filters['unidade'], self::equipmentNamePattern($filters['nome_bem']),
                 $filters['analitico'], $filters['safra'], !$export,
             );
-            $result['orders'] = $repository->describeOrders($result['orders']);
+            $result['orders'] = $repository->summarizeOrders($repository->describeOrders($result['orders']));
 
             return $result + ['filters' => $filters, 'available' => true];
         } catch (Throwable) {
@@ -147,6 +148,15 @@ final class OrderListingService
                 if (in_array($code, $codes, true)) $options[$code] = $label;
             }
             return $options;
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    public function initialUsers(): array
+    {
+        try {
+            return array_column(($this->repository ?? new ProtheusRepository(budgetSeconds: 5))->initialUsers(), 'code', 'code');
         } catch (Throwable) {
             return [];
         }

@@ -58,8 +58,8 @@ final class OrderDescriptionPresentationTest extends TestCase
         $supplement = new OrderSupplement(number: '007042', branch: '01', description: $original, executedService: $original,
             labor: [['description' => self::QUESTIONS[0]]], descriptions: [['source' => 'Descrição original da O.S.', 'text' => $original], ['source' => 'Apontamento', 'text' => self::QUESTIONS[1]]]);
         $detail = (new OrderDetailPresenter())->present(['source_order_number' => '007042', 'branch_code' => '01'], $supplement, Availability::Available)['protheus'];
-        self::assertSame('REVISAR MANCAIS', $detail['description']); self::assertSame('REVISAR MANCAIS', $detail['original_description']);
-        self::assertSame('REVISAR MANCAIS', $detail['executed_service']);
+        self::assertSame('REVISAR MANCAIS', $detail['description']); self::assertSame($original, $detail['original_description']);
+        self::assertSame($original, $detail['executed_service']);
         self::assertSame($original, $supplement->executedService);
         self::assertSame(D::MISSING, $detail['labor'][0]['description']); self::assertSame(D::MISSING, $detail['descriptions'][0]['text']);
         $export = new OrderStreamingExport(); $method = new \ReflectionMethod($export, 'orderColumns');

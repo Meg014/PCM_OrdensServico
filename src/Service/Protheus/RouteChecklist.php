@@ -3,9 +3,41 @@ declare(strict_types=1);
 
 namespace App\Service\Protheus;
 
-/** Confirmed asset-code prefixes, never equipment descriptions or maintenance types. */
+/** Confirmed route families and audited TOTVS identities; never description keywords. */
 final class RouteChecklist
 {
+    private const FAMILIES = [
+        'PREVELE FAB' => ['ELETRI', 'INSTRU'],
+        'PREVLUB FAB' => ['MECANI'],
+        'PREVMEC FAB' => ['MECANI'],
+    ];
+
+    /** Same confirmed families as the SQL predicate, plus exact audited TOTVS service identities. */
+    public static function isOrder(array $order): bool
+    {
+        $equipment = strtoupper(trim((string)($order['TJ_CODBEM'] ?? $order['equipment_code'] ?? '')));
+        $area = strtoupper(trim((string)($order['TJ_CODAREA'] ?? $order['maintenance_area_code'] ?? $order['area'] ?? '')));
+        foreach (self::FAMILIES as $prefix => $areas) {
+            if (in_array($area, $areas, true) && ($equipment === $prefix || str_starts_with($equipment, $prefix . ' '))) {
+                return true;
+            }
+        }
+        // Service codes alone can also be used on ordinary O.S.; require the entire verified identity.
+        $identity = [
+            'branch' => trim((string)($order['TJ_FILIAL'] ?? $order['branch_code'] ?? $order['branch'] ?? '')),
+            'equipment' => $equipment,
+            'cost_center' => trim((string)($order['TJ_CCUSTO'] ?? $order['cost_center_code'] ?? $order['cost_center'] ?? '')),
+            'service' => trim((string)($order['TJ_SERVICO'] ?? $order['service_code'] ?? '')),
+        ];
+        static $routes = null;
+        $routes ??= require ROOT . '/resources/data/action-plan-factory-routes.php';
+        foreach ($routes as $route) {
+            if ($identity === $route) return true;
+        }
+
+        return false;
+    }
+
     public const AGES = ['route_on_time' => 'EM DIA', 'route_attention' => 'ATENÇÃO',
         'route_critical' => 'CRÍTICO', 'route_unknown' => 'Sem data válida',
         'route_future' => 'Data futura'];

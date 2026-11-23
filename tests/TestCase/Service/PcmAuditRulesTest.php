@@ -108,6 +108,39 @@ final class PcmAuditRulesTest extends TestCase
         ], new DateTimeImmutable('2026-11-17'))));
     }
 
+    public function testFuturePlanningDoesNotGenerateFlagsOrChangeSourceDates(): void
+    {
+        $asOf = new DateTimeImmutable('2026-11-23');
+        foreach (['maintenance_planned_start', 'maintenance_planned_end', 'general_planned_start',
+            'general_planned_end', 'TJ_DTMPINI', 'TJ_DTMPFIM', 'TJ_DTPPINI', 'TJ_DTPPFIM',
+            'planned_date'] as $field) {
+            foreach (['20261124', '2026-11-24', new DateTimeImmutable('2026-11-24')] as $date) {
+                $source = ['TJ_CODAREA' => 'MECANI', $field => $date];
+                $before = $source;
+                self::assertSame([], OrderAuditFlags::forOrder($source, $asOf), $field);
+                self::assertSame($before, $source);
+            }
+        }
+    }
+
+    public function testFutureOriginAndExecutionStillGenerateFlagsWithFuturePlanning(): void
+    {
+        $asOf = new DateTimeImmutable('2026-11-23');
+        foreach (['origin_date', 'maintenance_actual_start', 'maintenance_actual_end',
+            'general_actual_start', 'general_actual_end', 'TJ_DTORIGI',
+            'TJ_DTMRINI', 'TJ_DTMRFIM', 'TJ_DTPRINI', 'TJ_DTPRFIM'] as $field) {
+            foreach (['20261124', '2026-11-24', new DateTimeImmutable('2026-11-24')] as $date) {
+                $source = ['TJ_CODAREA' => 'MECANI', 'TJ_DTMPINI' => '20261201', $field => $date];
+                $before = $source;
+                self::assertSame(['future_date'], array_keys(OrderAuditFlags::forOrder($source, $asOf)), $field);
+                self::assertSame($before, $source);
+            }
+            self::assertSame([], OrderAuditFlags::forOrder([
+                'TJ_CODAREA' => 'MECANI', $field => '20261123',
+            ], $asOf), $field);
+        }
+    }
+
     public function testHistoricalDrilldownPreservesPlannedPeriodInPageAndCount(): void
     {
         $calls = [];

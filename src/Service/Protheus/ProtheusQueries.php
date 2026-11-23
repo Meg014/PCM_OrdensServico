@@ -584,6 +584,12 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if ($sql === ChecklistServiceFilter::options()) return true;
+        $withoutChecklist = ChecklistServiceFilter::remove($sql);
+        if ($withoutChecklist !== $sql) {
+            // Other fixed scopes may have been inserted at the same anchor afterwards.
+            return self::allows($withoutChecklist);
+        }
         if (in_array($sql, [MissingCompletionAuditQueries::ORDERS, MissingCompletionAuditQueries::COLUMNS,
             MissingCompletionAuditQueries::COMPARISON], true)) return true;
         if (in_array($sql, [PcmReconciliationQueries::totals(), PcmReconciliationQueries::totals(false),

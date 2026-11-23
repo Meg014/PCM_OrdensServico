@@ -329,6 +329,30 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('Fonte: Protheus', $html);
     }
 
+    public function testChecklistFiltersRemainInPaginationAndExportLinks(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $listing = ['filters' => ['service_scope' => 'checklist', 'checklist_service' => '000123'],
+            'page' => 2, 'limit' => 20, 'total' => 42, 'has_more' => true, 'available' => true, 'orders' => []];
+        $view->set('listing', $listing);
+        $view->set('checklistServices', ['000123' => '000123 — Rota <teste>']);
+        $html = $view->render('orders', false);
+        self::assertStringContainsString('Rotas de Checklist', $html);
+        self::assertStringContainsString('Rota &lt;teste&gt;', $html);
+        self::assertStringContainsString('<option value="000123" selected="selected">', $html);
+        self::assertSame(4, substr_count($html, 'service_scope=checklist&amp;checklist_service=000123'));
+        self::assertStringContainsString('page=3', $html);
+        self::assertStringContainsString('pcm-checklist-filter.js', $view->fetch('script'));
+        $listing['filters'] = [];
+        $view->set('listing', $listing);
+        $html = $view->render('orders', false);
+        self::assertMatchesRegularExpression('/<select[^>]*name="checklist_service"[^>]*disabled/', $html);
+    }
+
     public function test005810ListingUsesMaintenanceDatesAndPreservesClosedStatus(): void
     {
         Router::reload();

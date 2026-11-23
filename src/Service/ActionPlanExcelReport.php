@@ -100,7 +100,7 @@ final class ActionPlanExcelReport
                 $values['L'] = $order['tasks'] ?? '';
                 // Never infer execution from 'description' (also used for opening notes).
                 // Producers must supply explicitly separated, confirmed execution text.
-                $values['M'] = \App\Service\Protheus\OrderDescriptions::display($order['executed_service'] ?? null);
+                $values['M'] = \App\Service\Protheus\ExecutedServicePresentation::display($order['executed_service'] ?? null, $order);
                 foreach ($values as $column => $value) {
                     if (is_string($value) && mb_strlen($value, 'UTF-8') > 32767) {
                         throw new DomainException('Um texto excede o limite de uma célula do Excel. Nenhum arquivo foi gerado.');

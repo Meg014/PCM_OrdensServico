@@ -79,6 +79,7 @@ final class OrderEntryExportService
             if (!is_string($value) || strlen($value) > ($key === 'equipment_q' && !empty($query['bem']) ? 255 : 100) || preg_match('/[\x00-\x1F\x7F]/', $value)) throw new InvalidArgumentException('Filtro inválido.');
             $filters[$key] = trim($value);
         }
+        $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
         $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {
@@ -104,8 +105,9 @@ final class OrderEntryExportService
         if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) throw new InvalidArgumentException('Período inválido.');
         if ($filters['card'] !== '' || $filters['backlog_age'] !== '') {
             if ($filters['area'] === '') throw new InvalidArgumentException('Setor do drill-down inválido.');
-            $service = $filters['nome_bem'] === '' ? $this : new self(
-                ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withEquipmentSubstring($filters['nome_bem']),
+            $scopedRepository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withChecklistFilter($filters);
+            $service = $filters['nome_bem'] === '' ? new self($scopedRepository) : new self(
+                $scopedRepository->withEquipmentSubstring($filters['nome_bem']),
             );
             $data = $service->load($filters['area'], [
                 'filial' => EquipmentFilter::branch($filters), 'equipment' => $filters['bem'], 'service' => $filters['servico'],
@@ -130,6 +132,7 @@ final class OrderEntryExportService
             $repository = ($this->repository ?? new ProtheusRepository(budgetSeconds: 15))->withPlannedPeriod([
                 'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
             ]);
+            $repository = $repository->withChecklistFilter($filters);
             $data = $repository->generalEntries($params, $page, $limit);
             return ['available' => true, 'filters' => $filters] + $data;
         } catch (Throwable) {

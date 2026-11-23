@@ -25,11 +25,10 @@ final class OrderAuditFlags
         if (preg_match('/\bTESTE\b/ui', $name)) {
             $flags['test_service'] = 'Serviço de teste: ' . $name;
         }
-        foreach (['origin_date', 'maintenance_planned_start', 'maintenance_planned_end',
-            'maintenance_actual_start', 'maintenance_actual_end', 'general_planned_start',
-            'general_planned_end', 'general_actual_start', 'general_actual_end',
-            'TJ_DTORIGI', 'TJ_DTMPINI', 'TJ_DTMPFIM', 'TJ_DTMRINI', 'TJ_DTMRFIM',
-            'TJ_DTPPINI', 'TJ_DTPPFIM', 'TJ_DTPRINI', 'TJ_DTPRFIM', 'planned_date'] as $field) {
+        // Future planning is valid; only origin and actual execution dates are audited against today.
+        foreach (['origin_date', 'maintenance_actual_start', 'maintenance_actual_end',
+            'general_actual_start', 'general_actual_end', 'TJ_DTORIGI',
+            'TJ_DTMRINI', 'TJ_DTMRFIM', 'TJ_DTPRINI', 'TJ_DTPRFIM'] as $field) {
             $value = $order[$field] ?? null;
             if ($value instanceof DateTimeInterface) {
                 $date = $value->format('Y-m-d');
@@ -41,7 +40,7 @@ final class OrderAuditFlags
                 continue;
             }
             if ($date > $asOf->format('Y-m-d')) {
-                $flags['future_date'] = 'Data posterior a ' . $asOf->format('d/m/Y') . ' (validar planejamento e execução)';
+                $flags['future_date'] = 'Data posterior a ' . $asOf->format('d/m/Y') . ' (validar origem e execução)';
             }
         }
 

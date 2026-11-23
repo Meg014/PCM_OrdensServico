@@ -27,6 +27,21 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private ?string $equipmentSubstring = null;
     private ?array $sectorPeriod = null;
     private ?array $plannedPeriod = null;
+    private ?string $checklistService = null;
+
+    public function withChecklistFilter(array $filters): self
+    {
+        $filters = ChecklistServiceFilter::normalize($filters);
+        $copy = clone $this;
+        $copy->checklistService = $filters['service_scope'] === 'checklist' ? $filters['checklist_service'] : null;
+
+        return $copy;
+    }
+
+    public function checklistServices(): array
+    {
+        return $this->read(ChecklistServiceFilter::options());
+    }
 
     public function withPlannedPeriod(array $filters): self
     {
@@ -840,6 +855,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
      */
     private function read(string $sql, array $params = [], array $types = []): array
     {
+        if ($this->checklistService !== null) {
+            $scoped = ChecklistServiceFilter::apply($sql);
+            if ($scoped !== $sql) {
+                $sql = $scoped;
+                $params += ['checklist_service' => $this->checklistService, 'checklist_service_code' => $this->checklistService];
+            }
+        }
         if ($this->plannedPeriod !== null) {
             $scoped = SectorPresentationScope::dashboardPeriod($sql);
             if ($scoped !== $sql) {

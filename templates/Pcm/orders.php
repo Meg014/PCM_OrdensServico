@@ -46,6 +46,16 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
 <div class="w-100 d-none d-md-block"></div>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('service_scope', [
+    'label' => 'Tipo de serviço', 'id' => 'filter-service-scope', 'class' => 'form-select',
+    'options' => ['' => 'Todos os serviços', 'checklist' => 'Rotas de Checklist'],
+    'value' => $filters['service_scope'] ?? '',
+]) ?></div>
+<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('checklist_service', [
+    'label' => 'Serviço de Checklist', 'id' => 'filter-checklist-service', 'class' => 'form-select',
+    'empty' => 'Todas as rotas', 'options' => $checklistServices ?? [],
+    'value' => $filters['checklist_service'] ?? '', 'disabled' => ($filters['service_scope'] ?? '') !== 'checklist',
+]) ?></div>
 <div class="col-12 col-md-6 position-relative" data-equipment-autocomplete data-lookup="<?= h($this->Url->build(['_name' => 'pcm-equipment-suggestions'])) ?>">
 <label class="form-label" for="filter-equipment">Bem / Equipamento</label>
 <input class="form-control" id="filter-equipment" name="equipment_q" maxlength="100" value="<?= h(($filters['equipment_q'] ?? '') ?: (($filters['bem'] ?? '') ?: ($filters['nome_bem'] ?? ''))) ?>"
@@ -95,7 +105,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <table class="table pcm-orders-table pcm-order-listing align-middle"><thead><tr><th class="pcm-order-number">O.S.</th><th class="pcm-order-description">Descrição</th><?php foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row, 'hideFutureDate' => true]) ?></td>
+<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row]) ?></td>
 <td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?></td>
 <td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_start')[0])) ?></td>
@@ -114,3 +124,5 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 </nav></footer></div></section>
 <?php endif; ?>
 <?= $this->Html->script('pcm-equipment-autocomplete', ['block' => true]) ?>
+<?= $this->Html->script('pcm-checklist-filter', ['block' => true]) ?>
+<?= $this->Html->script('pcm-checklist-filter', ['block' => true]) ?>

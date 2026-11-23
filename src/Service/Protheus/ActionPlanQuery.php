@@ -24,7 +24,7 @@ SQL;
     {
         return <<<'SQL'
 WITH orders AS (
-    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO,
+    SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
         j.TJ_SITUACA, j.TJ_TERMINO, j.TJ_DTORIGI, j.TJ_OBSERVA,
         COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) identity_count
     FROM dbo.STJ010 j
@@ -51,7 +51,7 @@ SQL
         . ActionPlanRouteScope::predicate() . <<<'SQL'
 
 )
-SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
+SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
     CONVERT(varchar(10), j.reference_date, 23) reference_date,
     CONVERT(varchar(max), j.TJ_OBSERVA) description,
     c.name cost_center_name, c.matches cost_center_matches,

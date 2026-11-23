@@ -26,6 +26,7 @@ final class OrderListingService
             }
             $filters[$key] = trim($value);
         }
+        $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
         $plannedPeriod = \App\Service\PcmPeriod::fromFilters([
             'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
         ]);
@@ -80,6 +81,7 @@ final class OrderListingService
         }
         try {
             $repository = $this->repository ?? new ProtheusRepository(budgetSeconds: 8, areaScope: $this->areaScope);
+            $repository = $repository->withChecklistFilter($filters);
             if ($plannedPeriod !== null) $repository = $repository->withPlannedPeriod($plannedPeriod);
             if ($drilldown) {
                 if ($filters['nome_bem'] !== '') $repository = $repository->withEquipmentSubstring($filters['nome_bem']);
@@ -133,6 +135,23 @@ final class OrderListingService
         }
 
         return '%' . str_replace(['~', '%', '_', '['], ['~~', '~%', '~_', '~['], mb_strtoupper($name)) . '%';
+    }
+
+    public function checklistServices(): array
+    {
+        try {
+            $rows = ($this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope))->checklistServices();
+            $options = [];
+            foreach ($rows as $row) {
+                $code = trim((string)$row['code']);
+                $name = trim((string)($row['name'] ?? ''));
+                $label = $code . ($name === '' ? '' : ' — ' . $name);
+                if (!isset($options[$code]) || $name !== '') $options[$code] = $label;
+            }
+            return $options;
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     public function areas(): array

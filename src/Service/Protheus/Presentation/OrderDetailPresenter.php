@@ -38,6 +38,8 @@ final class OrderDetailPresenter
             $availability = Availability::Unavailable;
         }
         $available = $availability === Availability::Available;
+        $executionIdentity = $available ? $supplement->maintenance + ['branch' => $supplement->branch] : [];
+        $checklist = $available && \App\Service\Protheus\RouteChecklist::isOrder($executionIdentity);
 
         return [
             'pcm' => $pcm,
@@ -56,8 +58,8 @@ final class OrderDetailPresenter
                     $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
                 'original_description' => $available ? \App\Service\Protheus\OrderDescriptions::forOrder($supplement->description,
                     $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
-                'executed_service' => $available ? \App\Service\Protheus\OrderDescriptions::display($supplement->executedService) : null,
-                'executed_service_available' => $available && $supplement->executedServiceAvailable,
+                'executed_service' => $available ? \App\Service\Protheus\ExecutedServicePresentation::display($supplement->executedService, $executionIdentity) : null,
+                'executed_service_available' => $available && ($checklist || $supplement->executedServiceAvailable),
                 'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
                     static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
                 )), ['text', 'source']) : [],

@@ -67,7 +67,14 @@ final class OrderAuditPresentationTest extends TestCase
             self::assertSame('CANCELADA', $detail['order_status']);
             self::assertSame('Sem serviço executado registrado', $detail['executed_service']);
             self::assertSame($cancellation['reason'] ?? null, $detail['cancellation']['reason']);
-            if ($cancellation === []) self::assertSame('Motivo do cancelamento não informado no TOTVS.', $detail['cancellation']['message']);
+            if ($cancellation === []) {
+                self::assertSame('O.S ABERTA PARA TESTE', $detail['cancellation']['message']);
+                self::assertSame('Motivo padrão — não registrado no TOTVS', $detail['cancellation']['source_label']);
+                self::assertTrue($detail['cancellation']['derived']);
+            } else {
+                self::assertSame('Motivo original', $detail['cancellation']['message']);
+                self::assertFalse($detail['cancellation']['derived']);
+            }
         }
     }
 
@@ -80,7 +87,8 @@ final class OrderAuditPresentationTest extends TestCase
         $before = $order;
         $cancelled = array_replace($order, ['number' => '000002', 'TJ_SITUACA' => 'C', 'status' => 'Cancelada',
             'cancellation' => ['reason' => 'Motivo confirmado pela origem de teste', 'source' => 'confirmed_test_source']]);
-        $stream = (new ActionPlanExcelReport())->write([$order, $cancelled]);
+        $withoutReason = array_replace($cancelled, ['number' => '000003', 'cancellation' => []]);
+        $stream = (new ActionPlanExcelReport())->write([$order, $cancelled, $withoutReason]);
         $book = IOFactory::load(stream_get_meta_data($stream)['uri']);
         try {
             self::assertSame(1, $book->getSheetCount());
@@ -91,6 +99,10 @@ final class OrderAuditPresentationTest extends TestCase
             self::assertSame('Cancelada', (string)$book->getSheet(0)->getCell('N10')->getValue());
             self::assertSame('Sem serviço executado registrado', (string)$book->getSheet(0)->getCell('M10')->getValue());
             self::assertStringContainsString('Motivo confirmado pela origem de teste', $book->getSheet(0)->getComment('M10')->getText()->getPlainText());
+            $note = $book->getSheet(0)->getComment('M11')->getText()->getPlainText();
+            self::assertStringContainsString('O.S ABERTA PARA TESTE', $note);
+            self::assertStringContainsString('Motivo padrão — não registrado no TOTVS', $note);
+            self::assertSame([], $withoutReason['cancellation']);
             self::assertSame($before, $order);
         } finally { $book->disconnectWorksheets(); fclose($stream); }
     }

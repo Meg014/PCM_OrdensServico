@@ -112,6 +112,33 @@ test('audit summary keeps original partial notes, users and provenance separate'
     assert.equal(h.calls.length, 1);
 });
 
+test('cancelled order shows presentation default once and keeps missing execution text once', async () => {
+    const payload = {...detail, order_status: 'CANCELADA', executed_service: 'Sem serviço executado registrado',
+        executed_service_available: true, executed_service_source_label: 'Sem serviço executado registrado',
+        cancellation: {reason: null, message: 'O.S ABERTA PARA TESTE', derived: true,
+            source_label: 'Motivo padrão — não registrado no TOTVS'}};
+    const h = harness(() => ok({detail: payload, history}));
+    await tick();
+    assert.equal(h.targets.detail.textContent.split('Sem serviço executado registrado').length - 1, 1);
+    assert.equal(h.targets.detail.textContent.split('O.S ABERTA PARA TESTE').length - 1, 1);
+    assert.ok(h.targets.detail.textContent.includes('Motivo padrão — não registrado no TOTVS'));
+    assert.equal(h.targets.detail.textContent.includes('Motivo do cancelamento não informado no TOTVS.'), false);
+    all(h.targets.history).find(el => el.tag === 'button' && el.textContent === 'Abrir OS 004368').listeners.click();
+    await tick();
+    assert.equal(h.targets.selected.textContent.split('Sem serviço executado registrado').length - 1, 1);
+    assert.ok(h.targets.selected.textContent.includes('O.S ABERTA PARA TESTE'));
+});
+
+test('confirmed cancellation reason remains literal and does not show presentation default', async () => {
+    const reason = 'Motivo original <b>literal</b>\nSegunda linha';
+    const h = harness(() => ok({detail: {...detail, order_status: 'CANCELADA',
+        cancellation: {reason, message: reason, derived: false, source_label: 'Motivo original registrado no TOTVS'}}, history}));
+    await tick();
+    assert.ok(h.targets.detail.textContent.includes(reason));
+    assert.equal(h.targets.detail.textContent.includes('O.S ABERTA PARA TESTE'), false);
+    assert.equal(all(h.targets.detail).some(el => el.tag === 'b'), false);
+});
+
 test('renders text safely, preserves multiple entries and loads only requested history/detail', async () => {
     const h = harness(url => ok(url.searchParams.get('part') === 'history'
         ? {history: {...history, page: 2}} : {detail, history}));

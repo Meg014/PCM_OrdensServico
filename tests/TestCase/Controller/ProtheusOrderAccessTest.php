@@ -353,6 +353,44 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertMatchesRegularExpression('/<select[^>]*name="checklist_service"[^>]*disabled/', $html);
     }
 
+    public function testCleanListingKeepsUserScopeAndDoesNotRenderExecutionSummary(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $row = ['TJ_ORDEM' => '007659', 'TJ_FILIAL' => '01', 'origin_date' => '2502-08-14',
+            'TJ_DTORIGI' => '25020814', 'TJ_DTMPINI' => '25020814', 'TJ_CODAREA' => 'MECANI',
+            'TJ_CODBEM' => 'BEM', 'equipment_name' => 'Bem', 'TJ_SERVICO' => 'PREMEC',
+            'service_name' => 'Preventiva', 'TJ_CCUSTO' => 'CC01', 'TJ_SITUACA' => 'C', 'TJ_TERMINO' => 'N',
+            'execution_summary' => ['text' => 'Sem serviço executado registrado', 'source_label' => 'Sem execução']];
+        $listing = ['filters' => ['initial_user' => 'Inicio', 'order_status' => 'cancelled',
+            'service_scope' => 'checklist', 'checklist_service' => 'PREMEC', 'centro' => 'CC01'],
+            'page' => 2, 'limit' => 20, 'total' => 42, 'has_more' => true, 'available' => true, 'orders' => [$row]];
+        $before = $listing;
+        $view->set('listing', $listing);
+        $view->set('initialUsers', ['Inicio' => 'Inicio', 'Outro' => 'Outro']);
+        $view->set('checklistServices', \App\Service\Protheus\ChecklistServiceFilter::SERVICES);
+        $html = $view->render('orders', false);
+        self::assertStringNotContainsString('<summary>Serviço Executado</summary>', $html);
+        self::assertStringNotContainsString('Sem serviço executado registrado', $html);
+        self::assertStringNotContainsString('Motivo do cancelamento', $html);
+        self::assertStringNotContainsString('filter-centro', $html);
+        self::assertStringNotContainsString('Usuário de início (TOTVS)', $html);
+        self::assertSame(1, substr_count($html, 'Usuário de início'));
+        self::assertSame(1, substr_count($html, 'name="initial_user"'));
+        self::assertStringContainsString('<option value="Inicio" selected="selected">Inicio</option>', $html);
+        self::assertLessThan(strpos($html, 'name="initial_user"'), strpos($html, 'id="filter-os"'));
+        self::assertLessThan(strpos($html, 'id="filter-equipment"'), strpos($html, 'name="initial_user"'));
+        self::assertSame(4, substr_count($html, 'initial_user=Inicio&amp;order_status=cancelled&amp;service_scope=checklist&amp;checklist_service=PREMEC'));
+        self::assertStringContainsString('name="centro"', $html); // Preserve existing drill-down scopes, without a visible filter.
+        self::assertStringContainsString('page=3', $html);
+        self::assertStringContainsString('/pcm/protheus/os/007659?filial=01', $html);
+        self::assertStringContainsString('<td class="text-warning fw-semibold">14/08/2502</td>', $html);
+        self::assertSame($before, $listing);
+    }
+
     public function testListingFilterOrderAndFutureDatesUseSharedValidation(): void
     {
         Router::reload();
@@ -377,8 +415,11 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringNotContainsString('Data posterior', $html);
         self::assertStringContainsString('25/11/2026', $html);
         self::assertStringContainsString('16/12/2026', $html);
-        self::assertSame(1, substr_count($html, 'Data fora do intervalo aceitável'));
-        self::assertStringContainsString('14/08/2502', $html);
+        self::assertStringNotContainsString('Data fora do intervalo aceitável', $html);
+        self::assertStringContainsString('<td class="text-warning fw-semibold">14/08/2502</td>', $html);
+        self::assertStringContainsString('<td>25/11/2026</td>', $html);
+        self::assertStringContainsString('<td>16/12/2026</td>', $html);
+        self::assertSame(1, substr_count($html, 'class="text-warning fw-semibold"'));
         foreach (['007881', '007880', '007492', '007659'] as $number) self::assertStringContainsString($number, $html);
     }
 

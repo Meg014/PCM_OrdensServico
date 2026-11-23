@@ -14,6 +14,10 @@ $protheusDate = static function ($value): string {
     $iso = (new \App\Service\Protheus\Presentation\OrderSupplementMapper())->date($value);
     return $iso ? implode('/', array_reverse(explode('-', $iso))) : '—';
 };
+$originDateHasIssue = static function (array $row): bool {
+    $flags = \App\Service\OrderAuditFlags::forOrder(['origin_date' => $row['origin_date'] ?? null]);
+    return isset($flags['invalid_date']) || isset($flags['date_out_of_range']);
+};
 $areaName = static fn ($code) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$code ?? ''] ?? $display($code);
 $statusName = static function (array $row): string {
     $situation = rtrim((string)($row['TJ_SITUACA'] ?? ''));
@@ -36,15 +40,11 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <section class="pcm-panel p-3 mb-4">
 <?= $this->Form->create(null, ['type' => 'get', 'class' => 'row g-3']) ?>
 <?php if (!empty($filters['filial'])): ?><?= $this->Form->hidden('filial', ['value' => $filters['filial']]) ?><?php endif; ?>
-<?php if (($filters['centro_modo'] ?? '') === 'blank' || ($filters['centro_modo'] ?? '') === 'null'): ?>
-<?= $this->Form->hidden('centro_modo', ['value' => $filters['centro_modo']]) ?>
-<div class="col-md-4"><label class="form-label">Centro de custo</label><input class="form-control" value="Sem centro de custo" disabled></div>
-<?php endif; ?>
-<?php foreach (['os' => 'Número da OS (com zeros à esquerda)', 'centro' => 'Centro de custo'] as $key => $label): ?>
-<?php if ($key === 'centro' && in_array($filters['centro_modo'] ?? '', ['blank', 'null'], true)) continue; ?>
-<div class="col-md-4"><label class="form-label" for="filter-<?= h($key) ?>"><?= h($label) ?></label>
-<input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
-<?php endforeach; ?>
+<?php foreach (['centro', 'centro_modo'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
+<div class="col-12 col-md-4"><label class="form-label" for="filter-os">Número da OS (com zeros à esquerda)</label>
+<input class="form-control" id="filter-os" name="os" maxlength="100" value="<?= h($filters['os'] ?? '') ?>"></div>
+<div class="col-12 col-md-4"><?= $this->Form->control('initial_user', ['label' => 'Usuário de início',
+    'empty' => 'Todos', 'options' => $initialUsers ?? [], 'value' => $filters['initial_user'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="w-100 d-none d-md-block"></div>
 <div class="col-12 col-md-6 position-relative" data-equipment-autocomplete data-lookup="<?= h($this->Url->build(['_name' => 'pcm-equipment-suggestions'])) ?>">
 <label class="form-label" for="filter-equipment">Bem / Equipamento</label>
@@ -72,8 +72,6 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('order_status', ['label' => 'Situação',
     'options' => ['all' => 'Todas', 'open' => 'Abertas', 'closed' => 'Fechadas', 'cancelled' => 'Canceladas'],
     'value' => ($filters['order_status'] ?? '') ?: 'all', 'class' => 'form-select']) ?></div>
-<div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('initial_user', ['label' => 'Usuário de início (TOTVS)',
-    'empty' => 'Todos', 'options' => $initialUsers ?? [], 'value' => $filters['initial_user'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($areaName($area)) ?></option><?php endforeach; ?>
@@ -94,7 +92,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <?php if (($filters['situacao'] ?? '') === 'C'): ?><p class="text-body-secondary">Consulta histórica de canceladas. Estas O.S. não entram nos indicadores de abertas ou fechadas.</p><?php endif; ?>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
-<span class="text-body-secondary ms-2">O.S. e centro de custo por código exato.</span></div>
+<span class="text-body-secondary ms-2">O.S. por código exato.</span></div>
 <?= $this->Form->end() ?></section>
 <?php if (($filters['analitico'] ?? '') === '1'): ?><p class="alert alert-secondary">Escopo analítico: Data de origem a partir de 01/01/2025.</p><?php endif; ?>
 <?php if (!empty($listing['drilldown'])): ?><p class="alert alert-secondary pcm-active-drilldown"><strong>Filtro ativo: <?= h($areaName($filters['area'] ?? '')) ?> · <?= h($listing['drilldown']['label']) ?></strong>
@@ -107,13 +105,9 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <table class="table pcm-orders-table pcm-order-listing align-middle"><thead><tr><th class="pcm-order-number">O.S.</th><th class="pcm-order-description">Descrição</th><?php foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row]) ?></td>
-<td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?>
-<?php if (isset($row['execution_summary'])): ?><details class="mt-2"><summary>Serviço Executado</summary>
-<p class="mb-1"><?= h($row['execution_summary']['text']) ?></p><small class="text-body-secondary"><?= h($row['execution_summary']['source_label']) ?></small>
-<?php if (($row['TJ_SITUACA'] ?? '') === 'C'): ?><p>Motivo do cancelamento não informado no TOTVS.</p><?php endif; ?>
-</details><?php endif; ?></td>
-<td><?= h($originDate($row['origin_date'] ?? null)) ?></td>
+<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row, 'excludeFlags' => ['invalid_date', 'date_out_of_range']]) ?></td>
+<td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?></td>
+<td<?= $originDateHasIssue($row) ? ' class="text-warning fw-semibold"' : '' ?>><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_start')[0])) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_end')[0])) ?></td>
 <td class="pcm-order-text"><?= h($display($row['TJ_CODBEM'])) ?><br><?= h($display($row['equipment_name'])) ?></td>
@@ -130,5 +124,4 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 </nav></footer></div></section>
 <?php endif; ?>
 <?= $this->Html->script('pcm-equipment-autocomplete', ['block' => true]) ?>
-<?= $this->Html->script('pcm-checklist-filter', ['block' => true]) ?>
 <?= $this->Html->script('pcm-checklist-filter', ['block' => true]) ?>

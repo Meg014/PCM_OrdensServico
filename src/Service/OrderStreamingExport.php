@@ -120,7 +120,9 @@ final class OrderStreamingExport
             'audit_closure_date' => ['Data real de fim (manutenção — TOTVS)', 'date', 24, static fn($r) => $r['TJ_DTMRFIM'] ?? null],
             'audit_closure_time' => ['Hora real de fim (manutenção — TOTVS)', 'time', 24, static fn($r) => $r['TJ_HOMRFIM'] ?? null],
             'audit_general_closure_date' => ['Data real de fim (geral — TOTVS)', 'date', 24, static fn($r) => $r['TJ_DTPRFIM'] ?? null],
-            'cancellation_reason' => ['Motivo de cancelamento', 'text', 48, static fn($r) => ($r['TJ_SITUACA'] ?? '') === 'C' ? ($r['cancellation']['reason'] ?? 'Motivo do cancelamento não informado no TOTVS.') : ''],
+            'cancellation_reason' => ['Motivo original de cancelamento (TOTVS)', 'text', 48, static fn($r) => trim($r['TJ_SITUACA'] ?? '') === 'C' ? (\App\Service\Protheus\CancellationPresentation::present($r['cancellation'] ?? [])['reason'] ?? '') : ''],
+            'cancellation_display' => ['Apresentação do motivo de cancelamento', 'text', 48, static fn($r) => trim($r['TJ_SITUACA'] ?? '') === 'C' ? \App\Service\Protheus\CancellationPresentation::present($r['cancellation'] ?? [])['message'] : ''],
+            'cancellation_source' => ['Origem do motivo de cancelamento', 'text', 48, static fn($r) => trim($r['TJ_SITUACA'] ?? '') === 'C' ? \App\Service\Protheus\CancellationPresentation::present($r['cancellation'] ?? [])['source_label'] : ''],
             'cost_center_unit_name' => ['Unidade da O.S.', 'text', 24, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::label($row['TJ_CCUSTO'] ?? null)],
             'cost_center_source_unit' => ['Classificação do centro de custo', 'text', 30, static fn (array $row): string => \App\Service\Protheus\ProtheusUnit::sourceGroup($row['TJ_CCUSTO'] ?? null)],
         ];

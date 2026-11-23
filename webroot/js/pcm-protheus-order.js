@@ -79,7 +79,7 @@
         executionBody.style.whiteSpace = 'pre-wrap';
         executionBody.style.overflowWrap = 'anywhere';
         execution.append(executionBody);
-        if (data.executed_service_source_label) execution.append(node('small', data.executed_service_source_label, 'text-body-secondary d-block'));
+        if (data.executed_service_source_label && data.executed_service_source_label !== executionBody.textContent) execution.append(node('small', data.executed_service_source_label, 'text-body-secondary d-block'));
         if (data.execution_history && data.execution_history !== data.executed_service) {
             const historyText = node('details', undefined, 'mt-2');
             historyText.append(node('summary', 'Apontamentos originais de execução no TOTVS'));
@@ -90,6 +90,7 @@
         }
         if (data.cancellation) {
             execution.append(node('p', data.cancellation.reason || data.cancellation.message, 'mt-2'));
+            if (data.cancellation.source_label) execution.append(node('small', data.cancellation.source_label, 'text-body-secondary d-block'));
             const cancellationContext = [data.cancellation.user, data.cancellation.date, data.cancellation.time].filter(Boolean);
             if (cancellationContext.length) execution.append(node('small', cancellationContext.join(' · '), 'text-body-secondary d-block'));
         }

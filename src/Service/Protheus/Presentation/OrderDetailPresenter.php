@@ -65,11 +65,8 @@ final class OrderDetailPresenter
                 'executed_service_available' => $available && ($supplement->executedServiceAvailable || ($execution['derived'] ?? false)),
                 'execution_history' => $available && $supplement->executedServiceAvailable ? $supplement->executedService : null,
                 'order_status' => $execution['status'] ?? null,
-                'cancellation' => ($execution['status'] ?? '') === 'CANCELADA' ? ($supplement->cancellation ?: [
-                    'reason' => null, 'message' => 'Motivo do cancelamento não informado no TOTVS.',
-                    'user' => null, 'date' => null, 'time' => null,
-                    'source' => 'Sem campos de cancelamento confirmados na fonte atual',
-                ]) : null,
+                'cancellation' => ($execution['status'] ?? '') === 'CANCELADA'
+                    ? \App\Service\Protheus\CancellationPresentation::present($supplement->cancellation) : null,
                 'descriptions' => $available ? $this->project(array_values(array_filter($supplement->descriptions,
                     static fn (array $source): bool => ($source['source'] ?? '') !== 'Descrição original da O.S.',
                 )), ['text', 'source']) : [],

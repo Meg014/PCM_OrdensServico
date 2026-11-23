@@ -19,7 +19,10 @@ final class ExcelAuditComments
             foreach ($order['closure_metadata'] ?? [] as $field => $value) {
                 if (trim((string)$value) !== '') $note .= "\n" . $field . ': ' . $value;
             }
-            if ($summary['status'] === 'CANCELADA') $note .= "\n" . ($order['cancellation']['reason'] ?? 'Motivo do cancelamento não informado no TOTVS.');
+            if ($summary['status'] === 'CANCELADA') {
+                $cancellation = \App\Service\Protheus\CancellationPresentation::present($order['cancellation'] ?? []);
+                $note .= "\nMotivo: " . $cancellation['message'] . "\nOrigem do motivo: " . $cancellation['source_label'];
+            }
             $comments .= '<comment ref="M' . ($i + 9) . '" authorId="0"><text><t xml:space="preserve">' . $escape($note) . '</t></text></comment>';
             $vml .= '<v:shape id="_x0000_s' . (1025 + $i) . '" type="#_x0000_t202" style="position:absolute;width:360pt;height:120pt;visibility:hidden"><v:textbox/><x:ClientData ObjectType="Note"><x:MoveWithCells/><x:SizeWithCells/><x:AutoFill>False</x:AutoFill><x:Row>' . ($i + 8) . '</x:Row><x:Column>12</x:Column></x:ClientData></v:shape>';
         }

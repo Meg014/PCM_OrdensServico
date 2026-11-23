@@ -353,6 +353,35 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertMatchesRegularExpression('/<select[^>]*name="checklist_service"[^>]*disabled/', $html);
     }
 
+    public function testListingFilterOrderAndFutureDatesUseSharedValidation(): void
+    {
+        Router::reload();
+        $routes = require ROOT . '/config/routes.php';
+        $routes(Router::createRouteBuilder('/'));
+        $view = new View($this->request());
+        $view->setTemplatePath('Pcm');
+        $orders = [];
+        foreach (['007881' => '2026-11-25', '007880' => '2026-11-25', '007492' => '2026-12-16', '007659' => '2502-08-14'] as $number => $date) {
+            $orders[] = ['TJ_ORDEM' => $number, 'TJ_FILIAL' => '01', 'origin_date' => $date,
+                'TJ_DTMPINI' => str_replace('-', '', $date), 'TJ_CODAREA' => 'MECANI',
+                'TJ_CODBEM' => 'BEM', 'equipment_name' => 'Bem', 'TJ_SERVICO' => 'PREMEC',
+                'service_name' => 'Preventiva', 'TJ_CCUSTO' => 'CC01', 'TJ_SITUACA' => 'L', 'TJ_TERMINO' => 'N'];
+        }
+        $view->set('listing', ['filters' => [], 'page' => 1, 'limit' => 20, 'total' => 4,
+            'has_more' => false, 'available' => true, 'orders' => $orders]);
+        $view->set('checklistServices', \App\Service\Protheus\ChecklistServiceFilter::SERVICES);
+        $html = $view->render('orders', false);
+        self::assertLessThan(strpos($html, 'id="filter-service-scope"'), strpos($html, 'id="filter-equipment"'));
+        self::assertLessThan(strpos($html, 'id="filter-checklist-service"'), strpos($html, 'id="filter-service-scope"'));
+        self::assertStringContainsString('<option value="PREVLA">PREVLAM — Laminadores</option>', $html);
+        self::assertStringNotContainsString('Data posterior', $html);
+        self::assertStringContainsString('25/11/2026', $html);
+        self::assertStringContainsString('16/12/2026', $html);
+        self::assertSame(1, substr_count($html, 'Data fora do intervalo aceitável'));
+        self::assertStringContainsString('14/08/2502', $html);
+        foreach (['007881', '007880', '007492', '007659'] as $number) self::assertStringContainsString($number, $html);
+    }
+
     public function test005810ListingUsesMaintenanceDatesAndPreservesClosedStatus(): void
     {
         Router::reload();

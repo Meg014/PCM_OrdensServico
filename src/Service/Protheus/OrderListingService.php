@@ -142,11 +142,9 @@ final class OrderListingService
         try {
             $rows = ($this->repository ?? new ProtheusRepository(budgetSeconds: 5, areaScope: $this->areaScope))->checklistServices();
             $options = [];
-            foreach ($rows as $row) {
-                $code = trim((string)$row['code']);
-                $name = trim((string)($row['name'] ?? ''));
-                $label = $code . ($name === '' ? '' : ' — ' . $name);
-                if (!isset($options[$code]) || $name !== '') $options[$code] = $label;
+            $codes = array_column($rows, 'code');
+            foreach (ChecklistServiceFilter::SERVICES as $code => $label) {
+                if (in_array($code, $codes, true)) $options[$code] = $label;
             }
             return $options;
         } catch (Throwable) {

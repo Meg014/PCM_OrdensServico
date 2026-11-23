@@ -6,14 +6,16 @@ namespace App\Service;
 use App\Model\Table\MaintenanceAreasTable;
 use DateTimeImmutable;
 use DateTimeInterface;
-use DateTimeZone;
 
 /** Read-only quality signals. Original source fields are never rewritten. */
 final class OrderAuditFlags
 {
+    // Operational date bounds, independent of the current day. No source values are corrected.
+    public const MIN_YEAR = 1900;
+    public const MAX_YEAR = 2100;
+
     public static function forOrder(array $order, ?DateTimeImmutable $asOf = null): array
     {
-        $asOf ??= new DateTimeImmutable('today', new DateTimeZone('America/Sao_Paulo'));
         $flags = [];
         $area = strtoupper(trim((string)($order['maintenance_area_code'] ?? $order['TJ_CODAREA'] ?? '')));
         if ($area === '') {
@@ -25,22 +27,24 @@ final class OrderAuditFlags
         if (preg_match('/\bTESTE\b/ui', $name)) {
             $flags['test_service'] = 'Serviço de teste: ' . $name;
         }
-        // Future planning is valid; only origin and actual execution dates are audited against today.
-        foreach (['origin_date', 'maintenance_actual_start', 'maintenance_actual_end',
-            'general_actual_start', 'general_actual_end', 'TJ_DTORIGI',
-            'TJ_DTMRINI', 'TJ_DTMRFIM', 'TJ_DTPRINI', 'TJ_DTPRFIM'] as $field) {
+        // Origin, planning and execution may all be in the future.
+        foreach (['origin_date', 'maintenance_planned_start', 'maintenance_planned_end',
+            'maintenance_actual_start', 'maintenance_actual_end', 'general_planned_start',
+            'general_planned_end', 'general_actual_start', 'general_actual_end', 'planned_date',
+            'TJ_DTORIGI', 'TJ_DTMPINI', 'TJ_DTMPFIM', 'TJ_DTMRINI', 'TJ_DTMRFIM',
+            'TJ_DTPPINI', 'TJ_DTPPFIM', 'TJ_DTPRINI', 'TJ_DTPRFIM'] as $field) {
             $value = $order[$field] ?? null;
             if ($value instanceof DateTimeInterface) {
-                $date = $value->format('Y-m-d');
-            } elseif (is_string($value) && preg_match('/^\d{8}$/D', $value)) {
-                $date = substr($value, 0, 4) . '-' . substr($value, 4, 2) . '-' . substr($value, 6, 2);
-            } elseif (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}/', $value)) {
-                $date = substr($value, 0, 10);
-            } else {
-                continue;
+                $value = $value->format('Y-m-d');
             }
-            if ($date > $asOf->format('Y-m-d')) {
-                $flags['future_date'] = 'Data posterior a ' . $asOf->format('d/m/Y') . ' (validar origem e execução)';
+            if ($value === null || (is_string($value) && in_array(trim($value), ['', '00000000', '0000-00-00'], true))) continue;
+            if (!is_string($value)
+                || !preg_match('/^(\d{4})-?(\d{2})-?(\d{2})(?:[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/D', trim($value), $parts)
+                || !checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1])) {
+                $flags['invalid_date'] = 'Data inválida no TOTVS (verificar cadastro)';
+            } elseif ((int)$parts[1] < self::MIN_YEAR || (int)$parts[1] > self::MAX_YEAR) {
+                $flags['date_out_of_range'] = 'Data fora do intervalo aceitável (' . self::MIN_YEAR . ' a ' . self::MAX_YEAR
+                    . '): ' . $parts[3] . '/' . $parts[2] . '/' . $parts[1] . ' (verificar cadastro no TOTVS)';
             }
         }
 

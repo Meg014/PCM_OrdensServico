@@ -101,7 +101,7 @@ final class PcmAuditRulesTest extends TestCase
             'TJ_CODBEM' => 'CALD', 'service_name' => 'TESTE', 'TJ_DTORIGI' => '20261118'];
         $before = $source;
         $flags = OrderAuditFlags::forOrder($source, new DateTimeImmutable('2026-11-17'));
-        self::assertSame(['missing_area', 'test_service', 'future_date'], array_keys($flags));
+        self::assertSame(['missing_area', 'test_service'], array_keys($flags));
         self::assertSame($before, $source);
         self::assertSame(['unknown_area'], array_keys(OrderAuditFlags::forOrder([
             'TJ_CODAREA' => 'NOVA', 'service_name' => 'ENTRESSAFRA', 'TJ_DTORIGI' => '20261117',
@@ -123,7 +123,7 @@ final class PcmAuditRulesTest extends TestCase
         }
     }
 
-    public function testFutureOriginAndExecutionStillGenerateFlagsWithFuturePlanning(): void
+    public function testFutureOriginAndExecutionAreValidRegardlessOfToday(): void
     {
         $asOf = new DateTimeImmutable('2026-11-23');
         foreach (['origin_date', 'maintenance_actual_start', 'maintenance_actual_end',
@@ -132,12 +132,38 @@ final class PcmAuditRulesTest extends TestCase
             foreach (['20261124', '2026-11-24', new DateTimeImmutable('2026-11-24')] as $date) {
                 $source = ['TJ_CODAREA' => 'MECANI', 'TJ_DTMPINI' => '20261201', $field => $date];
                 $before = $source;
-                self::assertSame(['future_date'], array_keys(OrderAuditFlags::forOrder($source, $asOf)), $field);
+                self::assertSame([], OrderAuditFlags::forOrder($source, $asOf), $field);
+                self::assertSame([], OrderAuditFlags::forOrder($source, new DateTimeImmutable('2020-01-01')), $field);
                 self::assertSame($before, $source);
             }
             self::assertSame([], OrderAuditFlags::forOrder([
                 'TJ_CODAREA' => 'MECANI', $field => '20261123',
             ], $asOf), $field);
+        }
+    }
+
+    public function testFutureReportedOrdersAreValidAndYear2502IsFlaggedWithoutChangingSource(): void
+    {
+        foreach (['007881' => '20261125', '007880' => '20261125', '007492' => '20261216', '007659' => '25020814'] as $number => $date) {
+            $order = ['TJ_ORDEM' => $number, 'TJ_CODAREA' => 'MECANI', 'TJ_DTORIGI' => $date, 'TJ_DTMPINI' => $date];
+            $before = $order;
+            $flags = OrderAuditFlags::forOrder($order);
+            self::assertSame($number === '007659' ? ['date_out_of_range'] : [], array_keys($flags));
+            self::assertSame($before, $order);
+            self::assertSame($flags, OrderAuditFlags::forOrder($order, new DateTimeImmutable('2000-01-01')));
+        }
+    }
+
+    public function testCalendarAndOperationalRangeValidationIncludesPlanningAndExecution(): void
+    {
+        foreach (['TJ_DTORIGI', 'TJ_DTMPINI', 'TJ_DTPPFIM', 'TJ_DTMRFIM', 'general_actual_end'] as $field) {
+            foreach (['20260230' => 'invalid_date', 'data inválida' => 'invalid_date',
+                '18991231' => 'date_out_of_range', '25020814' => 'date_out_of_range'] as $date => $flag) {
+                self::assertSame([$flag], array_keys(OrderAuditFlags::forOrder(['TJ_CODAREA' => 'MECANI', $field => (string)$date])));
+            }
+            foreach (['19000101', '21001231', '', '00000000', '0000-00-00', null] as $date) {
+                self::assertSame([], OrderAuditFlags::forOrder(['TJ_CODAREA' => 'MECANI', $field => $date]));
+            }
         }
     }
 

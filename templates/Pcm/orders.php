@@ -46,6 +46,15 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <input class="form-control" id="filter-<?= h($key) ?>" name="<?= h($key) ?>" maxlength="100" value="<?= h($filters[$key] ?? '') ?>"></div>
 <?php endforeach; ?>
 <div class="w-100 d-none d-md-block"></div>
+<div class="col-12 col-md-6 position-relative" data-equipment-autocomplete data-lookup="<?= h($this->Url->build(['_name' => 'pcm-equipment-suggestions'])) ?>">
+<label class="form-label" for="filter-equipment">Bem / Equipamento</label>
+<input class="form-control" id="filter-equipment" name="equipment_q" maxlength="100" value="<?= h(($filters['equipment_q'] ?? '') ?: (($filters['bem'] ?? '') ?: ($filters['nome_bem'] ?? ''))) ?>"
+    placeholder="Digite o código ou nome do equipamento" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="equipment-options" aria-expanded="false" aria-describedby="equipment-message" data-search>
+<input type="hidden" name="bem" value="<?= h($filters['bem'] ?? '') ?>" data-selected>
+<input type="hidden" name="bem_filial" value="<?= h($filters['bem_filial'] ?? '') ?>" data-branch>
+<div id="equipment-options" role="listbox" aria-label="Equipamentos encontrados" class="list-group position-absolute bg-white shadow w-100" style="z-index:10;max-height:20rem;overflow:auto" hidden></div>
+<small id="equipment-message" class="text-body-secondary" role="status" aria-live="polite">Selecione uma sugestão para filtrar o equipamento exato; sem seleção, a busca usa trechos do código ou nome.</small>
+</div>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('service_scope', [
     'label' => 'Tipo de serviço', 'id' => 'filter-service-scope', 'class' => 'form-select',
     'options' => ['' => 'Todos os serviços', 'checklist' => 'Rotas de Checklist'],
@@ -56,15 +65,6 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
     'empty' => 'Todas as rotas', 'options' => $checklistServices ?? [],
     'value' => $filters['checklist_service'] ?? '', 'disabled' => ($filters['service_scope'] ?? '') !== 'checklist',
 ]) ?></div>
-<div class="col-12 col-md-6 position-relative" data-equipment-autocomplete data-lookup="<?= h($this->Url->build(['_name' => 'pcm-equipment-suggestions'])) ?>">
-<label class="form-label" for="filter-equipment">Bem / Equipamento</label>
-<input class="form-control" id="filter-equipment" name="equipment_q" maxlength="100" value="<?= h(($filters['equipment_q'] ?? '') ?: (($filters['bem'] ?? '') ?: ($filters['nome_bem'] ?? ''))) ?>"
-    placeholder="Digite o código ou nome do equipamento" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="equipment-options" aria-expanded="false" aria-describedby="equipment-message" data-search>
-<input type="hidden" name="bem" value="<?= h($filters['bem'] ?? '') ?>" data-selected>
-<input type="hidden" name="bem_filial" value="<?= h($filters['bem_filial'] ?? '') ?>" data-branch>
-<div id="equipment-options" role="listbox" aria-label="Equipamentos encontrados" class="list-group position-absolute bg-white shadow w-100" style="z-index:10;max-height:20rem;overflow:auto" hidden></div>
-<small id="equipment-message" class="text-body-secondary" role="status" aria-live="polite">Selecione uma sugestão para filtrar o equipamento exato; sem seleção, a busca usa trechos do código ou nome.</small>
-</div>
 <?php foreach (['servico', 'tipo', 'termino', 'historico', 'safra', 'analitico', 'card', 'card_status',
     'backlog_age', 'q', 'status', 'service_name', 'period_start', 'period_end'] as $key): ?><?php if (($filters[$key] ?? '') !== ''): ?><?= $this->Form->hidden($key, ['value' => $filters[$key]]) ?><?php endif; ?><?php endforeach; ?>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',

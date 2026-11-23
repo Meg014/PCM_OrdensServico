@@ -18,19 +18,39 @@ use PHPUnit\Framework\TestCase;
 
 final class ChecklistServiceFilterTest extends TestCase
 {
+    public function testServiceOptionsUseVerifiedTotvsCodesAndRequestedLabels(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('getDriver')->willReturn(new ProtheusReadOnly());
+        $connection->expects(self::once())->method('execute')->willReturnCallback(function ($sql) {
+            self::assertSame(ChecklistServiceFilter::options(), $sql);
+            self::assertTrue(ProtheusQueries::allows($sql));
+            self::assertStringNotContainsString('TJ_CODBEM', $sql);
+            $statement = $this->createMock(StatementInterface::class);
+            $statement->method('fetchAll')->willReturn(array_map(static fn($code) => ['code' => $code],
+                ['PREVLA', 'PRELUB', 'PREMEC', 'PREELE']));
+            return $statement;
+        });
+        $options = (new OrderListingService(new ProtheusRepository($connection)))->checklistServices();
+        self::assertSame(['PREELE', 'PREMEC', 'PRELUB', 'PREVLA'], array_keys($options));
+        self::assertSame(['PREVELE — Elétrica', 'PREVMEC — Mecânica', 'PREVLUB — Lubrificação', 'PREVLAM — Laminadores'], array_values($options));
+    }
+
     public function testOnlyRecognizedRoutesWithSelectedServiceAreReturnedAndCounted(): void
     {
         $db = new \PDO('sqlite::memory:');
         $db->exec('CREATE TABLE orders (TJ_ORDEM TEXT, TJ_CODBEM TEXT, TJ_CODAREA TEXT, TJ_SERVICO TEXT, D_E_L_E_T_ TEXT)');
         $db->exec("INSERT INTO orders VALUES
-            ('001', 'PREVMEC FAB', 'MECANI', '000123', ''),
-            ('002', 'PREVLUB FAB 01', 'MECANI', '000456', ''),
-            ('003', 'PREVELE FAB 01', 'INSTRU', '000123', ''),
-            ('004', 'BOMBA', 'MECANI', '000123', ''),
-            ('005', 'PREVMEC FAB', 'FAB', '000123', ''),
-            ('006', 'PREVMEC FAB', 'MECANI', '000123', '*')");
+            ('001', 'PREVMEC FAB', 'MECANI', 'PREELE', ''),
+            ('002', 'PREVLUB FAB 01', 'MECANI', 'PRELUB', ''),
+            ('003', 'PREVELE FAB 01', 'INSTRU', 'PREELE', ''),
+            ('004', 'BOMBA', 'MECANI', 'CORRET', ''),
+            ('005', 'PREVMEC FAB', 'FAB', 'CORRET', ''),
+            ('006', 'PREVMEC FAB', 'MECANI', 'PREELE', '*'),
+            ('007', 'LAM 01', 'MECANI', 'PREVLA', ''),
+            ('008', 'BEM', 'FAB', 'PREMEC', '')");
         $where = " FROM orders j WHERE j.D_E_L_E_T_ <> '*'";
-        foreach (['' => ['001', '002', '003'], '000123' => ['001', '003'], '000456' => ['002']] as $service => $expected) {
+        foreach (['' => ['001', '002', '003', '007', '008'], 'PREELE' => ['001', '003'], 'PRELUB' => ['002'], 'PREVLA' => ['007'], 'PREMEC' => ['008']] as $service => $expected) {
             $params = ['checklist_service' => $service, 'checklist_service_code' => $service];
             $statement = $db->prepare(ChecklistServiceFilter::apply('SELECT j.TJ_ORDEM' . $where) . ' ORDER BY j.TJ_ORDEM');
             $statement->execute($params);
@@ -75,8 +95,8 @@ final class ChecklistServiceFilterTest extends TestCase
         $connection->method('execute')->willReturnCallback(function ($sql, $params) use (&$calls) {
             self::assertTrue(ProtheusQueries::allows($sql));
             self::assertNotSame($sql, ChecklistServiceFilter::remove($sql));
-            self::assertSame('000123', $params['checklist_service']);
-            self::assertSame('000123', $params['checklist_service_code']);
+            self::assertSame('PREELE', $params['checklist_service']);
+            self::assertSame('PREELE', $params['checklist_service_code']);
             self::assertSame('CC01', $params['centro']);
             self::assertSame('MECANI', $params['area']);
             self::assertSame('2026-11-01', $params['date_start']);
@@ -86,14 +106,14 @@ final class ChecklistServiceFilterTest extends TestCase
             return $statement;
         });
         $repository = new ProtheusRepository($connection);
-        $query = ['service_scope' => 'checklist', 'checklist_service' => '000123',
+        $query = ['service_scope' => 'checklist', 'checklist_service' => 'PREELE',
             'os' => '000001', 'centro' => 'CC01', 'area' => 'MECANI', 'unidade' => 'factory',
             'bem' => 'PREVMEC FAB', 'situacao' => 'L', 'date_start' => '2026-11-01', 'date_end' => '2026-11-30'];
         $listing = new OrderListingService($repository);
         $result = $listing->load($query);
         self::assertTrue($result['available']);
         self::assertSame(7, $result['total']);
-        self::assertSame('000123', $result['filters']['checklist_service']);
+        self::assertSame('PREELE', $result['filters']['checklist_service']);
         self::assertTrue($listing->load($query, true, 3)['available']);
         self::assertTrue((new OrderEntryExportService($repository))->loadGeneral($query, 3)['available']);
         self::assertCount(4, $calls);

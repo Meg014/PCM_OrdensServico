@@ -8,6 +8,14 @@ use InvalidArgumentException;
 /** Shared listing/export scope, applied before aggregation and pagination. */
 final class ChecklistServiceFilter
 {
+    /** Values verified in ST4010; labels follow the requested route names. */
+    public const SERVICES = [
+        'PREELE' => 'PREVELE — Elétrica',
+        'PREMEC' => 'PREVMEC — Mecânica',
+        'PRELUB' => 'PREVLUB — Lubrificação',
+        'PREVLA' => 'PREVLAM — Laminadores',
+    ];
+
     public static function normalize(array $filters): array
     {
         $type = $filters['service_scope'] ?? '';
@@ -24,8 +32,13 @@ final class ChecklistServiceFilter
 
     private static function clause(): string
     {
-        return ' AND (' . RouteChecklist::predicate('j.TJ_CODBEM', 'j.TJ_CODAREA') . ')'
+        return ' AND ' . self::servicePredicate()
             . " AND (CAST(:checklist_service AS VARCHAR(100)) = '' OR j.TJ_SERVICO = CAST(:checklist_service_code AS VARCHAR(100)))";
+    }
+
+    private static function servicePredicate(): string
+    {
+        return "j.TJ_SERVICO IN ('" . implode("', '", array_keys(self::SERVICES)) . "')";
     }
 
     public static function apply(string $sql): string
@@ -41,21 +54,10 @@ final class ChecklistServiceFilter
         return str_replace(self::clause(), '', $sql);
     }
 
-    /** Services actually used by recognized routes; branch masters override shared masters. */
+    /** Confirm the actual service masters, including services with no current orders. */
     public static function options(): string
     {
-        $route = RouteChecklist::predicate('j.TJ_CODBEM', 'j.TJ_CODAREA');
-
-        return <<<SQL
-SELECT DISTINCT RTRIM(j.TJ_SERVICO) AS code,
-    RTRIM(CASE WHEN local_service.matches > 0 THEN local_service.name ELSE shared_service.name END) AS name
-FROM dbo.STJ010 j
-OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s
-    WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.T4_FILIAL = j.TJ_FILIAL AND s.D_E_L_E_T_ <> '*') local_service
-OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s
-    WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.T4_FILIAL = '' AND s.D_E_L_E_T_ <> '*') shared_service
-WHERE j.D_E_L_E_T_ <> '*' AND {$route} AND NULLIF(RTRIM(j.TJ_SERVICO), '') IS NOT NULL
-ORDER BY code, name
-SQL;
+        return "SELECT DISTINCT RTRIM(s.T4_SERVICO) AS code FROM dbo.ST4010 s WHERE s.D_E_L_E_T_ <> '*' AND "
+            . str_replace('j.TJ_SERVICO', 's.T4_SERVICO', self::servicePredicate()) . ' ORDER BY code';
     }
 }

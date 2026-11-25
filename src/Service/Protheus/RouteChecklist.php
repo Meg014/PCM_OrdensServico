@@ -16,7 +16,7 @@ final class RouteChecklist
     public static function isOrder(array $order): bool
     {
         $equipment = strtoupper(trim((string)($order['TJ_CODBEM'] ?? $order['equipment_code'] ?? '')));
-        $area = strtoupper(trim((string)($order['TJ_CODAREA'] ?? $order['maintenance_area_code'] ?? $order['area'] ?? '')));
+        $area = strtoupper(trim((string)($order['original_area'] ?? $order['TJ_CODAREA'] ?? $order['maintenance_area_code'] ?? $order['area'] ?? '')));
         foreach (self::FAMILIES as $prefix => $areas) {
             if (in_array($area, $areas, true) && ($equipment === $prefix || str_starts_with($equipment, $prefix . ' '))) {
                 return true;
@@ -70,9 +70,9 @@ final class RouteChecklist
         return $result;
     }
 
-    public static function unitPredicate(): string
+    public static function unitPredicate(string $area = 'n.TJ_CODAREA'): string
     {
-        $route = self::predicate('n.TJ_CODBEM', 'n.TJ_CODAREA');
+        $route = self::predicate('n.TJ_CODBEM', $area);
         return "(({$route} AND f.unit IN ('', 'factory')) OR (NOT {$route} AND "
             . ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit') . '))';
     }

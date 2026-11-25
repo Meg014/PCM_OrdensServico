@@ -7,6 +7,7 @@ final class OrderAuditQueries
 {
     public const BATCH = <<<'SQL'
 SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO,
+    j.TJ_CODAREA AS original_area,
     j.TJ_DTMRFIM, j.TJ_HOMRFIM, j.TJ_DTPRFIM, j.TJ_HOPRFIM
 FROM OPENJSON(CAST(:identities AS NVARCHAR(MAX)))
 WITH (branch VARCHAR(100) '$.branch', number VARCHAR(100) '$.number') k

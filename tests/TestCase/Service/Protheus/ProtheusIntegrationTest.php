@@ -54,7 +54,8 @@ final class ProtheusIntegrationTest extends TestCase
                 'pcm_descricao' => 'LAVAR TODOS 3 FILTRO COM SODA',
             ]],
             Sql::EQUIPMENT_BRANCH => [['T9_CODBEM' => 'FTR 30 001 ']],
-            Sql::SERVICE_BRANCH => [['T4_SERVICO' => 'COROPE ']],
+            Sql::SERVICE_BRANCH => [['T4_SERVICO' => 'COROPE ', 'T4_NOME' => 'Corretiva',
+                'pcm_service_description' => 'VERIFICAR TEMPERATURA']],
             Sql::ENTRIES => [
                 ['TL_TIPOREG' => 'M ', 'TL_CODIGO' => '008382 '],
                 ['TL_TIPOREG' => 'M ', 'TL_CODIGO' => '008382 '],
@@ -69,6 +70,8 @@ final class ProtheusIntegrationTest extends TestCase
         $order = $repository->findOrder('004893');
         self::assertSame('004893', $order['numero']);
         self::assertSame('LAVAR TODOS 3 FILTRO COM SODA', $order['descricao']);
+        self::assertSame([], $order['description_sources']);
+        self::assertSame('Corretiva', $order['servico']['T4_NOME']);
         self::assertArrayNotHasKey('TJ_OBSERVA', $order['dados_principais']);
         self::assertSame('008382', $order['mao_de_obra'][0]['profissional']['T1_CODFUNC']);
         self::assertCount(2, $order['mao_de_obra']);

@@ -57,7 +57,9 @@ final class OrderDetailPresenter
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? \App\Service\Protheus\OrderDescriptions::forOrder($supplement->description,
                     $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
-                'original_description' => $available ? $supplement->description : null,
+                'original_description' => $available && !\App\Service\Protheus\OrderDescriptions::usesEquipmentDescription(
+                    $supplement->maintenance['equipment_code'] ?? null,
+                ) ? $supplement->description : null,
                 'executed_service' => $execution['text'] ?? null,
                 'executed_service_source' => $execution['source'] ?? null,
                 'executed_service_source_label' => $execution['source_label'] ?? null,
@@ -73,6 +75,7 @@ final class OrderDetailPresenter
                 'task_activities' => $available ? $supplement->taskActivities : OrderTaskActivities::present([], '', '', false),
                 'maintenance' => $available ? $this->project([$supplement->maintenance], [
                     'equipment_code', 'equipment_name', 'service_code', 'service_name', 'area', 'cost_center', 'unit_name', 'cost_center_source_unit',
+                    'original_area', 'reclassified_area',
                     'initial_user', 'ending_user', 'update_user', 'situation', 'ending',
                     'planned_start_date', 'planned_start_time', 'planned_end_date', 'planned_end_time',
                     'actual_start_date', 'actual_start_time', 'actual_end_date', 'actual_end_time',

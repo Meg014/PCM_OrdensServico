@@ -524,6 +524,7 @@ SQL;
 
     public const ORDER = <<<'SQL'
 SELECT TOP (2) j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.TJ_CCUSTO,
+    j.TJ_CODAREA AS original_area, CAST(NULL AS varchar(20)) AS reclassified_area,
     j.TJ_SITUACA, j.TJ_TERMINO, j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO,
     j.TJ_DTORIGI, j.TJ_PLANO, j.TJ_SEQRELA,
     j.TJ_DTMPINI, j.TJ_HOMPINI, j.TJ_DTMPFIM, j.TJ_HOMPFIM,
@@ -551,7 +552,7 @@ WHERE RTRIM(b.T9_CODBEM) = :codigo AND b.D_E_L_E_T_ <> '*'
 SQL;
 
     public const SERVICE = <<<'SQL'
-SELECT TOP (2) s.*, CONVERT(VARCHAR(MAX), s.T4_DESCRIC) AS pcm_service_description
+SELECT TOP (2) s.T4_FILIAL, s.T4_SERVICO, s.T4_NOME
 FROM dbo.ST4010 s
 WHERE RTRIM(s.T4_SERVICO) = :codigo AND s.D_E_L_E_T_ <> '*'
 SQL;
@@ -585,6 +586,11 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        if ($sql === ReclassificationQueries::PREVIEW) return true;
+        $original = ReclassificationQueries::original($sql);
+        if ($original !== null) {
+            return ReclassificationQueries::applicable($original) && ReclassificationQueries::apply($original) === $sql && self::allows($original);
+        }
         $withoutAudit = OrderAuditSelection::remove($sql);
         if ($withoutAudit !== $sql) return self::allows($withoutAudit);
         if (in_array($sql, [OrderAuditQueries::METADATA, OrderAuditQueries::USERS, OrderAuditQueries::USER_SAMPLE, OrderAuditQueries::BATCH], true)) return true;

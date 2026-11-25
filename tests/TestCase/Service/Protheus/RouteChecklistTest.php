@@ -46,7 +46,7 @@ final class RouteChecklistTest extends TestCase
     public function testRealAggregationAndDrilldownPartitionTheGeneralPopulationWithoutDuplication(): void
     {
         $db = new \PDO('sqlite::memory:');
-        $db->exec('CREATE TABLE bucketed (TJ_CODBEM TEXT, TJ_CODAREA TEXT, age_days INTEGER,
+        $db->exec('CREATE TABLE bucketed (TJ_CODBEM TEXT, original_area TEXT, age_days INTEGER,
             age_bucket TEXT, identity_count INTEGER, equipment_matches INTEGER, service_matches INTEGER)');
         $insert = $db->prepare('INSERT INTO bucketed VALUES (?, ?, ?, ?, 1, 1, 1)');
         foreach ([['PREVELE FAB 01', 'ELETRI', 15, '8_15'], ['PREVLUB FAB 01', 'MECANI', 8, '8_15'],

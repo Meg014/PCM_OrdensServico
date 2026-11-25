@@ -52,6 +52,8 @@ final class OrderSupplementMapper
             'service_code' => $this->text($main['TJ_SERVICO'] ?? null),
             'service_name' => $this->text($order['servico']['T4_NOME'] ?? null),
             'area' => $this->text($main['TJ_CODAREA'] ?? null),
+            'original_area' => $this->text($main['original_area'] ?? null),
+            'reclassified_area' => $this->text($main['reclassified_area'] ?? null),
             'cost_center' => $this->text($main['TJ_CCUSTO'] ?? null),
             'unit_name' => \App\Service\Protheus\ProtheusUnit::label($this->text($main['TJ_CCUSTO'] ?? null)),
             'cost_center_source_unit' => \App\Service\Protheus\ProtheusUnit::sourceGroup($this->text($main['TJ_CCUSTO'] ?? null)),

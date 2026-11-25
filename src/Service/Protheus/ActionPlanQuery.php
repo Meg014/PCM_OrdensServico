@@ -25,6 +25,7 @@ SQL;
         return <<<'SQL'
 WITH orders AS (
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
+        j.TJ_CODAREA AS original_area, CAST(NULL AS varchar(20)) AS reclassified_area,
         j.TJ_SITUACA, j.TJ_TERMINO, j.TJ_DTORIGI, j.TJ_OBSERVA,
         j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO, j.TJ_DTMRFIM, j.TJ_HOMRFIM, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
         COUNT(*) OVER (PARTITION BY j.TJ_FILIAL, j.TJ_ORDEM) identity_count
@@ -53,6 +54,7 @@ SQL
 
 )
 SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA, j.identity_count, j.TJ_SITUACA, j.TJ_TERMINO,
+    j.original_area, j.reclassified_area,
     j.TJ_USUAINI, j.TJ_USUAFIM, j.TJ_USUARIO, j.TJ_DTMRFIM, j.TJ_HOMRFIM, j.TJ_DTPRFIM, j.TJ_HOPRFIM,
     CONVERT(varchar(10), j.reference_date, 23) reference_date,
     CONVERT(varchar(max), j.TJ_OBSERVA) description,

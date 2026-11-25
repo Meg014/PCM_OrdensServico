@@ -22,7 +22,8 @@ final class OrderDescriptionPresentationTest extends TestCase
     public function testChecklistOnlyAndNoFallbackToChecklistOrService(): void
     {
         self::assertSame(D::MISSING, D::display($this->checklist()));
-        self::assertSame(D::MISSING, D::best($this->checklist(), ['Apontamento independente'], 'Serviço'));
+        self::assertSame(D::MISSING, D::listing(['descricao' => $this->checklist(),
+            'entry_description' => 'Apontamento independente', 'service_description' => 'Serviço']));
         self::assertSame(D::MISSING, D::display(''));
     }
     public function testMixedChecklistAtBeginningMiddleEndAndTechnicalQuestions(): void

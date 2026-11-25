@@ -66,6 +66,7 @@ $title = trim($this->fetch('title')) ?: 'PCM';
                     <li class="nav-item"><?= $this->Html->link('Plano de Ação', ['_name' => 'pcm-action-plan'], ['class' => 'nav-link']) ?></li>
                     <li class="nav-item"><?= $this->Html->link('Não Conformidades', '/pcm/nao-conformidades', ['class' => 'nav-link']) ?></li>
                     <?php if ($currentUser->role === 'ADMIN'): ?>
+                        <li class="nav-item"><?= $this->Html->link('Reclassificação de O.S.', '/pcm/reclassificacao-os', ['class' => 'nav-link']) ?></li>
                         <li class="nav-item"><?= $this->Html->link('Usuários', '/usuarios', ['class' => 'nav-link']) ?></li>
                     <?php endif; ?>
                     <li class="nav-item">

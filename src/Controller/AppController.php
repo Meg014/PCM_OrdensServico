@@ -104,7 +104,7 @@ class AppController extends Controller
         }
         if (
             $currentUser !== null && (
-            $this->request->getParam('controller') === 'Users'
+            in_array($controller, ['Users', 'OrderReclassifications'], true)
             || ($this->request->getParam('controller') === 'ReportImports' && $this->request->getParam('action') === 'manual')
             ) && $currentUser->role !== 'ADMIN'
         ) {

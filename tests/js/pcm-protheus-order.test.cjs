@@ -149,7 +149,7 @@ test('renders text safely, preserves multiple entries and loads only requested h
     assert.match(h.targets.detail.textContent, /ROLAMENTO 6203 ZZ C3/);
     assert.match(h.targets.detail.textContent, /<script>/);
     assert.match(h.targets.detail.textContent, /Descrição da manutenção/);
-    assert.match(h.targets.detail.textContent, /Descrições e atividades registradas/);
+    assert.doesNotMatch(h.targets.detail.textContent, /Descrições e atividades registradas|Descrição detalhada do serviço/);
     assert.match(h.targets.detail.textContent, /21\/09\/2026 · Ana/);
     assert.match(h.targets.detail.textContent, /Inspecionar\nLubrificar <b>peça<\/b>/);
     assert.match(h.targets.detail.textContent, /45 min \(0,75 h\)/);

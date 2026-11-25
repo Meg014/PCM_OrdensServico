@@ -80,6 +80,19 @@ final class PcmAuthorizationTest extends TestCase
         }
     }
 
+    public function testReclassificationsRequireCurrentAdminRole(): void
+    {
+        foreach (['ADMIN', 'USUARIO', 'TV'] as $role) {
+            $controller = $this->controller($role, 'OrderReclassifications', 'index', path: '/pcm/reclassificacao-os');
+            try {
+                $controller->beforeFilter(new Event('Controller.initialize', $controller));
+                self::assertSame('ADMIN', $role);
+            } catch (ForbiddenException) {
+                self::assertContains($role, ['USUARIO', 'TV']);
+            }
+        }
+    }
+
     public function testTvOnlyAccessesPresentationAndItsRefreshEndpoint(): void
     {
         foreach (['presentation' => '/pcm/apresentacao', 'presentationData' => '/pcm/apresentacao/data'] as $action => $path) {

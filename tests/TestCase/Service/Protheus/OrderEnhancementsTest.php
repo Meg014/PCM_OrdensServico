@@ -7,7 +7,6 @@ use App\Database\Driver\ProtheusReadOnly;
 use App\Service\Protheus\EquipmentFilter;
 use App\Service\Protheus\EquipmentLookupQueries;
 use App\Service\Protheus\OrderDescriptionQueries;
-use App\Service\Protheus\OrderDescriptions;
 use App\Service\Protheus\OrderEntryExportService;
 use App\Service\Protheus\OrderListingService;
 use App\Service\Protheus\Presentation\LaborDuration;
@@ -51,16 +50,13 @@ final class OrderEnhancementsTest extends TestCase
         self::assertStringNotContainsString('Divergência', $unknownQuantity['hours_note']);
     }
 
-    public function testOnlyRealDetailedSourcesAreUsedInPriorityOrder(): void
+    public function testDescriptionQueriesRequestOnlyOrderTextAndServiceIdentity(): void
     {
-        self::assertSame("Original\nLinha 2", OrderDescriptions::best("Original\nLinha 2\0", ['Apontamento'], 'Detalhe'));
-        self::assertSame('Apontamento', OrderDescriptions::best(" \0", ['', 'Apontamento', 'Outro'], 'Detalhe'));
-        self::assertSame('Detalhe', OrderDescriptions::best(null, [], 'Detalhe'));
-        self::assertNull(OrderDescriptions::best(null, ['', "\xFF\x01", '...'], null));
-        self::assertStringNotContainsString('T4_NOME', OrderDescriptionQueries::BATCH);
-        self::assertStringNotContainsString('ST5010', OrderDescriptionQueries::BATCH);
-        self::assertStringContainsString('T4_DESCRIC', OrderDescriptionQueries::BATCH);
-        self::assertStringContainsString('l.TL_FILIAL = j.TJ_FILIAL', OrderDescriptionQueries::BATCH);
+        self::assertStringContainsString('j.TJ_OBSERVA', OrderDescriptionQueries::BATCH);
+        self::assertStringNotContainsString('ST4010', OrderDescriptionQueries::BATCH);
+        self::assertStringNotContainsString('STL010', OrderDescriptionQueries::BATCH);
+        self::assertStringContainsString('s.T4_SERVICO, s.T4_NOME', ProtheusQueries::SERVICE_BRANCH);
+        self::assertStringNotContainsString('T4_DESCRIC', ProtheusQueries::SERVICE_BRANCH);
     }
 
     public function testEachLaborEntryKeepsItsOwnReadableDescription(): void
@@ -86,7 +82,7 @@ final class OrderEnhancementsTest extends TestCase
         self::assertStringContainsString('RTRIM(j.TJ_ORDEM) = :numero', ProtheusQueries::ENTRIES);
     }
 
-    public function testDescriptionBatchPreservesIdentitiesRowsAndPrecedence(): void
+    public function testDescriptionBatchPreservesIdentitiesAndIgnoresUnrelatedText(): void
     {
         $calls = [];
         $sources = [
@@ -101,7 +97,7 @@ final class OrderEnhancementsTest extends TestCase
         $result = $repository->describeOrders($orders);
         self::assertCount(1, $calls);
         self::assertCount(4, $result);
-        self::assertSame(['Original', 'Entrada filial 02', 'Detalhe', null], array_column($result, 'descricao'));
+        self::assertSame(['Original', null, null, null], array_column($result, 'descricao'));
         self::assertSame(array_column($orders, 'TJ_ORDEM'), array_column($result, 'TJ_ORDEM'));
         self::assertCount(4, json_decode($calls[0][1]['identities'], true));
     }

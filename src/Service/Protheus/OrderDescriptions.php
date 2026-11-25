@@ -16,14 +16,19 @@ final class OrderDescriptions
 
     public static function forOrder(?string $original, ?string $equipmentCode, ?string $equipmentName): string
     {
-        $equipment = trim($equipmentCode ?? '');
+        return self::display(self::usesEquipmentDescription($equipmentCode) ? $equipmentName : $original);
+    }
+
+    public static function usesEquipmentDescription(?string $equipmentCode): bool
+    {
+        $equipment = strtoupper(trim($equipmentCode ?? ''));
         foreach (['PREVELE FAB', 'PREVLUB FAB', 'PREVMEC FAB'] as $prefix) {
-            if (str_starts_with(strtoupper($equipment), $prefix)) {
-                return self::display($equipmentName);
+            if (str_starts_with($equipment, $prefix)) {
+                return true;
             }
         }
 
-        return self::display($original);
+        return false;
     }
 
     /** Match only the five known questions, wherever placed; other questions stay intact. */
@@ -66,15 +71,5 @@ final class OrderDescriptions
         $value = preg_replace('/^[\p{Z}\s\x{FEFF}]+|[\p{Z}\s\x{FEFF}]+$/u', '', $value);
 
         return preg_match('/[\p{L}\p{N}]/u', $value) === 1 ? $value : null;
-    }
-
-    public static function best(mixed $original, array $entries, mixed $service): ?string
-    {
-        foreach ([$original, ...$entries, $service] as $candidate) {
-            $text = self::text($candidate);
-            if ($text !== null) return self::display($text);
-        }
-
-        return null;
     }
 }

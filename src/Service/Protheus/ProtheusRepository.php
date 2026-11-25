@@ -18,6 +18,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private Connection $connection;
 
     private ?array $historyUserColumns = null;
+    private ?string $effectiveAreas = null;
 
     private ?string $historicalOffseasonServices = null;
 
@@ -110,7 +111,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return $this->sectorStage;
     }
 
-    public function __construct(?Connection $connection = null, ?int $budgetSeconds = null, private readonly ?string $areaScope = null)
+    public function __construct(?Connection $connection = null, ?int $budgetSeconds = null, private readonly ?string $areaScope = null,
+        private readonly ?\App\Service\OrderReclassificationService $reclassifications = null)
     {
         if ($areaScope !== null && !preg_match('/^[A-Z0-9_-]{1,30}$/D', $areaScope)) {
             throw new InvalidArgumentException('Escopo de área inválido.');
@@ -202,6 +204,11 @@ final class ProtheusRepository implements ProtheusReaderInterface
         return $this->read(ProtheusQueries::AREAS);
     }
 
+    public function reclassificationPreview(string $branch, array $numbers): array
+    {
+        return $this->read(ReclassificationQueries::PREVIEW, ['branch' => $branch, 'numbers' => json_encode($numbers, JSON_THROW_ON_ERROR)]);
+    }
+
     public function suggestEquipment(string $term): array
     {
         if (mb_strlen($term) < 2 || strlen($term) > 100 || preg_match('/[\x00-\x1F\x7F]/', $term)) {
@@ -225,16 +232,12 @@ final class ProtheusRepository implements ProtheusReaderInterface
         $sources = [];
         foreach ($this->read(OrderDescriptionQueries::BATCH, ['identities' => json_encode(array_values($keys), JSON_THROW_ON_ERROR)]) as $row) {
             $key = json_encode([(string)$row['TJ_FILIAL'], (string)$row['TJ_ORDEM']], JSON_THROW_ON_ERROR);
-            $sources[$key]['original'] = $row['order_description'] ?? null;
-            $sources[$key]['entries'][] = $row['entry_description'] ?? null;
-            $sources[$key]['service'] = $row['service_description'] ?? null;
+            $sources[$key] = $row['order_description'] ?? null;
         }
         foreach ($orders as &$order) {
             $key = json_encode([(string)$order['TJ_FILIAL'], (string)$order['TJ_ORDEM']], JSON_THROW_ON_ERROR);
-            $source = $sources[$key] ?? [];
-            $order['original_description'] = $source['original'] ?? ($order['descricao'] ?? null);
-            $order['descricao'] = OrderDescriptions::best($source['original'] ?? ($order['descricao'] ?? null),
-                $source['entries'] ?? [], $source['service'] ?? null);
+            $order['original_description'] = array_key_exists($key, $sources) ? $sources[$key] : ($order['descricao'] ?? null);
+            $order['descricao'] = OrderDescriptions::text($order['original_description']);
         }
         unset($order);
 
@@ -783,16 +786,8 @@ final class ProtheusRepository implements ProtheusReaderInterface
                     'professional' => $entry['TL_TIPOREG'] === 'M' ? ($professionals[$code]['T1_NOME'] ?? null) : null];
             }
         }
-        $serviceDescription = OrderDescriptions::text($result['servico']['pcm_service_description'] ?? null);
-        $result['descricao'] = OrderDescriptions::best($description, array_column($result['description_sources'], 'text'), $serviceDescription);
-        if ($result['original_description'] !== null) {
-            array_unshift($result['description_sources'], ['source' => 'Descrição original da O.S.',
-                'text' => $result['original_description'], 'date' => null, 'professional' => null]);
-        }
-        if ($serviceDescription !== null) {
-            $result['description_sources'][] = ['source' => 'Descrição detalhada do serviço',
-                'text' => $serviceDescription, 'date' => null, 'professional' => null];
-        }
+        $result['descricao'] = OrderDescriptions::forOrder($result['original_description'], $order['TJ_CODBEM'],
+            $result['equipamento']['T9_NOME'] ?? null);
         // Optional catalog failures never hide the order, labor, materials or original text.
         $result['task_activity_rows'] = [];
         $result['task_activities_available'] = false;
@@ -947,6 +942,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if (in_array($params['area'] ?? $params['scope_area'] ?? $this->areaScope, ['ELETRI', 'INSTRU'], true)) $sql = SectorPresentationScope::areas($sql);
         if ($this->deadline !== null && microtime(true) >= $this->deadline) {
             throw new RuntimeException('Tempo de consulta complementar excedido.');
+        }
+        if (ReclassificationQueries::applicable($sql)) {
+            $this->effectiveAreas ??= json_encode(($this->reclassifications ?? new \App\Service\OrderReclassificationService())->activeMap(), JSON_THROW_ON_ERROR);
+            if ($this->effectiveAreas !== '[]') {
+                $sql = ReclassificationQueries::apply($sql);
+                $params['pcm_areas'] = $this->effectiveAreas;
+            }
         }
         $statement = $this->connection->execute($sql, $params, $types + array_fill_keys(array_keys($params), 'string'));
         try {

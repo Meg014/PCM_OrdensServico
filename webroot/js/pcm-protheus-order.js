@@ -113,7 +113,10 @@
             ['Data de origem', date(data.origin_date)],
             ['Equipamento', codeName(m.equipment_code, m.equipment_name)],
             ['Serviço', codeName(m.service_code, m.service_name)],
-            ['Área', value(m.area_name ?? m.area)], ['Centro de custo', value(m.cost_center)],
+            ...(m.reclassified_area
+                ? [['Área original (TOTVS)', value(m.original_area)], ['Área reclassificada', value(m.area_name ?? m.reclassified_area)]]
+                : [['Área', value(m.area_name ?? m.area)]]),
+            ['Centro de custo', value(m.cost_center)],
             ['Unidade', value(m.unit_name)],
             ['Classificação do centro de custo', value(m.cost_center_source_unit)],
             ['Manutenção planejada — início', dateTime(m.planned_start_date, m.planned_start_time)],
@@ -143,9 +146,10 @@
             additional.append(node('p', `${label}: ${dateTime(m[key + '_date'], m[key + '_time'])}`, 'mb-1'));
         });
         card.append(additional);
-        target.replaceChildren(title, card, heading('Descrições e atividades registradas'));
+        target.replaceChildren(title, card);
+        renderTaskActivities(target, data.task_activities);
         const descriptions = data.descriptions || [];
-        if (!descriptions.length) target.append(node('p', 'Não existe descrição detalhada disponível no TOTVS.', 'text-body-secondary'));
+        if (descriptions.length) target.append(heading('Apontamentos da O.S.'));
         descriptions.forEach(item => {
             const section = node('section', undefined, 'pcm-detail-card mb-3');
             const source = node('h3', item.source, 'h6');
@@ -155,7 +159,6 @@
             section.append(source, text);
             target.append(section);
         });
-        renderTaskActivities(target, data.task_activities);
         target.append(heading('Mão de obra', 'QUEM EXECUTOU · QUANTIDADE REGISTRADA'));
         target.append(table(['Profissional', 'Código', 'Data início', 'Início', 'Data fim', 'Fim', 'Quantidade / horas', 'Descrição do apontamento'],
             data.labor.map(row => [row.professional, row.code, date(row.date), row.start_time,

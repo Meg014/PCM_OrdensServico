@@ -25,6 +25,7 @@ final class ProtheusSectorQueries
 WITH scoped AS (
     SELECT j.R_E_C_N_O_ AS record_id, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO,
         j.TJ_TIPO, j.TJ_CODAREA, j.TJ_CCUSTO, j.TJ_SITUACA, j.TJ_TERMINO,
+        j.TJ_CODAREA AS original_area,
         CONVERT(VARCHAR(MAX), j.TJ_OBSERVA) AS descricao,
         TRY_CONVERT(date, NULLIF(j.TJ_DTMPINI, ''), 112) AS planned_date,
         {{INDICATOR_DATE}} AS indicator_date,
@@ -207,9 +208,9 @@ SQL;
         $base = self::base($area, ProtheusOperationalEligibility::OPEN);
         // Route assets belong to Factory even when their legacy cost center maps elsewhere.
         $base = str_replace(ProtheusUnit::predicate('n.TJ_CCUSTO', 'f.unit'),
-            RouteChecklist::unitPredicate(), $base);
+            RouteChecklist::unitPredicate('n.original_area'), $base);
         return $base . self::AGE . ', classified AS (SELECT bucketed.*, CASE WHEN '
-            . RouteChecklist::predicate() . ' THEN 1 ELSE 0 END AS is_checklist, '
+            . RouteChecklist::predicate('TJ_CODBEM', 'original_area') . ' THEN 1 ELSE 0 END AS is_checklist, '
             . RouteChecklist::ageCase() . ' AS checklist_bucket FROM bucketed)';
     }
 

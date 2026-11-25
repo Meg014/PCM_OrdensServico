@@ -55,6 +55,7 @@ return function (RouteBuilder $routes): void {
             ->setPass(['token'])->setPatterns(['token' => '[A-Za-z0-9_-]+\.[a-f0-9]{64}']);
         $builder->post('/logout', ['controller' => 'Auth', 'action' => 'logout']);
         $builder->connect('/meu-perfil', ['controller' => 'Profile', 'action' => 'index']);
+        $builder->connect('/pcm/reclassificacao-os', ['controller' => 'OrderReclassifications', 'action' => 'index'], ['_method' => ['GET', 'POST']]);
         $builder->get('/pcm/nao-conformidades', ['controller' => 'Nonconformities', 'action' => 'index']);
         $builder->connect('/pcm/nao-conformidades/responsaveis', ['controller' => 'Nonconformities', 'action' => 'responsibles'], ['_method' => ['GET', 'POST']]);
         $builder->connect('/pcm/nao-conformidades/responsaveis/{responsibleId}', ['controller' => 'Nonconformities', 'action' => 'responsibles'], ['pass' => ['responsibleId'], 'responsibleId' => '[1-9][0-9]*', '_method' => ['GET', 'POST']]);

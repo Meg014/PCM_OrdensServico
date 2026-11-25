@@ -26,6 +26,7 @@ final class RouteDescriptionPresentationTest extends TestCase
                 executedService: 'Serviço executado independente', taskActivities: ['tasks' => [['description' => 'Tarefa independente']]]);
             $detail = (new OrderDetailPresenter())->present(['source_order_number' => '007396', 'branch_code' => '01'], $supplement, Availability::Available)['protheus'];
             self::assertSame($expected, $detail['description']);
+            self::assertSame($code === 'ELV 80 016' ? $original : null, $detail['original_description']);
             self::assertSame('Serviço executado independente', $detail['executed_service']);
             self::assertSame($supplement->taskActivities, $detail['task_activities']);
             self::assertSame($original, $supplement->description);

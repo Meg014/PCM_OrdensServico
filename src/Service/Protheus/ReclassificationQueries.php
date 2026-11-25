@@ -41,11 +41,14 @@ SQL;
             if (in_array($column, ['TJ_USUAINI', 'TJ_USUAFIM'], true) && !str_contains($sql, 'j.' . $column)) continue;
             $columns[] = 'o.' . $column;
         }
+        // The historical dashboard reuses the complete source in several aggregates.
+        // A hash join avoids repeated JSON lookups there. Identity lookups need their indexed plans.
+        $join = str_contains($sql, '/* PCM historical dashboard */') ? 'LEFT HASH JOIN' : 'LEFT JOIN';
         $cte = self::START . "\nSELECT " . implode(', ', $columns) . ',
     o.TJ_CODAREA AS pcm_original_area, m.destination AS pcm_destination,
     COALESCE(m.destination, o.TJ_CODAREA) AS TJ_CODAREA
 FROM dbo.STJ010 o
-LEFT JOIN OPENJSON(CAST(:pcm_areas AS nvarchar(max)))
+' . $join . ' OPENJSON(CAST(:pcm_areas AS nvarchar(max)))
     WITH (branch varchar(20), number varchar(50), destination varchar(20)) m
     ON m.branch COLLATE DATABASE_DEFAULT=o.TJ_FILIAL AND m.number COLLATE DATABASE_DEFAULT=o.TJ_ORDEM' . self::END;
         $body = str_replace([self::SOURCE, 'j.TJ_CODAREA AS original_area', 'CAST(NULL AS varchar(20)) AS reclassified_area'],

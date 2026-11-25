@@ -180,8 +180,10 @@ final class ProtheusSectorService
                 'historical_rankings' => $historical,
                 'missing_start' => $missing, 'has_more' => $data['has_more']]);
         } catch (Throwable $exception) {
+            $failureStage = $stage === 'repository' ? $repository->sectorDiagnosticStage() : $stage;
+            \Cake\Log\Log::error('PCM setor [' . ($area ?: 'geral') . ' / ' . $failureStage . '] ' . $exception::class . ': ' . strtok($exception->getMessage(), "\r\n"));
             if ($this->diagnostic !== null && PHP_SAPI === 'cli') {
-                ($this->diagnostic)($exception, $stage === 'repository' ? $repository->sectorDiagnosticStage() : $stage);
+                ($this->diagnostic)($exception, $failureStage);
             }
             return $result;
         }

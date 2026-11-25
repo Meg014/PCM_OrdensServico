@@ -170,7 +170,7 @@ SQL;
     private static function dashboardBase(): string
     {
         return <<<'SQL'
-WITH base AS (
+WITH base AS ( /* PCM historical dashboard */
     SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODAREA, j.TJ_CODBEM, j.TJ_SERVICO,
            j.TJ_CCUSTO, j.TJ_TIPO, j.TJ_SITUACA, j.TJ_TERMINO,
            CASE WHEN j.TJ_TERMINO = 'S' THEN 'completed' ELSE 'open' END AS status_group,

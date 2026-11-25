@@ -107,6 +107,7 @@ final class ProtheusDashboardService
             $payload['available'] = true;
             $payload['queried_at'] = (new DateTimeImmutable())->format(DATE_ATOM);
         } catch (Throwable $exception) {
+            \Cake\Log\Log::error('PCM Geral/TV [' . $stage . '] ' . $exception::class . ': ' . strtok($exception->getMessage(), "\r\n"));
             if ($this->diagnostic !== null && PHP_SAPI === 'cli') ($this->diagnostic)($exception, $stage);
             $payload['record_count'] = null;
             $payload['groups'] = [];

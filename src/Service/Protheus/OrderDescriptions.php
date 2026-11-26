@@ -11,18 +11,22 @@ final class OrderDescriptions
     /** Shared order presentation using equipment data already loaded by the caller. */
     public static function listing(array $order): string
     {
-        return self::forOrder($order['descricao'] ?? null, $order['TJ_CODBEM'] ?? null, $order['equipment_name'] ?? null);
+        return self::forOrder($order['descricao'] ?? null, $order['TJ_CODBEM'] ?? null, $order['equipment_name'] ?? null,
+            $order['equipment_family'] ?? null);
     }
 
-    public static function forOrder(?string $original, ?string $equipmentCode, ?string $equipmentName): string
+    public static function forOrder(?string $original, ?string $equipmentCode, ?string $equipmentName, ?string $equipmentFamily = null): string
     {
-        return self::display(self::usesEquipmentDescription($equipmentCode) ? $equipmentName : $original);
+        return self::display(self::usesEquipmentDescription($equipmentCode, $equipmentFamily) ? $equipmentName : $original);
     }
 
-    public static function usesEquipmentDescription(?string $equipmentCode): bool
+    public static function usesEquipmentDescription(?string $equipmentCode, ?string $equipmentFamily = null): bool
     {
+        $family = strtoupper(trim($equipmentFamily ?? ''));
+        if ($family !== '') return $family === 'ROT';
+
         $equipment = strtoupper(trim($equipmentCode ?? ''));
-        foreach (['PREVELE FAB', 'PREVLUB FAB', 'PREVMEC FAB'] as $prefix) {
+        foreach (['PREVELE FAB', 'PREVLUB FAB', 'PREVMEC FAB', 'PREVLAM FAB'] as $prefix) {
             if (str_starts_with($equipment, $prefix)) {
                 return true;
             }

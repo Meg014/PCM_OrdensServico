@@ -45,13 +45,14 @@ SQL
 ), named AS (
     SELECT j.*,
         CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END AS equipment_name,
+        CASE WHEN bl.matches > 0 THEN bl.family ELSE bs.family END AS equipment_family,
         CASE WHEN bl.matches > 0 THEN bl.matches ELSE bs.matches END AS equipment_matches,
         CASE WHEN sl.matches > 0 THEN sl.name ELSE ss.name END AS service_name,
         CASE WHEN sl.matches > 0 THEN sl.matches ELSE ss.matches END AS service_matches
     FROM scoped j
-    OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
+    OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b
         WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.T9_FILIAL = j.TJ_FILIAL AND b.D_E_L_E_T_ <> '*') bl
-    OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name FROM dbo.ST9010 b
+    OUTER APPLY (SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b
         WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.T9_FILIAL = '' AND b.D_E_L_E_T_ <> '*') bs
     OUTER APPLY (SELECT COUNT(*) AS matches, MAX(s.T4_NOME) AS name FROM dbo.ST4010 s
         WHERE s.T4_SERVICO = j.TJ_SERVICO AND s.T4_FILIAL = j.TJ_FILIAL AND s.D_E_L_E_T_ <> '*') sl
@@ -274,7 +275,7 @@ SQL : '';
 
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
-SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, TJ_SERVICO, service_name,
+SELECT record_id, TJ_FILIAL, TJ_ORDEM, descricao, TJ_CODBEM, equipment_name, equipment_family, TJ_SERVICO, service_name,
     TJ_CODAREA, TJ_CCUSTO, TJ_TIPO, TJ_SITUACA, TJ_TERMINO, filtered.status AS status,
     CONVERT(VARCHAR(10), origin_date, 23) AS origin_date, CONVERT(VARCHAR(8), origin_date, 112) AS TJ_DTORIGI,
     CONVERT(VARCHAR(10), planned_date, 23) AS planned_date, TJ_HOMPINI, TJ_DTPRINI, TJ_HOPRINI,
@@ -314,7 +315,7 @@ SQL;
         return ($backlog ? self::backlogBase($area) : self::base($area)) . <<<SQL
 
 SELECT filtered.record_id, filtered.TJ_FILIAL, filtered.TJ_ORDEM, filtered.descricao,
-    filtered.TJ_CODBEM, filtered.equipment_name, filtered.TJ_SERVICO, filtered.service_name,
+    filtered.TJ_CODBEM, filtered.equipment_name, filtered.equipment_family, filtered.TJ_SERVICO, filtered.service_name,
     filtered.TJ_CODAREA, filtered.TJ_CCUSTO, cost_center.name AS cost_center_name,
     filtered.TJ_TIPO, filtered.status,
     l.TL_TIPOREG, l.TL_CODIGO, l.TL_DTINICI, l.TL_DTFIM, l.TL_HOINICI, l.TL_HOFIM,

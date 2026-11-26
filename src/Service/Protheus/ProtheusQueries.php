@@ -431,12 +431,13 @@ WITH filtered AS (
           WHERE offseason.branch = j.TJ_FILIAL AND offseason.code = j.TJ_SERVICO))
 ), named AS (
     SELECT j.*, CASE WHEN bl.matches > 0 THEN bl.name ELSE bs.name END equipment_name,
+        CASE WHEN bl.matches > 0 THEN bl.family ELSE bs.family END AS equipment_family,
         CASE WHEN bl.matches > 0 THEN bl.matches ELSE bs.matches END equipment_matches,
         CASE WHEN sl.matches > 0 THEN sl.name ELSE ss.name END service_name,
         CASE WHEN sl.matches > 0 THEN sl.matches ELSE ss.matches END service_matches
     FROM filtered j
-    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL=j.TJ_FILIAL AND b.D_E_L_E_T_<>'*') bl
-    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL='' AND b.D_E_L_E_T_<>'*') bs
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL=j.TJ_FILIAL AND b.D_E_L_E_T_<>'*') bl
+    OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL='' AND b.D_E_L_E_T_<>'*') bs
     OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s WHERE s.T4_SERVICO=j.TJ_SERVICO AND s.T4_FILIAL=j.TJ_FILIAL AND s.D_E_L_E_T_<>'*') sl
     OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s WHERE s.T4_SERVICO=j.TJ_SERVICO AND s.T4_FILIAL='' AND s.D_E_L_E_T_<>'*') ss
 )
@@ -480,6 +481,7 @@ WITH page_keys AS (
 )
 SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM,
        CASE WHEN b_local.matches > 0 THEN b_local.name ELSE b_shared.name END AS equipment_name,
+        CASE WHEN b_local.matches > 0 THEN b_local.family ELSE b_shared.family END AS equipment_family,
        CASE WHEN b_local.matches > 0 THEN b_local.matches ELSE b_shared.matches END AS equipment_matches,
        j.TJ_SERVICO,
        CASE WHEN s_local.matches > 0 THEN s_local.name ELSE s_shared.name END AS service_name,
@@ -495,13 +497,13 @@ SELECT j.R_E_C_N_O_ AS record_id, p.identity_count, j.TJ_FILIAL, j.TJ_ORDEM, j.T
 FROM page_keys p
 INNER JOIN dbo.STJ010 j ON j.R_E_C_N_O_ = p.R_E_C_N_O_ AND j.D_E_L_E_T_ <> '*'
 OUTER APPLY (
-    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name
+    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name, MAX(b.T9_CODFAMI) AS family
     FROM dbo.ST9010 b
     WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*'
       AND b.T9_FILIAL = j.TJ_FILIAL
 ) b_local
 OUTER APPLY (
-    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name
+    SELECT COUNT(*) AS matches, MAX(b.T9_NOME) AS name, MAX(b.T9_CODFAMI) AS family
     FROM dbo.ST9010 b
     WHERE b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*'
       AND b.T9_FILIAL = ''

@@ -48,6 +48,7 @@ final class OrderSupplementMapper
             'ending_user' => $this->text($main['TJ_USUAFIM'] ?? null),
             'update_user' => $this->text($main['TJ_USUARIO'] ?? null),
             'equipment_code' => $this->text($main['TJ_CODBEM'] ?? null),
+            'equipment_family' => $this->text($order['equipamento']['T9_CODFAMI'] ?? null),
             'equipment_name' => $this->text($order['equipamento']['T9_NOME'] ?? null),
             'service_code' => $this->text($main['TJ_SERVICO'] ?? null),
             'service_name' => $this->text($order['servico']['T4_NOME'] ?? null),

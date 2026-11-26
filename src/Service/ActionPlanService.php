@@ -76,6 +76,7 @@ final class ActionPlanService
                     'sector' => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$row['reclassified_area'] ?? ''] ?? trim((string)$row['cost_center_name']),
                     'original_area' => $row['original_area'] ?? null,
                     'equipment' => trim((string)$row['equipment_name']),
+                    'equipment_family' => $row['equipment_family'] ?? null,
                     'equipment_code' => trim((string)($row['TJ_CODBEM'] ?? '')),
                     'maintenance_area_code' => trim((string)($row['TJ_CODAREA'] ?? '')),
                     'cost_center_code' => trim((string)($row['TJ_CCUSTO'] ?? '')),

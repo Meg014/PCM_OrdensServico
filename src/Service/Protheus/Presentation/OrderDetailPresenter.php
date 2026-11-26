@@ -56,9 +56,10 @@ final class OrderDetailPresenter
                 },
                 'origin_date' => $available ? $supplement->originDate : null,
                 'description' => $available ? \App\Service\Protheus\OrderDescriptions::forOrder($supplement->description,
-                    $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null) : null,
+                    $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_name'] ?? null,
+                    $supplement->maintenance['equipment_family'] ?? null) : null,
                 'original_description' => $available && !\App\Service\Protheus\OrderDescriptions::usesEquipmentDescription(
-                    $supplement->maintenance['equipment_code'] ?? null,
+                    $supplement->maintenance['equipment_code'] ?? null, $supplement->maintenance['equipment_family'] ?? null,
                 ) ? $supplement->description : null,
                 'executed_service' => $execution['text'] ?? null,
                 'executed_service_source' => $execution['source'] ?? null,

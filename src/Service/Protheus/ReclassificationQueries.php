@@ -9,10 +9,10 @@ final class ReclassificationQueries
     public const PREVIEW = <<<'SQL'
 SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_CODAREA,
     j.TJ_SITUACA, j.TJ_TERMINO, CONVERT(varchar(max),j.TJ_OBSERVA) AS descricao,
-    b.T9_NOME AS equipment_name, s.T4_NOME AS service_name
+    b.T9_NOME AS equipment_name, b.T9_CODFAMI AS equipment_family, s.T4_NOME AS service_name
 FROM OPENJSON(CAST(:numbers AS nvarchar(max))) WITH (number varchar(50) '$') n
 JOIN dbo.STJ010 j ON j.TJ_ORDEM=n.number AND j.TJ_FILIAL=CAST(:branch AS varchar(20)) AND j.D_E_L_E_T_<>'*'
-OUTER APPLY (SELECT TOP (1) b.T9_NOME FROM dbo.ST9010 b
+OUTER APPLY (SELECT TOP (1) b.T9_NOME, b.T9_CODFAMI FROM dbo.ST9010 b
     WHERE b.T9_CODBEM=j.TJ_CODBEM AND b.T9_FILIAL IN (j.TJ_FILIAL,'') AND b.D_E_L_E_T_<>'*'
     ORDER BY b.T9_FILIAL DESC,b.R_E_C_N_O_) b
 OUTER APPLY (SELECT TOP (1) s.T4_NOME FROM dbo.ST4010 s

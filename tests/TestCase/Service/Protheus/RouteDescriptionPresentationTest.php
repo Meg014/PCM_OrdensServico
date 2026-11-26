@@ -17,12 +17,12 @@ final class RouteDescriptionPresentationTest extends TestCase
 {
     public function testRoutesAndOrdinaryOrdersAcrossDetailsAndStreamingSchemas(): void
     {
-        foreach (['PREVELE FAB 01', 'PREVLUB FAB 02', 'PREVMEC FAB 07', 'ELV 80 016'] as $code) {
+        foreach (['PREVELE FAB 01', 'PREVLUB FAB 02', 'PREVMEC FAB 07', 'ELV 80 016', 'ROTA07', 'PREVLAM FAB 01'] as $code) {
             $expected = $code === 'ELV 80 016' ? 'Trocar correia' : 'ROTA 07 - RECEPÇÃO';
             $original = "Trocar correia\nferramentas limpas antes do serviço? ( ) sim ( ) não ( ) n/a";
-            $row = ['descricao' => $original, 'TJ_CODBEM' => $code, 'equipment_name' => 'ROTA 07 - RECEPÇÃO'];
+            $row = ['descricao' => $original, 'TJ_CODBEM' => $code, 'equipment_family' => $code === 'ROTA07' ? 'ROT' : null, 'equipment_name' => 'ROTA 07 - RECEPÇÃO'];
             $supplement = new OrderSupplement(number: '007396', branch: '01', description: $original,
-                maintenance: ['equipment_code' => $code, 'equipment_name' => $row['equipment_name']],
+                maintenance: ['equipment_code' => $code, 'equipment_family' => $row['equipment_family'], 'equipment_name' => $row['equipment_name']],
                 executedService: 'Serviço executado independente', taskActivities: ['tasks' => [['description' => 'Tarefa independente']]]);
             $detail = (new OrderDetailPresenter())->present(['source_order_number' => '007396', 'branch_code' => '01'], $supplement, Availability::Available)['protheus'];
             self::assertSame($expected, $detail['description']);
@@ -44,9 +44,9 @@ final class RouteDescriptionPresentationTest extends TestCase
     public function testActionPlanGroupingCarriesEquipmentIdentityToDescriptionColumnOnly(): void
     {
         $rows = [];
-        foreach (['PREVELE FAB 01', 'PREVLUB FAB 02', 'PREVMEC FAB 07', 'ELV 80 016'] as $i => $code) {
+        foreach (['PREVELE FAB 01', 'PREVLUB FAB 02', 'PREVMEC FAB 07', 'ELV 80 016', 'ROTA07', 'PREVLAM FAB 01'] as $i => $code) {
             $rows[] = ['TJ_FILIAL' => '01', 'TJ_ORDEM' => '00739' . $i, 'TJ_CODBEM' => $code,
-                'reference_date' => '2026-11-10', 'cost_center_name' => 'Setor', 'equipment_name' => 'ROTA 07 - RECEPÇÃO',
+                'equipment_family' => $code === 'ROTA07' ? 'ROT' : null, 'reference_date' => '2026-11-10', 'cost_center_name' => 'Setor', 'equipment_name' => 'ROTA 07 - RECEPÇÃO',
                 'description' => 'Trocar correia', 'service_name' => 'Preventiva', 'TJ_TERMINO' => 'N',
                 'TL_TAREFA' => '001', 'task_description' => 'Tarefa independente'];
         }

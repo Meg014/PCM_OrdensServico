@@ -60,6 +60,7 @@ SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_COD
     CONVERT(varchar(max), j.TJ_OBSERVA) description,
     c.name cost_center_name, c.matches cost_center_matches,
     CASE WHEN b.matches > 0 THEN b.name ELSE bs.name END equipment_name,
+        CASE WHEN b.matches > 0 THEN b.family ELSE bs.family END AS equipment_family,
     CASE WHEN b.matches > 0 THEN b.matches ELSE bs.matches END equipment_matches,
     CASE WHEN s.matches > 0 THEN s.name ELSE ss.name END service_name,
     CASE WHEN s.matches > 0 THEN s.matches ELSE ss.matches END service_matches,
@@ -70,9 +71,9 @@ SELECT j.TJ_FILIAL, j.TJ_ORDEM, j.TJ_CCUSTO, j.TJ_CODBEM, j.TJ_SERVICO, j.TJ_COD
 FROM filtered j
 OUTER APPLY (SELECT COUNT(*) matches, MAX(c.CTT_DESC01) name FROM dbo.CTT010 c
     WHERE c.CTT_FILIAL = j.TJ_FILIAL AND c.CTT_CUSTO = j.TJ_CCUSTO AND c.D_E_L_E_T_ <> '*') c
-OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b
+OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b
     WHERE b.T9_FILIAL = j.TJ_FILIAL AND b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*') b
-OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name FROM dbo.ST9010 b
+OUTER APPLY (SELECT COUNT(*) matches, MAX(b.T9_NOME) name, MAX(b.T9_CODFAMI) AS family FROM dbo.ST9010 b
     WHERE b.T9_FILIAL = '' AND b.T9_CODBEM = j.TJ_CODBEM AND b.D_E_L_E_T_ <> '*') bs
 OUTER APPLY (SELECT COUNT(*) matches, MAX(s.T4_NOME) name FROM dbo.ST4010 s
     WHERE s.T4_FILIAL = j.TJ_FILIAL AND s.T4_SERVICO = j.TJ_SERVICO AND s.D_E_L_E_T_ <> '*') s

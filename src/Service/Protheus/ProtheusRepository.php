@@ -787,7 +787,7 @@ final class ProtheusRepository implements ProtheusReaderInterface
             }
         }
         $result['descricao'] = OrderDescriptions::forOrder($result['original_description'], $order['TJ_CODBEM'],
-            $result['equipamento']['T9_NOME'] ?? null);
+            $result['equipamento']['T9_NOME'] ?? null, $result['equipamento']['T9_CODFAMI'] ?? null);
         // Optional catalog failures never hide the order, labor, materials or original text.
         $result['task_activity_rows'] = [];
         $result['task_activities_available'] = false;

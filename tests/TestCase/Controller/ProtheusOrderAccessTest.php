@@ -387,6 +387,7 @@ final class ProtheusOrderAccessTest extends TestCase
         self::assertStringContainsString('name="centro"', $html); // Preserve existing drill-down scopes, without a visible filter.
         self::assertStringContainsString('page=3', $html);
         self::assertStringContainsString('/pcm/protheus/os/007659?filial=01', $html);
+        self::assertMatchesRegularExpression('/<a\b(?=[^>]*text-danger-emphasis)(?=[^>]*\/pcm\/protheus\/os\/007659)[^>]*>007659<\/a>/', $html);
         self::assertStringContainsString('<td class="text-warning fw-semibold">14/08/2502</td>', $html);
         self::assertSame($before, $listing);
     }

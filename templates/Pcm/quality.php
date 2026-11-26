@@ -27,7 +27,7 @@ $this->assign('title', 'Qualidade dos dados');
             <tbody>
             <?php foreach ($orders as $order): ?>
                 <tr>
-                    <td><strong><?= h($order->source_order_number) ?></strong></td>
+                    <td><strong class="<?= h($this->OrderNumber->colorClass($order->treated_status)) ?>"><?= h($order->source_order_number) ?></strong></td>
                     <td><?= h($this->MaintenanceArea->name($order->maintenance_area_code)) ?></td>
                     <td><?= h(trim(($order->equipment_code ?: '—') . ($order->equipment_name ? ' — ' . $order->equipment_name : ''))) ?></td>
                     <td><?= h($order->service_name ?: $order->service_code ?: '—') ?></td>

@@ -15,6 +15,19 @@ use RuntimeException;
 
 final class OrderListingTest extends TestCase
 {
+    public function testCancelledVisibilityDependsOnExactNumberOrExplicitStatus(): void
+    {
+        foreach ([
+            [[], ''], [['order_status' => 'all'], ''], [['bem' => 'PREVELE FAB 01'], ''],
+            [['area' => 'MECANI', 'initial_user' => 'PCM'], ''], [['order_status' => 'cancelled'], 'cancelled'],
+            [['os' => '006346'], 'all'], [['os' => '006346', 'order_status' => 'all'], 'all'],
+            [['os' => '006346', 'order_status' => 'closed'], 'closed'],
+            [['os' => '006346', 'order_status' => 'open'], 'open'], [['os' => '006346', 'situacao' => 'L'], ''],
+        ] as [$query, $expected]) {
+            self::assertSame($expected, \App\Service\Protheus\OrderAuditSelection::forListing($query)['order_status']);
+        }
+    }
+
     public function testCurrentOrderWithoutLocalSnapshotAndBoundedSqlPage(): void
     {
         $calls = [];

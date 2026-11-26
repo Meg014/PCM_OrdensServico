@@ -1,7 +1,7 @@
 <?php $this->assign('title', 'OS ' . $identity['source_order_number']); ?>
 <?= $this->element('sector_return_link') ?>
 <header class="pcm-page-header"><div><p class="pcm-eyebrow">PCM | ORDENS DE SERVIÇO</p>
-<h1>OS <?= h($identity['source_order_number']) ?></h1>
+<h1>OS <span data-current-order-number="<?= h($identity['source_order_number']) ?>"><?= h($identity['source_order_number']) ?></span></h1>
 <p><span class="badge text-bg-secondary">Fonte: Protheus</span></p></div>
 <?= $this->Html->link('Pesquisar ordens', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?></header>
 <?= $this->element('protheus_order', ['protheusUrl' => $this->Url->build([

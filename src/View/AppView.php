@@ -40,5 +40,6 @@ class AppView extends View
         parent::initialize();
         $this->addHelper('PcmTime');
         $this->addHelper('MaintenanceArea');
+        $this->addHelper('OrderNumber');
     }
 }

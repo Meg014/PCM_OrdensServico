@@ -6,6 +6,34 @@ use InvalidArgumentException;
 final class OrderAuditSelection
 {
     private const ALL = '(1 = 1 /* explicit audit consultation */)';
+    private const EXACT_NUMBER = ' AND j.TJ_ORDEM = CAST(:drilldown_number AS VARCHAR(100))';
+
+    public static function withDrilldownNumber(string $sql): string
+    {
+        $anchor = "j.D_E_L_E_T_ <> '*'";
+        $position = strpos($sql, $anchor);
+        return str_starts_with($sql, 'WITH scoped AS (') && $position !== false
+            ? substr_replace($sql, $anchor . self::EXACT_NUMBER, $position, strlen($anchor)) : $sql;
+    }
+
+    public static function withoutDrilldownNumber(string $sql): string
+    {
+        return str_replace(self::EXACT_NUMBER, '', $sql);
+    }
+
+    public static function forListing(array $query): array
+    {
+        $selection = self::normalize($query);
+        if (($query['situacao'] ?? '') === 'C' && in_array($selection['order_status'], ['', 'all'], true)) {
+            $selection['order_status'] = 'cancelled';
+        }
+        if (in_array($selection['order_status'], ['', 'all'], true)) {
+            $exact = trim((string)($query['os'] ?? '')) !== '';
+            $selection['order_status'] = $exact && empty($query['situacao'])
+                && empty($query['card']) && empty($query['backlog_age']) ? 'all' : '';
+        }
+        return $selection;
+    }
 
     public static function normalize(array $query): array
     {
@@ -33,6 +61,7 @@ final class OrderAuditSelection
 
     public static function apply(string $sql, string $state, bool $user): string
     {
+        if ($sql === ProtheusQueries::historicalServiceDefinitions()) return $sql;
         $anchor = "j.D_E_L_E_T_ <> '*'";
         $position = strpos($sql, $anchor);
         if ($position === false) return $sql;

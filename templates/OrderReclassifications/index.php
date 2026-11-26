@@ -1,5 +1,8 @@
 <?php
 $this->assign('title', 'Reclassificação de O.S.');
+$numberLink = fn(array $r, ?string $status) => $this->Html->link($r['number'], [
+    '_name' => 'pcm-protheus-order', 'number' => $r['number'], '?' => ['filial' => $r['branch']],
+], ['class' => $this->OrderNumber->colorClass($status)]);
 $name = static fn($code) => \App\Model\Table\MaintenanceAreasTable::FRIENDLY_NAMES[$code] ?? ($code ?: 'Sem área');
 $pages = function (string $key, int $page, bool $next) {
     foreach (['Anterior' => $page - 1, 'Próxima' => $page + 1] as $label => $target) {
@@ -35,7 +38,7 @@ $pages = function (string $key, int $page, bool $next) {
 </tr></thead><tbody>
 <?php foreach ($preview['rows'] as $r): ?><tr><td>
 <?php if ($r['issue'] === ''): ?><input class="form-check-input" type="checkbox" name="selected[]" checked value="<?= h($r['number']) ?>" aria-label="Incluir O.S. <?= h($r['number']) ?>"><?php endif; ?>
-</td><?php foreach ([$r['number'], $r['description'], $r['equipment'], $r['service'], $r['status'], $name($r['original']), $name($r['destination']), $r['issue'] ?: 'Disponível'] as $value): ?><td><?= h($value) ?></td><?php endforeach; ?></tr><?php endforeach; ?>
+</td><td><?= $r['issue'] === 'Inexistente' ? h($r['number']) : $numberLink($r, $r['status']) ?></td><?php foreach ([$r['description'], $r['equipment'], $r['service'], $r['status'], $name($r['original']), $name($r['destination']), $r['issue'] ?: 'Disponível'] as $value): ?><td><?= h($value) ?></td><?php endforeach; ?></tr><?php endforeach; ?>
 </tbody></table></div>
 <?= $this->Form->button('Confirmar selecionadas', ['class' => 'btn btn-primary', 'disabled' => !in_array('', array_column($preview['rows'], 'issue'), true)]) ?>
 <?= $this->Form->end() ?></section><?php endif; ?>
@@ -45,7 +48,7 @@ $pages = function (string $key, int $page, bool $next) {
 <?= $this->Form->hidden('operation', ['value' => 'reverse']) ?>
 <div class="table-responsive"><table class="table"><thead><tr><th>Reverter</th><th>Filial</th><th>O.S.</th><th>Área original na transferência</th><th>Destino</th></tr></thead><tbody>
 <?php foreach (array_slice($active, 0, 50) as $r): ?><tr><td><input type="checkbox" class="form-check-input" name="ids[]" value="<?= (int)$r['id'] ?>" aria-label="Reverter O.S. <?= h($r['number']) ?>"></td>
-<td><?= h($r['branch']) ?></td><td><?= h($r['number']) ?></td><td><?= h($name($r['original_area'])) ?></td><td><?= h($name($r['destination'])) ?></td></tr><?php endforeach; ?>
+<td><?= h($r['branch']) ?></td><td><?= $numberLink($r, $situations[$r['branch']][$r['number']] ?? null) ?></td><td><?= h($name($r['original_area'])) ?></td><td><?= h($name($r['destination'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div>
 <?= $this->Form->control('reason', ['id' => 'reversal-reason', 'label' => 'Justificativa da reversão', 'required' => true, 'maxlength' => 2000, 'class' => 'form-control']) ?>
 <?= $this->Form->button('Reverter selecionadas', ['class' => 'btn btn-outline-danger my-2']) ?>
@@ -55,5 +58,5 @@ $pages = function (string $key, int $page, bool $next) {
 <?php if (!$history): ?><p>Nenhum evento nesta página.</p><?php else: ?>
 <div class="table-responsive"><table class="table"><thead><tr>
 <?php foreach (['Data/hora (Brasília)', 'Usuário', 'Operação', 'Filial', 'O.S.', 'Área anterior', 'Destino', 'Justificativa'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead><tbody>
-<?php foreach (array_slice($history, 0, 50) as $r): ?><tr><?php foreach ([$r['created'], $r['actor'], $r['operation'], $r['branch'], $r['number'], $name($r['previous_area']), $name($r['destination']), $r['reason']] as $value): ?><td><?= h($value) ?></td><?php endforeach; ?></tr><?php endforeach; ?>
+<?php foreach (array_slice($history, 0, 50) as $r): ?><tr><?php foreach ([$r['created'], $r['actor'], $r['operation'], $r['branch']] as $value): ?><td><?= h($value) ?></td><?php endforeach; ?><td><?= $numberLink($r, $situations[$r['branch']][$r['number']] ?? null) ?></td><?php foreach ([$name($r['previous_area']), $name($r['destination']), $r['reason']] as $value): ?><td><?= h($value) ?></td><?php endforeach; ?></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?><nav><?php $pages('history_page', $historyPage, count($history) > 50) ?></nav></section>

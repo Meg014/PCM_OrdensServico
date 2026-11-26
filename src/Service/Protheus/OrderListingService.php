@@ -27,7 +27,7 @@ final class OrderListingService
             $filters[$key] = trim($value);
         }
         $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
-        $filters += OrderAuditSelection::normalize($query);
+        $filters += OrderAuditSelection::forListing($query);
         $plannedPeriod = \App\Service\PcmPeriod::fromFilters([
             'date_start' => $filters['period_start'], 'date_end' => $filters['period_end'],
         ]);

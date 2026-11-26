@@ -80,7 +80,7 @@ final class OrderEntryExportService
             $filters[$key] = trim($value);
         }
         $filters = ChecklistServiceFilter::normalize($filters + array_intersect_key($query, array_flip(['service_scope', 'checklist_service'])));
-        $filters += OrderAuditSelection::normalize($query);
+        $filters += OrderAuditSelection::forListing($query);
         $filters = EquipmentFilter::normalize($filters);
         if (!in_array($filters['centro_modo'], ['', 'exact', 'blank', 'null'], true)
             || ($filters['centro_modo'] === 'exact' && $filters['centro'] === '')) {

@@ -29,11 +29,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
     private ?array $sectorPeriod = null;
     private ?array $plannedPeriod = null;
     private array $auditSelection = [];
+    private string $drilldownNumber = '';
 
     public function withAuditSelection(array $query): self
     {
         $copy = clone $this;
         $copy->auditSelection = OrderAuditSelection::normalize($query);
+        $copy->drilldownNumber = !empty($query['card']) || !empty($query['backlog_age']) ? trim($query['os'] ?? '') : '';
         return $copy;
     }
 
@@ -942,6 +944,13 @@ final class ProtheusRepository implements ProtheusReaderInterface
         if (in_array($params['area'] ?? $params['scope_area'] ?? $this->areaScope, ['ELETRI', 'INSTRU'], true)) $sql = SectorPresentationScope::areas($sql);
         if ($this->deadline !== null && microtime(true) >= $this->deadline) {
             throw new RuntimeException('Tempo de consulta complementar excedido.');
+        }
+        if ($this->drilldownNumber !== '') {
+            $filtered = OrderAuditSelection::withDrilldownNumber($sql);
+            if ($filtered !== $sql) {
+                $sql = $filtered;
+                $params['drilldown_number'] = $this->drilldownNumber;
+            }
         }
         if (ReclassificationQueries::applicable($sql)) {
             $this->effectiveAreas ??= json_encode(($this->reclassifications ?? new \App\Service\OrderReclassificationService())->activeMap(), JSON_THROW_ON_ERROR);

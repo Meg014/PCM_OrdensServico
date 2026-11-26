@@ -70,8 +70,8 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('unidade', ['label' => 'Unidade', 'empty' => 'Todas',
     'options' => \App\Service\Protheus\ProtheusUnit::LABELS, 'value' => $filters['unidade'] ?? '', 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><?= $this->Form->control('order_status', ['label' => 'Situação',
-    'options' => ['all' => 'Todas', 'open' => 'Abertas', 'closed' => 'Fechadas', 'cancelled' => 'Canceladas'],
-    'value' => ($filters['order_status'] ?? '') ?: 'all', 'class' => 'form-select']) ?></div>
+    'options' => ['all' => 'Padrão', 'open' => 'Abertas', 'closed' => 'Fechadas', 'cancelled' => 'Canceladas'],
+    'value' => ($filters['order_status'] ?? '') ?: (($filters['situacao'] ?? '') === 'C' ? 'cancelled' : 'all'), 'class' => 'form-select']) ?></div>
 <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="filter-area">Área/Setor</label>
 <select class="form-select" id="filter-area" name="area"><option value="">Todos</option>
 <?php foreach (($areas ?? []) as $area): ?><option value="<?= h($area) ?>"<?= ($filters['area'] ?? '') === $area ? ' selected' : '' ?>><?= h($areaName($area)) ?></option><?php endforeach; ?>
@@ -92,7 +92,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <?php if (($filters['situacao'] ?? '') === 'C'): ?><p class="text-body-secondary">Consulta histórica de canceladas. Estas O.S. não entram nos indicadores de abertas ou fechadas.</p><?php endif; ?>
 <div class="col-12"><button class="btn btn-primary" type="submit">Pesquisar</button>
 <?= $this->Html->link('Limpar', ['_name' => 'pcm-orders'], ['class' => 'btn btn-outline-secondary']) ?>
-<span class="text-body-secondary ms-2">O.S. por código exato.</span></div>
+<span class="text-body-secondary ms-2">Para consultar canceladas, selecione a situação ou informe o número exato da O.S.</span></div>
 <?= $this->Form->end() ?></section>
 <?php if (($filters['analitico'] ?? '') === '1'): ?><p class="alert alert-secondary">Escopo analítico: Data de origem a partir de 01/01/2025.</p><?php endif; ?>
 <?php if (!empty($listing['drilldown'])): ?><p class="alert alert-secondary pcm-active-drilldown"><strong>Filtro ativo: <?= h($areaName($filters['area'] ?? '')) ?> · <?= h($listing['drilldown']['label']) ?></strong>
@@ -105,7 +105,7 @@ $pageUrl = static fn (int $page) => ['_name' => 'pcm-orders',
 <table class="table pcm-orders-table pcm-order-listing align-middle"><thead><tr><th class="pcm-order-number">O.S.</th><th class="pcm-order-description">Descrição</th><?php foreach (['Data de origem', 'Início real', 'Fim real', 'Equipamento', 'Serviço', 'Situação', 'Centro de custo', 'Área/Setor'] as $label): ?><th><?= h($label) ?></th><?php endforeach; ?></tr></thead>
 <tbody>
 <?php foreach ($listing['orders'] as $row): ?>
-<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']]) ?><?= $this->element('order_audit_flags', ['order' => $row, 'excludeFlags' => ['invalid_date', 'date_out_of_range']]) ?></td>
+<tr><td class="pcm-order-number"><?= $this->Html->link($row['TJ_ORDEM'], ['_name' => 'pcm-protheus-order', 'number' => $row['TJ_ORDEM'], '?' => ['filial' => $row['TJ_FILIAL'], 'unit' => $filters['unidade'] ?? '']], ['class' => $this->OrderNumber->colorClass($row['TJ_SITUACA'] ?? null)]) ?><?= $this->element('order_audit_flags', ['order' => $row, 'excludeFlags' => ['invalid_date', 'date_out_of_range']]) ?></td>
 <td class="pcm-order-description"><?= $this->element('order_description', ['description' => \App\Service\Protheus\OrderDescriptions::listing($row)]) ?></td>
 <td<?= $originDateHasIssue($row) ? ' class="text-warning fw-semibold"' : '' ?>><?= h($originDate($row['origin_date'] ?? null)) ?></td>
 <td><?= h($protheusDate(\App\Service\Protheus\OrderDates::pair($row, 'actual_start')[0])) ?></td>

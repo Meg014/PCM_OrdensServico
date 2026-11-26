@@ -588,6 +588,10 @@ SQL;
 
     public static function allows(string $sql): bool
     {
+        $withoutNumber = OrderAuditSelection::withoutDrilldownNumber($sql);
+        if ($withoutNumber !== $sql && OrderAuditSelection::withDrilldownNumber($withoutNumber) === $sql) {
+            return self::allows($withoutNumber);
+        }
         if ($sql === ReclassificationQueries::PREVIEW) return true;
         $original = ReclassificationQueries::original($sql);
         if ($original !== null) {

@@ -56,12 +56,19 @@ final class OrderReclassificationsController extends AppController
             $this->Flash->error('Lote não concluído. Atualize a prévia e tente novamente.');
         }
         $enabled = $service->enabled();
+        $situations = [];
         if ($enabled) {
             $active = $service->page(false, $activePage);
             $history = $service->page(true, $historyPage);
+            try {
+                $situations = $service->currentSituations(array_merge($active, $history));
+            } catch (\Throwable $e) {
+                $this->log($e->getMessage(), 'error');
+                $this->Flash->warning('Situação atual das O.S. indisponível no TOTVS.');
+            }
         }
         $areas = $service::areas();
-        $this->set(compact('areas', 'active', 'history', 'activePage', 'historyPage', 'preview', 'enabled'));
+        $this->set(compact('areas', 'active', 'history', 'activePage', 'historyPage', 'preview', 'enabled', 'situations'));
         return null;
     }
 }

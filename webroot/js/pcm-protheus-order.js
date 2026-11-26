@@ -23,7 +23,7 @@
         const headingText = node('h2', title);
         headingText.append(node('span', 'Fonte: Protheus',
             'badge rounded-pill bg-secondary-subtle text-secondary-emphasis border fw-normal ms-2 align-middle'));
-        block.append(node('p', label), headingText);
+        block.append(label instanceof Node ? label : node('p', label), headingText);
         return block;
     };
     const notice = (target, text = unavailable) => target.replaceChildren(node('p', text, 'text-body-secondary py-3'));
@@ -61,7 +61,14 @@
             return;
         }
         const m = data.maintenance;
-        const title = heading('Detalhes da manutenção', `PROTHEUS · OS ${value(data.number)}`);
+        const cancelled = data.order_status === 'CANCELADA';
+        const label = node('p', 'PROTHEUS · OS ');
+        label.append(node('span', value(data.number), cancelled ? 'text-danger-emphasis' : ''));
+        const title = heading('Detalhes da manutenção', label);
+        const pageNumber = document.querySelector('[data-current-order-number]');
+        if (target === detail && pageNumber?.dataset.currentOrderNumber === data.number) {
+            pageNumber.className = cancelled ? 'text-danger-emphasis' : '';
+        }
         const card = node('section', undefined, 'pcm-detail-card');
         card.append(node('h3', 'Descrição da manutenção', 'h5'));
         const descriptionText = data.description == null ? '' : String(data.description)
@@ -246,14 +253,15 @@
         history.replaceChildren(heading('Histórico de manutenção do equipamento', `PROTHEUS · ${data.equipment_code}`));
         history.append(table(['OS', 'Data de referência', 'Serviço', 'Área', 'Situação / término (originais)', 'Detalhe'],
             data.orders.map(row => {
-                const button = node('button', 'Abrir OS ' + row.TJ_ORDEM, 'btn btn-sm btn-outline-secondary');
+                const cancelled = row.TJ_SITUACA === 'C';
+                const button = node('button', 'Abrir OS ' + row.TJ_ORDEM, cancelled ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-secondary');
                 button.type = 'button';
                 button.addEventListener('click', () => {
                     notice(selected, 'Carregando OS ' + row.TJ_ORDEM + '…');
                     dialog.showModal();
                     request(selected, {part: 'detail', os: row.TJ_ORDEM});
                 });
-                return [row.TJ_ORDEM, date(row.reference_date), codeName(row.TJ_SERVICO, row.service_name),
+                return [node('span', row.TJ_ORDEM, cancelled ? 'text-danger-emphasis' : ''), date(row.reference_date), codeName(row.TJ_SERVICO, row.service_name),
                     row.area_name ?? row.TJ_CODAREA, `Situação: ${value(row.TJ_SITUACA)} · Término: ${value(row.TJ_TERMINO)}`, button];
             }), 'Nenhuma OS disponível nesta página.'));
         const nav = node('nav', undefined, 'd-flex align-items-center gap-3 mt-3');

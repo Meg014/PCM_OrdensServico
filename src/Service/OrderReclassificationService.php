@@ -149,6 +149,19 @@ final class OrderReclassificationService
             'created' => (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s')]);
     }
 
+    public function currentSituations(array $rows): array
+    {
+        $branches = [];
+        foreach ($rows as $row) $branches[$row['branch']][] = $row['number'];
+        $situations = [];
+        foreach ($branches as $branch => $numbers) {
+            $repository = $this->repository ??= new ProtheusRepository();
+            $orders = $repository->reclassificationPreview((string)$branch, array_values(array_unique($numbers)));
+            $situations[$branch] = array_column($orders, 'TJ_SITUACA', 'TJ_ORDEM');
+        }
+        return $situations;
+    }
+
     public function page(bool $history, int $page): array
     {
         $this->requirePostgres();
